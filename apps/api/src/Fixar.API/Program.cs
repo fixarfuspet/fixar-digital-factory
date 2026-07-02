@@ -28,7 +28,7 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        await app.InitialiseDatabaseAsync();
+        // await app.InitialiseDatabaseAsync();
         app.UseSwaggerDocumentation();
     }
 
