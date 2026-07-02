@@ -1,0 +1,32 @@
+## .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+[Pp]ublish/
+
+## Rider / VS / VS Code
+.vs/
+.vscode/
+.idea/
+*.swp
+
+## Secrets / environment
+.env
+.env.*
+!.env.example
+*.pfx
+
+## Logs
+*.log
+logs/
+
+## EF Core
+**/Migrations/*.Designer.cs.orig
