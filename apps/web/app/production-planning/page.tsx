@@ -1,39 +1,73 @@
-const sampleAssignments = [
-  {
-    station: 1,
-    status: "Üretimde",
-    customer: "Icemen",
-    product: "10900 Memory Foam",
-    mold: "ICE 39-45",
-    operator: "Mahmut",
-    produced: 1240,
-  },
-  {
-    station: 2,
-    status: "Üretimde",
-    customer: "Dogo",
-    product: "Comfy Light",
-    mold: "CL 40-41",
-    operator: "Erdem",
-    produced: 860,
-  },
-];
+"use client";
+
+import { useEffect, useState } from "react";
+type Station = {
+  station: number;
+  status: string;
+  customer: string;
+  product: string;
+  mold: string;
+  operator: string;
+  produced: number;
+};
+
+const emptyStations: Station[] = Array.from({ length: 24 }, (_, i) => ({
+  station: i + 1,
+  status: "Boş",
+  customer: "-",
+  product: "-",
+  mold: "-",
+  operator: "-",
+  produced: 0,
+}));
 
 export default function ProductionPlanningPage() {
-  const stations = Array.from({ length: 24 }, (_, i) => {
-    const stationNumber = i + 1;
-    const assigned = sampleAssignments.find((x) => x.station === stationNumber);
 
-    return {
-      station: stationNumber,
-      status: assigned?.status ?? "Boş",
-      customer: assigned?.customer ?? "-",
-      product: assigned?.product ?? "-",
-      mold: assigned?.mold ?? "-",
-      operator: assigned?.operator ?? "-",
-      produced: assigned?.produced ?? 0,
-    };
-  });
+  const [stations, setStations] = useState<Station>([] as any);
+
+  useEffect(() => {
+    loadStations();
+  }, []);
+
+  async function loadStations() {
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/stationassignments/active"
+      );
+
+      if (!response.ok) {
+        setStations(emptyStations);
+        return;
+      }
+
+      const data = await response.json();
+
+      const list = [...emptyStations];
+
+      data.forEach((x: any) => {
+        const index = x.stationNumberSnapshot - 1;
+
+        if (index >= 0 && index < list.length) {
+          list[index] = {
+            station: x.stationNumberSnapshot,
+            status: x.status,
+            customer: x.customerName,
+            product: x.productName,
+            mold: x.moldName,
+            operator: x.operatorName ?? "-",
+            produced: x.producedPairs,
+          };
+        }
+      });
+
+      setStations(list);
+    } catch {
+      setStations(emptyStations);
+    }
+  }
+  
+
+
 
   return (
     <main className="min-h-screen bg-[#05070A] text-white">
