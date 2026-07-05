@@ -42,6 +42,7 @@ public DbSet<CuttingRecord> CuttingRecords => Set<CuttingRecord>();
 public DbSet<ProductionBox> ProductionBoxes => Set<ProductionBox>();
 
 public DbSet<ProductionBoxEvent> ProductionBoxEvents => Set<ProductionBoxEvent>();
+public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);

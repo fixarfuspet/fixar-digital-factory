@@ -1,4 +1,5 @@
 using Fixar.Domain.Common;
+using System.Collections.Generic;
 
 namespace Fixar.Domain.Entities;
 
@@ -21,4 +22,6 @@ public class Order : BaseAuditableEntity
     public DateTime? DueDate { get; set; }
 
     public string Status { get; set; } = "Aktif";
+    public ICollection<OrderItem> Items { get; set; }
+    = new List<OrderItem>();
 }
