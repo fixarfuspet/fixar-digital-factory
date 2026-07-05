@@ -3,6 +3,7 @@ using System;
 using Fixar.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fixar.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260705164350_UpdateInjectionStation")]
+    partial class UpdateInjectionStation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -215,6 +218,12 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CurrentMoldId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CurrentOrderId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -224,9 +233,15 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("LastModifiedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("LastMoldChangeAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProductionStartedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("StationNumber")
                         .HasColumnType("integer");
@@ -236,6 +251,10 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CurrentMoldId");
+
+                    b.HasIndex("CurrentOrderId");
 
                     b.ToTable("InjectionStations");
                 });
@@ -373,123 +392,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Products");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.ProductionBox", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("BoxCode")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CurrentLocation")
-                        .HasColumnType("text");
-
-                    b.Property<string>("CurrentStatus")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CustomerName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FabricColor")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("FilledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LastModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("MoldId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OperatorName")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("OrderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ProductionType")
-                        .HasColumnType("text");
-
-                    b.Property<int>("QuantityPairs")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MoldId");
-
-                    b.HasIndex("OrderId");
-
-                    b.HasIndex("ProductId");
-
-                    b.ToTable("ProductionBoxes");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.ProductionBoxEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("EventTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("FromLocation")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LastModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text");
-
-                    b.Property<string>("OperatorName")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ProductionBoxId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("QuantityPairs")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ToLocation")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductionBoxId");
-
-                    b.ToTable("ProductionBoxEvents");
                 });
 
             modelBuilder.Entity("Fixar.Domain.Entities.ProductionRecord", b =>
@@ -816,6 +718,21 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("Fixar.Domain.Entities.InjectionStation", b =>
+                {
+                    b.HasOne("Fixar.Domain.Entities.Mold", "CurrentMold")
+                        .WithMany()
+                        .HasForeignKey("CurrentMoldId");
+
+                    b.HasOne("Fixar.Domain.Entities.Order", "CurrentOrder")
+                        .WithMany()
+                        .HasForeignKey("CurrentOrderId");
+
+                    b.Navigation("CurrentMold");
+
+                    b.Navigation("CurrentOrder");
+                });
+
             modelBuilder.Entity("Fixar.Domain.Entities.Order", b =>
                 {
                     b.HasOne("Fixar.Domain.Entities.Customer", "Customer")
@@ -833,38 +750,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.ProductionBox", b =>
-                {
-                    b.HasOne("Fixar.Domain.Entities.Mold", "Mold")
-                        .WithMany()
-                        .HasForeignKey("MoldId");
-
-                    b.HasOne("Fixar.Domain.Entities.Order", "Order")
-                        .WithMany()
-                        .HasForeignKey("OrderId");
-
-                    b.HasOne("Fixar.Domain.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId");
-
-                    b.Navigation("Mold");
-
-                    b.Navigation("Order");
-
-                    b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.ProductionBoxEvent", b =>
-                {
-                    b.HasOne("Fixar.Domain.Entities.ProductionBox", "ProductionBox")
-                        .WithMany("Events")
-                        .HasForeignKey("ProductionBoxId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ProductionBox");
                 });
 
             modelBuilder.Entity("Fixar.Domain.Entities.ProductionRecord", b =>
@@ -977,11 +862,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Fixar.Domain.Entities.Product", b =>
                 {
                     b.Navigation("Orders");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.ProductionBox", b =>
-                {
-                    b.Navigation("Events");
                 });
 #pragma warning restore 612, 618
         }

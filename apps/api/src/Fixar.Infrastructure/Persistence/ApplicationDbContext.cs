@@ -21,12 +21,27 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
-    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
 public DbSet<Customer> Customers => Set<Customer>();
 
 public DbSet<Product> Products => Set<Product>();
 
 public DbSet<Order> Orders => Set<Order>();
+
+public DbSet<Mold> Molds => Set<Mold>();
+
+public DbSet<InjectionStation> InjectionStations => Set<InjectionStation>();
+
+public DbSet<ProductionRecord> ProductionRecords => Set<ProductionRecord>();
+
+public DbSet<CuttingMachine> CuttingMachines => Set<CuttingMachine>();
+
+public DbSet<CuttingRecord> CuttingRecords => Set<CuttingRecord>();
+
+public DbSet<ProductionBox> ProductionBoxes => Set<ProductionBox>();
+
+public DbSet<ProductionBoxEvent> ProductionBoxEvents => Set<ProductionBoxEvent>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
