@@ -63,16 +63,17 @@ public class ProductionPlanningLookupsController : ControllerBase
                 x.Quantity,
                 RemainingQuantity = x.Quantity - x.ProducedQuantity,
                 Items = x.Items.Select(i => new
-                {
-                    i.Id,
-                    ProductName = i.Product != null ? i.Product.Name : x.Product.Name,
-                    MoldName = i.Mold != null ? i.Mold.Name : "-",
-                    i.QuantityPairs,
-                    i.ProducedPairs,
-                    RemainingPairs = i.QuantityPairs - i.ProducedPairs,
-                    i.ProductionType,
-                    i.FabricColor
-                })
+{
+    i.Id,
+    MoldId = i.MoldId,
+    ProductName = i.Product != null ? i.Product.Name : x.Product.Name,
+    MoldName = i.Mold != null ? i.Mold.Name : "-",
+    i.QuantityPairs,
+    i.ProducedPairs,
+    RemainingPairs = i.QuantityPairs - i.ProducedPairs,
+    i.ProductionType,
+    i.FabricColor
+})
             })
             .ToListAsync(cancellationToken);
 
