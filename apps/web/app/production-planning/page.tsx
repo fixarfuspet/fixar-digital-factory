@@ -41,12 +41,24 @@ export default function ProductionPlanningPage() {
   const [savingTurn, setSavingTurn] = useState(false);
   const [turnConfirmOpen, setTurnConfirmOpen] = useState(false);
   const [turnSuccessOpen, setTurnSuccessOpen] = useState(false);
+  const [panelFlash, setPanelFlash] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [lastTurn, setLastTurn] = useState<LastTurn | null>(null);
   const [recentTurns, setRecentTurns] = useState<LastTurn[]>([]);
 
   useEffect(() => {
     loadStations();
   }, []);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setCooldown((x) => Math.max(0, x - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [cooldown]);
 
   async function loadStations() {
     try {
@@ -91,11 +103,16 @@ export default function ProductionPlanningPage() {
       return;
     }
 
+    if (cooldown > 0) {
+      alert("Çift kayıt olmaması için " + cooldown + " saniye bekle.");
+      return;
+    }
+
     setTurnConfirmOpen(true);
   }
 
   async function addOneTurn() {
-    if (savingTurn) return;
+    if (savingTurn || cooldown > 0) return;
 
     setSavingTurn(true);
 
@@ -130,14 +147,14 @@ export default function ProductionPlanningPage() {
     setRecentTurns((old) => [record, ...old].slice(0, 5));
     setTurnConfirmOpen(false);
     setTurnSuccessOpen(true);
+    setPanelFlash(true);
+    setCooldown(40);
 
     await loadStations();
 
+    setTimeout(() => setPanelFlash(false), 900);
+    setTimeout(() => setTurnSuccessOpen(false), 1600);
     setSavingTurn(false);
-
-    setTimeout(() => {
-      setTurnSuccessOpen(false);
-    }, 1800);
   }
 
   function handleStationClick(item: Station) {
@@ -147,6 +164,8 @@ export default function ProductionPlanningPage() {
       setSelectedStation(item.station);
     }
   }
+
+  const turnButtonDisabled = savingTurn || cooldown > 0;
 
   return (
     <main className="min-h-screen bg-[#05070A] text-white">
@@ -162,7 +181,14 @@ export default function ProductionPlanningPage() {
             </p>
           </header>
 
-          <section className="rounded-3xl border border-emerald-400/30 bg-emerald-400/10 p-6 shadow-2xl">
+          <section
+            className={
+              "rounded-3xl border p-6 shadow-2xl transition-all duration-500 " +
+              (panelFlash
+                ? "border-emerald-300 bg-emerald-400/25 shadow-emerald-500/40"
+                : "border-emerald-400/30 bg-emerald-400/10")
+            }
+          >
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
                 <p className="text-sm font-bold text-emerald-300">
@@ -190,25 +216,51 @@ export default function ProductionPlanningPage() {
 
                   <button
                     onClick={handleTurnClick}
-                    disabled={savingTurn}
-                    className="rounded-2xl bg-emerald-500 px-6 py-5 text-xl font-black text-black hover:bg-emerald-400 disabled:opacity-50"
+                    disabled={turnButtonDisabled}
+                    className={
+                      "rounded-2xl px-6 py-6 text-2xl font-black text-black transition-all " +
+                      (turnButtonDisabled
+                        ? "cursor-not-allowed bg-blue-400 opacity-80"
+                        : "bg-emerald-500 hover:scale-[1.02] hover:bg-emerald-400")
+                    }
                   >
-                    {savingTurn ? "TUR EKLENİYOR..." : "TUR EKLE"}
+                    {savingTurn
+                      ? "TUR EKLENİYOR..."
+                      : cooldown > 0
+                      ? "BEKLE " + cooldown + " SN"
+                      : "TUR EKLE"}
                   </button>
                 </div>
+
+                {cooldown > 0 && (
+                  <div className="mt-4 rounded-2xl border border-blue-400/30 bg-blue-400/10 p-4 text-sm font-bold text-blue-200">
+                    Çift kayıt olmaması için Tur Ekle butonu {cooldown} saniye kilitli.
+                  </div>
+                )}
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-5">
-                <p className="text-sm font-bold text-emerald-300">Son Tur</p>
+              <div
+                className={
+                  "rounded-2xl border p-5 transition-all duration-500 " +
+                  (panelFlash
+                    ? "border-emerald-300 bg-emerald-400/20"
+                    : "border-white/10 bg-black/25")
+                }
+              >
+                <p className="text-sm font-bold text-emerald-300">✓ Son Tur</p>
 
                 {lastTurn ? (
                   <div className="mt-3">
-                    <p className="text-3xl font-black text-white">{lastTurn.time}</p>
-                    <p className="mt-2 text-sm text-zinc-300">
-                      {lastTurn.turnCount} tur · {lastTurn.activeStationCount} istasyon · +
-                      {lastTurn.totalAddedPairs} çift
+                    <p className="text-4xl font-black text-white">{lastTurn.time}</p>
+                    <p className="mt-3 text-sm text-zinc-300">
+                      {lastTurn.turnCount} tur · {lastTurn.activeStationCount} istasyon
                     </p>
-                    <p className="mt-2 text-sm font-bold text-emerald-300">✓ İşlendi</p>
+                    <p className="mt-2 text-2xl font-black text-emerald-300">
+                      +{lastTurn.totalAddedPairs} çift
+                    </p>
+                    <p className="mt-2 text-sm font-bold text-emerald-300">
+                      Az önce işlendi
+                    </p>
                   </div>
                 ) : (
                   <p className="mt-3 text-sm text-zinc-400">Henüz tur eklenmedi.</p>
@@ -216,7 +268,7 @@ export default function ProductionPlanningPage() {
 
                 {recentTurns.length > 0 && (
                   <div className="mt-5 space-y-2">
-                    <p className="text-xs font-bold text-zinc-400">Son Kayıtlar</p>
+                    <p className="text-xs font-bold text-zinc-400">Son 5 Tur</p>
                     {recentTurns.map((x, i) => (
                       <div
                         key={i}
@@ -277,6 +329,7 @@ export default function ProductionPlanningPage() {
 
             <p className="mt-5 text-sm text-zinc-400">
               Bu işlem aktif üretimdeki tüm istasyonlara 1 çift üretim ekler.
+              İşlemden sonra buton 40 saniye kilitlenir.
             </p>
 
             <div className="mt-7 flex justify-end gap-3">
@@ -303,12 +356,12 @@ export default function ProductionPlanningPage() {
       {turnSuccessOpen && lastTurn && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl border border-emerald-400/30 bg-[#0F1115] p-8 text-center shadow-2xl">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-4xl font-black text-black">
+            <div className="mx-auto flex h-24 w-24 animate-pulse items-center justify-center rounded-full bg-emerald-500 text-5xl font-black text-black">
               ✓
             </div>
-            <h2 className="mt-5 text-3xl font-black">Tur İşlendi</h2>
-            <p className="mt-3 text-lg text-emerald-300">
-              +{lastTurn.totalAddedPairs} çift eklendi
+            <h2 className="mt-5 text-4xl font-black">TUR EKLENDİ</h2>
+            <p className="mt-3 text-xl font-bold text-emerald-300">
+              +{lastTurn.totalAddedPairs} çift işlendi
             </p>
           </div>
         </div>
@@ -352,7 +405,7 @@ function StationCard({ item, onClick }: { item: Station; onClick: () => void }) 
   return (
     <div
       className={
-        "rounded-2xl border p-5 shadow-lg " +
+        "rounded-2xl border p-5 shadow-lg transition-all " +
         (isActive
           ? "border-emerald-400/30 bg-emerald-400/15"
           : isPaused
