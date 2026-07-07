@@ -44,6 +44,9 @@ public DbSet<ProductionBox> ProductionBoxes => Set<ProductionBox>();
 public DbSet<ProductionBoxEvent> ProductionBoxEvents => Set<ProductionBoxEvent>();
 public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 public DbSet<StationAssignment> StationAssignments => Set<StationAssignment>();
+public DbSet<StockItem> StockItems => Set<StockItem>();
+
+public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
