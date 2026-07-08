@@ -173,7 +173,7 @@ export default function StocksPage() {
     { title: "Stok Kartı", value: stocks.length.toLocaleString("tr-TR"), note: `${activeStocks} aktif · ${passiveStocks} pasif`, tone: "emerald" as DashboardTone },
     { title: "Kritik Stok", value: criticalStocks.length.toLocaleString("tr-TR"), note: "Minimum seviyenin altında", tone: "red" as DashboardTone },
     { title: "Toplam Miktar", value: formatNumber(totalQuantity), note: "Tüm birimler toplamı", tone: "cyan" as DashboardTone },
-    { title: "Stok Değeri", value: formatCurrency(inventoryValue), note: "Son alış fiyatına göre", tone: "amber" as DashboardTone },
+    { title: "Stok Değeri", value: formatCurrency(inventoryValue), note: "Son alış fiyatına göre ₺", tone: "amber" as DashboardTone },
     { title: "Kategori", value: categoriesCount.toLocaleString("tr-TR"), note: "Tanımlı stok grubu", tone: "blue" as DashboardTone },
     { title: "Depo / Tedarikçi", value: `${warehouseCount} / ${supplierCount}`, note: "Depo ve tedarikçi görünümü", tone: "zinc" as DashboardTone },
   ];
@@ -1080,7 +1080,7 @@ function formatCurrency(value: number) {
   return value.toLocaleString("tr-TR", {
     maximumFractionDigits: 0,
     style: "currency",
-    currency: "EUR",
+    currency: "TRY",
   });
 }
 
@@ -1089,7 +1089,7 @@ function formatPrice(value: number | null | undefined) {
   return value.toLocaleString("tr-TR", {
     maximumFractionDigits: 2,
     style: "currency",
-    currency: "EUR",
+    currency: "TRY",
   });
 }
 
