@@ -645,21 +645,83 @@ function StockFormModal({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function unavailableSave() {
-    alert(
-      "Bu ekran hazır, ancak verilen mevcut API listesinde stok kartı oluşturma, düzenleme veya silme endpointi yok.\n\n" +
-        "Backend'e dokunmadan yalnızca GET /stocks ve POST /stocks/movement kullanılabilir. Bu yüzden stok kartı kaydı gönderilmedi."
-    );
+  async function saveStockCard() {
+  if (initialStock) {
+    alert("Düzenleme için PUT endpointi henüz bağlı değil. Şimdilik sadece yeni stok kartı oluşturma aktif.");
+    return;
   }
+
+  if (!form.name.trim()) {
+    alert("Stok adı zorunludur.");
+    return;
+  }
+
+  const response = await fetch(API + "/stocks", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: form.name.trim(),
+      code: form.code.trim() || null,
+      category: form.category.trim() || "Genel",
+      unit: form.unit.trim() || "kg",
+      currentQuantity: Number(form.currentQuantity || 0),
+      criticalQuantity: Number(form.criticalQuantity || 0),
+      minimumQuantity: form.minimumQuantity ? Number(form.minimumQuantity) : null,
+      maximumQuantity: form.maximumQuantity ? Number(form.maximumQuantity) : null,
+      lastPurchasePrice: form.lastPurchasePrice ? Number(form.lastPurchasePrice) : null,
+      currency: "TRY",
+      vatRate: null,
+      supplierName: form.supplierName.trim() || null,
+      supplierCode: null,
+      leadTimeDays: null,
+      warehouseName: form.warehouseName.trim() || null,
+      locationCode: form.shelfCode.trim() || null,
+      lotNumber: null,
+      expiryDate: null,
+      recipeUsageAmount: null,
+      wasteRate: null,
+      safetyInfo: null,
+      note: form.note.trim() || null,
+    }),
+  });
+
+  const resultText = await response.text();
+
+  if (!response.ok) {
+    alert("Stok kartı oluşturulamadı: " + resultText);
+    return;
+  }
+
+  alert("Stok kartı oluşturuldu.");
+  onClose();
+  window.location.reload();
+}
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#0F1115] p-5 shadow-2xl sm:p-8">
-        <ModalHeader title={title} subtitle={subtitle} onClose={onClose} />
+        <ModalHeader
+          title={title}
+          subtitle={subtitle}
+          onClose={onClose}
+        />
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <StockFormFields form={form} updateForm={updateForm} />
+          <StockFormFields
+            form={form}
+            updateForm={updateForm}
+          />
         </div>
-        <ModalActions onClose={onClose} onSubmit={unavailableSave} submitLabel={submitLabel} submitTone="success" />
+
+        <ModalActions
+          onClose={onClose}
+          onSubmit={saveStockCard}
+          submitLabel={submitLabel}
+          submitTone="success"
+        />
       </div>
     </div>
   );
