@@ -36,8 +36,21 @@ public class StocksController : ControllerBase
                 x.Unit,
                 x.CurrentQuantity,
                 x.CriticalQuantity,
+                x.MinimumQuantity,
+                x.MaximumQuantity,
                 x.LastPurchasePrice,
+                x.Currency,
+                x.VatRate,
                 x.SupplierName,
+                x.SupplierCode,
+                x.LeadTimeDays,
+                x.WarehouseName,
+                x.LocationCode,
+                x.LotNumber,
+                x.ExpiryDate,
+                x.RecipeUsageAmount,
+                x.WasteRate,
+                x.SafetyInfo,
                 x.Note,
                 x.IsActive,
                 IsCritical = x.CurrentQuantity <= x.CriticalQuantity
@@ -61,8 +74,21 @@ public class StocksController : ControllerBase
             Unit = request.Unit ?? "kg",
             CurrentQuantity = request.CurrentQuantity,
             CriticalQuantity = request.CriticalQuantity,
+            MinimumQuantity = request.MinimumQuantity,
+            MaximumQuantity = request.MaximumQuantity,
             LastPurchasePrice = request.LastPurchasePrice,
+            Currency = request.Currency ?? "EUR",
+            VatRate = request.VatRate,
             SupplierName = request.SupplierName,
+            SupplierCode = request.SupplierCode,
+            LeadTimeDays = request.LeadTimeDays,
+            WarehouseName = request.WarehouseName,
+            LocationCode = request.LocationCode,
+            LotNumber = request.LotNumber,
+            ExpiryDate = request.ExpiryDate,
+            RecipeUsageAmount = request.RecipeUsageAmount,
+            WasteRate = request.WasteRate,
+            SafetyInfo = request.SafetyInfo,
             Note = request.Note,
             IsActive = true
         };
@@ -76,8 +102,7 @@ public class StocksController : ControllerBase
     [HttpPost("movement")]
     public async Task<IActionResult> AddMovement([FromBody] CreateStockMovementRequest request, CancellationToken cancellationToken)
     {
-        var item = await _db.StockItems
-            .FirstOrDefaultAsync(x => x.Id == request.StockItemId, cancellationToken);
+        var item = await _db.StockItems.FirstOrDefaultAsync(x => x.Id == request.StockItemId, cancellationToken);
 
         if (item is null)
             return NotFound(ApiResponse<object>.Fail("Stok kartı bulunamadı.", "STOCK_NOT_FOUND"));
@@ -165,8 +190,21 @@ public record CreateStockItemRequest(
     string? Unit,
     decimal CurrentQuantity,
     decimal CriticalQuantity,
+    decimal? MinimumQuantity,
+    decimal? MaximumQuantity,
     decimal? LastPurchasePrice,
+    string? Currency,
+    decimal? VatRate,
     string? SupplierName,
+    string? SupplierCode,
+    int? LeadTimeDays,
+    string? WarehouseName,
+    string? LocationCode,
+    string? LotNumber,
+    DateTime? ExpiryDate,
+    decimal? RecipeUsageAmount,
+    decimal? WasteRate,
+    string? SafetyInfo,
     string? Note
 );
 

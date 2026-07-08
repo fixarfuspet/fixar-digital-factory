@@ -16,9 +16,35 @@ public class StockItem : BaseAuditableEntity
 
     public decimal CriticalQuantity { get; set; }
 
+    public decimal? MinimumQuantity { get; set; }
+
+    public decimal? MaximumQuantity { get; set; }
+
     public decimal? LastPurchasePrice { get; set; }
 
+    public string Currency { get; set; } = "EUR";
+
+    public decimal? VatRate { get; set; }
+
     public string? SupplierName { get; set; }
+
+    public string? SupplierCode { get; set; }
+
+    public int? LeadTimeDays { get; set; }
+
+    public string? WarehouseName { get; set; }
+
+    public string? LocationCode { get; set; }
+
+    public string? LotNumber { get; set; }
+
+    public DateTime? ExpiryDate { get; set; }
+
+    public decimal? RecipeUsageAmount { get; set; }
+
+    public decimal? WasteRate { get; set; }
+
+    public string? SafetyInfo { get; set; }
 
     public string? Note { get; set; }
 
