@@ -85,14 +85,17 @@ public class PurchasesController : ControllerBase
                 return BadRequest(ApiResponse<object>.Fail("Birim fiyat negatif olamaz.", "INVALID_UNIT_PRICE"));
         }
 
+        var orderDate = ToUtc(request.OrderDate) ?? DateTime.UtcNow;
+        var dueDate = ToUtc(request.DueDate);
+
         var purchase = new PurchaseOrder
         {
             SupplierName = request.SupplierName.Trim(),
             SupplierCode = request.SupplierCode,
             DocumentNo = request.DocumentNo,
             InvoiceNo = request.InvoiceNo,
-            OrderDate = request.OrderDate ?? DateTime.UtcNow,
-            DueDate = request.DueDate,
+            OrderDate = orderDate,
+            DueDate = dueDate,
             PaymentType = paymentType,
             Currency = request.Currency ?? "TRY",
             VatRate = request.VatRate,
@@ -146,6 +149,19 @@ public class PurchasesController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(ToPurchaseResponse(purchase), "Satın alma oluşturuldu."));
+    }
+
+    private static DateTime? ToUtc(DateTime? value)
+    {
+        if (!value.HasValue)
+            return null;
+
+        return value.Value.Kind switch
+        {
+            DateTimeKind.Utc => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
     }
 
     private static object ToPurchaseResponse(PurchaseOrder purchase)
