@@ -85,6 +85,10 @@ export default function PurchasesPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState("Tümü");
+  const [statusFilter, setStatusFilter] = useState("Tümü");
+  const [paymentFilter, setPaymentFilter] = useState("Tümü");
 
   useEffect(() => {
     loadPurchases();
@@ -166,6 +170,29 @@ export default function PurchasesPage() {
   const pendingCount = useMemo(() => purchases.filter(isPendingPurchase).length, [purchases]);
   const totalAmount = useMemo(() => purchases.reduce((sum, item) => sum + safeNumber(item.grandTotal), 0), [purchases]);
   const primaryCurrency = purchases.find((item) => item.currency)?.currency || "TRY";
+  const supplierOptions = useMemo(() => {
+    const values = purchases.map((item) => item.supplierName).filter(Boolean).map(String);
+    return ["Tümü", ...Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, "tr-TR"))];
+  }, [purchases]);
+  const filteredPurchases = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase("tr-TR");
+
+    return purchases.filter((purchase) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        [purchase.documentNo, purchase.invoiceNo, purchase.supplierName]
+          .filter(Boolean)
+          .some((value) => String(value).toLocaleLowerCase("tr-TR").includes(normalizedSearch));
+      const matchesSupplier = supplierFilter === "Tümü" || purchase.supplierName === supplierFilter;
+      const matchesStatus =
+        statusFilter === "Tümü" ||
+        (statusFilter === "Oluşturuldu" && !isPurchaseCancelled(purchase)) ||
+        (statusFilter === "İptal Edildi" && isPurchaseCancelled(purchase));
+      const matchesPayment = paymentFilter === "Tümü" || (purchase.paymentType || "") === paymentFilter;
+
+      return matchesSearch && matchesSupplier && matchesStatus && matchesPayment;
+    });
+  }, [paymentFilter, purchases, search, statusFilter, supplierFilter]);
 
   const dashboardCards = [
     {
@@ -244,12 +271,49 @@ export default function PurchasesPage() {
               <div>
                 <h2 className="text-2xl font-black">Satın Alma Kayıtları</h2>
                 <p className="mt-1 text-sm text-zinc-400">
-                  {purchases.length.toLocaleString("tr-TR")} kayıt listeleniyor.
+                  {filteredPurchases.length.toLocaleString("tr-TR")} kayıt listeleniyor.
                 </p>
               </div>
               <span className="w-fit rounded-full bg-white/[0.08] px-3 py-1 text-xs font-bold text-zinc-300">
                 Canlı API verisi
               </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Field label="Arama">
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className={CONTROL_CLASS}
+                  placeholder="Belge no, fatura no, tedarikçi"
+                />
+              </Field>
+              <Field label="Tedarikçi">
+                <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className={CONTROL_CLASS}>
+                  {supplierOptions.map((supplier) => (
+                    <option key={supplier} value={supplier}>
+                      {supplier}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Durum">
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={CONTROL_CLASS}>
+                  <option value="Tümü">Tümü</option>
+                  <option value="Oluşturuldu">Oluşturuldu</option>
+                  <option value="İptal Edildi">İptal Edildi</option>
+                </select>
+              </Field>
+              <Field label="Ödeme Şekli">
+                <select value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)} className={CONTROL_CLASS}>
+                  <option value="Tümü">Tümü</option>
+                  <option value="Nakit">Nakit</option>
+                  <option value="Havale">Havale</option>
+                  <option value="Kredi Kartı">Kredi Kartı</option>
+                  <option value="Çek">Çek</option>
+                  <option value="Cari Hesap">Cari Hesap</option>
+                </select>
+              </Field>
             </div>
 
             {loading && <LoadingState />}
@@ -267,7 +331,13 @@ export default function PurchasesPage() {
               </div>
             )}
 
-            {!loading && !error && purchases.length > 0 && (
+            {!loading && !error && purchases.length > 0 && filteredPurchases.length === 0 && (
+              <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-8 text-center text-zinc-300">
+                Filtreye uygun satın alma kaydı bulunamadı.
+              </div>
+            )}
+
+            {!loading && !error && filteredPurchases.length > 0 && (
               <div className="mt-5 overflow-hidden rounded-xl border border-white/10 bg-black/20">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[920px] border-collapse text-left">
@@ -284,7 +354,7 @@ export default function PurchasesPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {purchases.map((purchase) => {
+                      {filteredPurchases.map((purchase) => {
                         const cancelled = isPurchaseCancelled(purchase);
 
                         return (
