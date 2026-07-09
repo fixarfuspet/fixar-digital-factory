@@ -70,6 +70,7 @@ export default function PurchasesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -253,7 +254,7 @@ export default function PurchasesPage() {
                           </TableCell>
                           <TableCell>
                             <button
-                              onClick={() => alert("Detay ekranı yakında eklenecek.")}
+                              onClick={() => setDetailId(purchase.id)}
                               className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-white/[0.1]"
                             >
                               Detay
@@ -271,6 +272,7 @@ export default function PurchasesPage() {
       </div>
 
       <PurchaseFormModal open={formOpen} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
+      <PurchaseDetailModal purchaseId={detailId} onClose={() => setDetailId(null)} />
     </main>
   );
 }
@@ -640,6 +642,177 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
   );
 }
 
+function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | null; onClose: () => void }) {
+  const [purchase, setPurchase] = useState<PurchaseOrder | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!purchaseId) {
+      setPurchase(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadPurchaseDetail() {
+      setLoading(true);
+      setError(null);
+      setPurchase(null);
+
+      try {
+        const response = await fetch(`${API}/purchases/${purchaseId}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Satın alma detayı alınamadı.");
+        }
+
+        const result: unknown = await response.json();
+        const detail = extractPurchase(result);
+
+        if (!detail) {
+          throw new Error("Satın alma detayı beklenen formatta gelmedi.");
+        }
+
+        setPurchase(detail);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Satın alma detayı alınırken beklenmeyen bir hata oluştu.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPurchaseDetail();
+
+    return () => controller.abort();
+  }, [purchaseId]);
+
+  if (!purchaseId) return null;
+
+  const currency = purchase?.currency || "TRY";
+  const lines = purchase?.lines ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-white/10 bg-[#0F1115] p-5 shadow-2xl sm:p-8">
+        <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-black tracking-[0.28em] text-emerald-300">FIXAR OS</p>
+            <h2 className="mt-2 text-3xl font-black">Satın Alma Detayı</h2>
+            <p className="mt-1 text-sm text-zinc-400">{purchase?.documentNo || purchase?.invoiceNo || "Kayıt detayı yükleniyor"}</p>
+          </div>
+          <button onClick={onClose} className="w-fit rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-white transition hover:bg-zinc-700">
+            Kapat
+          </button>
+        </div>
+
+        {loading && (
+          <div className="rounded-xl border border-white/10 bg-black/20 p-5">
+            <div className="space-y-3">
+              <div className="h-5 w-56 animate-pulse rounded bg-white/10" />
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="h-20 animate-pulse rounded-xl bg-white/10" />
+                <div className="h-20 animate-pulse rounded-xl bg-white/10" />
+                <div className="h-20 animate-pulse rounded-xl bg-white/10" />
+              </div>
+              <div className="h-40 animate-pulse rounded-xl bg-white/10" />
+            </div>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-5 text-sm text-red-100">
+            <p className="font-black">Detay yüklenemedi.</p>
+            <p className="mt-1 text-red-200">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && purchase && (
+          <>
+            <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <DetailInfo label="Tedarikçi" value={purchase.supplierName || "-"} />
+              <DetailInfo label="Belge No" value={purchase.documentNo || "-"} />
+              <DetailInfo label="Fatura No" value={purchase.invoiceNo || "-"} />
+              <DetailInfo label="Sipariş Tarihi" value={formatDate(purchase.orderDate)} />
+              <DetailInfo label="Vade Tarihi" value={formatDate(purchase.dueDate)} />
+              <DetailInfo label="Ödeme Şekli" value={purchase.paymentType || "-"} />
+              <DetailInfo label="Para Birimi" value={currency} />
+              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                <p className="text-xs text-zinc-500">Durum</p>
+                <div className="mt-2">
+                  <StatusBadge status={purchase.status} />
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs text-zinc-500">Not</p>
+              <p className="mt-2 text-sm text-zinc-300">{purchase.note || "-"}</p>
+            </section>
+
+            <section className="mt-7 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="text-xl font-black">Ürün Satırları</h3>
+                  <p className="mt-1 text-sm text-zinc-400">{lines.length.toLocaleString("tr-TR")} satır listeleniyor.</p>
+                </div>
+              </div>
+
+              {lines.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-5 text-sm text-zinc-400">Bu satın alma kaydında ürün satırı yok.</div>
+              ) : (
+                <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] border-collapse text-left">
+                      <thead className="bg-white/[0.06] text-xs uppercase tracking-[0.16em] text-zinc-400">
+                        <tr>
+                          <TableHead>Stok adı</TableHead>
+                          <TableHead>Miktar</TableHead>
+                          <TableHead>Birim</TableHead>
+                          <TableHead>Birim fiyat</TableHead>
+                          <TableHead>Satır toplamı</TableHead>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {lines.map((line, index) => (
+                          <tr key={line.id ?? `${line.stockItemId}-${index}`} className="transition hover:bg-white/[0.04]">
+                            <TableCell>
+                              <span className="font-black text-white">{line.stockName || "-"}</span>
+                            </TableCell>
+                            <TableCell>{formatNumber(safeNumber(line.quantity))}</TableCell>
+                            <TableCell>{line.unit || "-"}</TableCell>
+                            <TableCell>{formatMoney(safeNumber(line.unitPrice), currency)}</TableCell>
+                            <TableCell>
+                              <span className="font-black text-emerald-200">{formatMoney(safeNumber(line.lineTotal), currency)}</span>
+                            </TableCell>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className="mt-6 grid grid-cols-1 gap-3 sm:ml-auto sm:max-w-md">
+              <SummaryRow label="Ara Toplam" value={formatMoney(safeNumber(purchase.subTotal), currency)} />
+              <SummaryRow label="KDV Toplam" value={formatMoney(safeNumber(purchase.vatTotal), currency)} />
+              <SummaryRow label="Genel Toplam" value={formatMoney(safeNumber(purchase.grandTotal), currency)} strong />
+            </section>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DashboardCard({ title, value, note, tone }: { title: string; value: string; note: string; tone: DashboardTone }) {
   const color =
     tone === "red"
@@ -673,6 +846,15 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
     <div className={`flex items-center justify-between rounded-xl border border-white/10 bg-black/20 p-4 ${strong ? "text-emerald-100" : "text-zinc-300"}`}>
       <span className="text-sm font-bold">{label}</span>
       <span className={strong ? "text-xl font-black" : "text-base font-black"}>{value}</span>
+    </div>
+  );
+}
+
+function DetailInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+      <p className="text-xs text-zinc-500">{label}</p>
+      <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
     </div>
   );
 }
@@ -723,6 +905,18 @@ function extractPurchases(result: unknown): PurchaseOrder[] {
   return [];
 }
 
+function extractPurchase(result: unknown): PurchaseOrder | null {
+  if (isPurchaseOrder(result)) {
+    return result;
+  }
+
+  if (isRecord(result) && isPurchaseOrder(result.data)) {
+    return result.data;
+  }
+
+  return null;
+}
+
 function extractStocks(result: unknown): StockItem[] {
   if (Array.isArray(result)) {
     return result.filter(isStockItem);
@@ -765,6 +959,10 @@ function isPendingPurchase(item: PurchaseOrder) {
 
 function safeNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function formatNumber(value: number) {
+  return safeNumber(value).toLocaleString("tr-TR");
 }
 
 function createEmptyPurchaseForm(): PurchaseFormState {
