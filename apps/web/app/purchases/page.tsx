@@ -81,7 +81,9 @@ export default function PurchasesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [formPurchase, setFormPurchase] = useState<PurchaseOrder | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,10 +111,55 @@ export default function PurchasesPage() {
     }
   }
 
-  function handleSaved() {
+  function handleSaved(message: string) {
     setFormOpen(false);
-    setSuccessMessage("Satın alma kaydı oluşturuldu.");
+    setFormPurchase(null);
+    setSuccessMessage(message);
     loadPurchases();
+  }
+
+  function openCreateForm() {
+    setSuccessMessage(null);
+    setFormPurchase(null);
+    setFormOpen(true);
+  }
+
+  function openEditForm(purchase: PurchaseOrder) {
+    if (isPurchaseCancelled(purchase)) return;
+
+    setSuccessMessage(null);
+    setFormPurchase(purchase);
+    setFormOpen(true);
+  }
+
+  async function cancelPurchase(purchase: PurchaseOrder) {
+    if (cancelingId || isPurchaseCancelled(purchase)) return;
+
+    const ok = confirm(`${purchase.documentNo || purchase.invoiceNo || purchase.supplierName || "Satın alma"} iptal edilecek.\n\nOnaylıyor musunuz?`);
+
+    if (!ok) return;
+
+    setCancelingId(purchase.id);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`${API}/purchases/${purchase.id}/cancel`, {
+        method: "POST",
+      });
+      const resultText = await response.text();
+
+      if (!response.ok) {
+        alert("Satın alma iptal edilemedi: " + resultText);
+        return;
+      }
+
+      setSuccessMessage("Satın alma iptal edildi.");
+      loadPurchases();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Satın alma iptal edilirken beklenmeyen bir hata oluştu.");
+    } finally {
+      setCancelingId(null);
+    }
   }
 
   const todayCount = useMemo(() => purchases.filter(isTodayPurchase).length, [purchases]);
@@ -172,10 +219,7 @@ export default function PurchasesPage() {
                 {loading ? "Yenileniyor..." : "Yenile"}
               </button>
               <button
-                onClick={() => {
-                  setSuccessMessage(null);
-                  setFormOpen(true);
-                }}
+                onClick={openCreateForm}
                 className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400"
               >
                 + Yeni Satın Alma
@@ -236,43 +280,63 @@ export default function PurchasesPage() {
                         <TableHead>Para Birimi</TableHead>
                         <TableHead>Toplam</TableHead>
                         <TableHead>Durum</TableHead>
-                        <TableHead>Detay</TableHead>
+                        <TableHead>İşlem</TableHead>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {purchases.map((purchase) => (
-                        <tr key={purchase.id} className="transition hover:bg-white/[0.04]">
-                          <TableCell>{formatDate(purchase.orderDate ?? purchase.createdAt)}</TableCell>
-                          <TableCell>
-                            <div className="font-black text-white">{purchase.documentNo || purchase.invoiceNo || "-"}</div>
-                            {purchase.invoiceNo && purchase.documentNo !== purchase.invoiceNo && (
-                              <div className="mt-1 text-xs text-zinc-500">Fatura: {purchase.invoiceNo}</div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-black text-white">{purchase.supplierName || "-"}</div>
-                            {purchase.supplierCode && <div className="mt-1 text-xs text-zinc-500">{purchase.supplierCode}</div>}
-                          </TableCell>
-                          <TableCell>{purchase.paymentType || "-"}</TableCell>
-                          <TableCell>{purchase.currency || "-"}</TableCell>
-                          <TableCell>
-                            <span className="font-black text-emerald-200">
-                              {formatMoney(safeNumber(purchase.grandTotal), purchase.currency || "TRY")}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={purchase.status} />
-                          </TableCell>
-                          <TableCell>
-                            <button
-                              onClick={() => setDetailId(purchase.id)}
-                              className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-white/[0.1]"
-                            >
-                              Detay
-                            </button>
-                          </TableCell>
-                        </tr>
-                      ))}
+                      {purchases.map((purchase) => {
+                        const cancelled = isPurchaseCancelled(purchase);
+
+                        return (
+                          <tr key={purchase.id} className={`transition hover:bg-white/[0.04] ${cancelled ? "bg-red-500/10" : ""}`}>
+                            <TableCell>{formatDate(purchase.orderDate ?? purchase.createdAt)}</TableCell>
+                            <TableCell>
+                              <div className="font-black text-white">{purchase.documentNo || purchase.invoiceNo || "-"}</div>
+                              {purchase.invoiceNo && purchase.documentNo !== purchase.invoiceNo && (
+                                <div className="mt-1 text-xs text-zinc-500">Fatura: {purchase.invoiceNo}</div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-black text-white">{purchase.supplierName || "-"}</div>
+                              {purchase.supplierCode && <div className="mt-1 text-xs text-zinc-500">{purchase.supplierCode}</div>}
+                            </TableCell>
+                            <TableCell>{purchase.paymentType || "-"}</TableCell>
+                            <TableCell>{purchase.currency || "-"}</TableCell>
+                            <TableCell>
+                              <span className={cancelled ? "font-black text-red-200" : "font-black text-emerald-200"}>
+                                {formatMoney(safeNumber(purchase.grandTotal), purchase.currency || "TRY")}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={purchase.status} />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  onClick={() => setDetailId(purchase.id)}
+                                  className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-white/[0.1]"
+                                >
+                                  Detay
+                                </button>
+                                <button
+                                  onClick={() => openEditForm(purchase)}
+                                  disabled={cancelled}
+                                  className="rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  Düzenle
+                                </button>
+                                <button
+                                  onClick={() => cancelPurchase(purchase)}
+                                  disabled={cancelled || cancelingId === purchase.id}
+                                  className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  {cancelingId === purchase.id ? "İptal..." : "İptal"}
+                                </button>
+                              </div>
+                            </TableCell>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -282,13 +346,31 @@ export default function PurchasesPage() {
         </div>
       </div>
 
-      <PurchaseFormModal open={formOpen} onClose={() => setFormOpen(false)} onSaved={handleSaved} />
+      <PurchaseFormModal
+        open={formOpen}
+        initialPurchase={formPurchase}
+        onClose={() => {
+          setFormOpen(false);
+          setFormPurchase(null);
+        }}
+        onSaved={handleSaved}
+      />
       <PurchaseDetailModal purchaseId={detailId} onClose={() => setDetailId(null)} />
     </main>
   );
 }
 
-function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+function PurchaseFormModal({
+  open,
+  initialPurchase,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  initialPurchase: PurchaseOrder | null;
+  onClose: () => void;
+  onSaved: (message: string) => void;
+}) {
   const [stocks, setStocks] = useState<StockItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stocksLoading, setStocksLoading] = useState(false);
@@ -304,11 +386,11 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
     if (!open) return;
 
     setError(null);
-    setForm(createEmptyPurchaseForm());
-    setLines([createEmptyPurchaseLine()]);
+    setForm(toPurchaseForm(initialPurchase));
+    setLines(toPurchaseFormLines(initialPurchase));
     loadStocks();
     loadSuppliers();
-  }, [open]);
+  }, [open, initialPurchase]);
 
   async function loadStocks() {
     setStocksLoading(true);
@@ -357,6 +439,11 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
   }
 
   function selectSupplier(supplierId: string) {
+    if (supplierId === "__existing__") {
+      setForm((current) => ({ ...current, supplierId }));
+      return;
+    }
+
     const supplier = suppliers.find((item) => item.id === supplierId);
 
     setForm((current) => ({
@@ -435,8 +522,8 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
     setSaving(true);
 
     try {
-      const response = await fetch(API + "/purchases", {
-        method: "POST",
+      const response = await fetch(initialPurchase ? `${API}/purchases/${initialPurchase.id}` : API + "/purchases", {
+        method: initialPurchase ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -453,7 +540,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
           subTotal: totals.subTotal,
           vatTotal: totals.vatTotal,
           grandTotal: totals.grandTotal,
-          status: "Oluşturuldu",
+          status: initialPurchase?.status || "Oluşturuldu",
           note: form.note.trim() || null,
           lines: preparedLines.map((line) => ({
             stockItemId: line.stock!.id,
@@ -473,7 +560,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
         throw new Error(resultText || "Satın alma kaydı oluşturulamadı.");
       }
 
-      onSaved();
+      onSaved(initialPurchase ? "Satın alma güncellendi." : "Satın alma kaydı oluşturuldu.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Satın alma kaydedilirken beklenmeyen bir hata oluştu.");
     } finally {
@@ -489,7 +576,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
         <div className="mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-black tracking-[0.28em] text-emerald-300">FIXAR OS</p>
-            <h2 className="mt-2 text-3xl font-black">Yeni Satın Alma</h2>
+            <h2 className="mt-2 text-3xl font-black">{initialPurchase ? "Satın Alma Düzenle" : "Yeni Satın Alma"}</h2>
             <p className="mt-1 text-sm text-zinc-400">Tedarikçi, belge ve stok satırlarını tek kayıt altında hazırlayın.</p>
           </div>
           <button
@@ -512,9 +599,10 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
               value={form.supplierId}
               onChange={(event) => selectSupplier(event.target.value)}
               className={CONTROL_CLASS}
-              disabled={suppliersLoading || suppliers.length === 0}
+              disabled={suppliersLoading || (suppliers.length === 0 && form.supplierId !== "__existing__")}
             >
               <option value="">{suppliers.length === 0 ? "Önce tedarikçi oluşturun" : "Tedarikçi seç"}</option>
+              {form.supplierId === "__existing__" && <option value="__existing__">{form.supplierName || "Mevcut tedarikçi"}</option>}
               {suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {[supplier.code, supplier.name].filter(Boolean).join(" - ") || supplier.id}
@@ -705,7 +793,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
             disabled={saving || stocksLoading || suppliersLoading}
             className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-black transition hover:bg-emerald-400 disabled:opacity-50"
           >
-            {saving ? "Kaydediliyor..." : "Kaydet"}
+            {saving ? "Kaydediliyor..." : initialPurchase ? "Değişiklikleri Kaydet" : "Kaydet"}
           </button>
         </div>
       </div>
@@ -952,9 +1040,10 @@ function TableCell({ children }: { children: ReactNode }) {
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
-  const label = status || "Oluşturuldu";
-  const isDone = ["Tamamlandı", "Ödendi", "Kapandı"].includes(label);
-  const isProblem = ["İptal", "İptal Edildi"].includes(label);
+  const rawLabel = status || "Oluşturuldu";
+  const label = rawLabel === "Cancelled" ? "İptal edildi" : rawLabel;
+  const isDone = ["Tamamlandı", "Ödendi", "Kapandı"].includes(rawLabel);
+  const isProblem = ["Cancelled", "İptal", "İptal Edildi"].includes(rawLabel);
   const className = isProblem
     ? "bg-red-500/20 text-red-200"
     : isDone
@@ -1040,8 +1129,14 @@ function isTodayPurchase(item: PurchaseOrder) {
 }
 
 function isPendingPurchase(item: PurchaseOrder) {
+  if (isPurchaseCancelled(item)) return false;
+
   const status = (item.status || "Oluşturuldu").toLocaleLowerCase("tr-TR");
   return status.includes("bekleyen") || status.includes("oluşturuldu") || status.includes("açık");
+}
+
+function isPurchaseCancelled(item: PurchaseOrder) {
+  return (item.status || "").toLocaleLowerCase("tr-TR") === "cancelled";
 }
 
 function safeNumber(value: number | null | undefined) {
@@ -1066,6 +1161,22 @@ function createEmptyPurchaseForm(): PurchaseFormState {
   };
 }
 
+function toPurchaseForm(purchase: PurchaseOrder | null): PurchaseFormState {
+  if (!purchase) return createEmptyPurchaseForm();
+
+  return {
+    supplierId: "__existing__",
+    supplierName: purchase.supplierName || "",
+    supplierCode: purchase.supplierCode || "",
+    documentNo: purchase.documentNo || "",
+    invoiceNo: purchase.invoiceNo || "",
+    orderDate: formatDateInputFromValue(purchase.orderDate) || formatDateInput(new Date()),
+    currency: purchase.currency || "TRY",
+    paymentType: fromBackendPaymentType(purchase.paymentType),
+    note: purchase.note || "",
+  };
+}
+
 function createEmptyPurchaseLine(): PurchaseFormLine {
   return {
     key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1075,6 +1186,21 @@ function createEmptyPurchaseLine(): PurchaseFormLine {
     unitPrice: "",
     vatRate: "20",
   };
+}
+
+function toPurchaseFormLines(purchase: PurchaseOrder | null): PurchaseFormLine[] {
+  if (!purchase || !purchase.lines || purchase.lines.length === 0) {
+    return [createEmptyPurchaseLine()];
+  }
+
+  return purchase.lines.map((line) => ({
+    key: line.id || `${line.stockItemId}-${Math.random().toString(36).slice(2)}`,
+    stockItemId: line.stockItemId || "",
+    quantity: line.quantity === null || line.quantity === undefined ? "" : String(line.quantity),
+    unit: line.unit || "",
+    unitPrice: line.unitPrice === null || line.unitPrice === undefined ? "" : String(line.unitPrice),
+    vatRate: purchase.vatRate === null || purchase.vatRate === undefined ? "0" : String(purchase.vatRate),
+  }));
 }
 
 function calculatePurchaseTotals(lines: PurchaseFormLine[]) {
@@ -1105,6 +1231,10 @@ function toBackendPaymentType(paymentType: string) {
   return paymentType === "Vadeli" ? "Cari Hesap" : paymentType;
 }
 
+function fromBackendPaymentType(paymentType: string | null | undefined) {
+  return paymentType === "Cari Hesap" ? "Vadeli" : paymentType || "Nakit";
+}
+
 function formatMoney(value: number, currency: string) {
   try {
     return value.toLocaleString("tr-TR", {
@@ -1123,6 +1253,15 @@ function formatDateInput(value: Date) {
   const day = String(value.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function formatDateInputFromValue(value: string | null | undefined) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return formatDateInput(date);
 }
 
 function formatDate(value: string | null | undefined) {
