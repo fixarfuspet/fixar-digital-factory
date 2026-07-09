@@ -553,15 +553,61 @@ function StockDetailModal({
 }
 
 function MovementHistoryModal({ stock, onClose }: { stock: StockItem | null; onClose: () => void }) {
-  if (!stock) return null;
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const movements = stock.movements ?? stock.movementHistory ?? [];
+  useEffect(() => {
+    if (!stock) {
+      setMovements([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const stockId = stock.id;
+
+    async function loadMovements() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`${API}/stocks/${stockId}/movements`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Hareket geçmişi alınamadı.");
+        }
+
+        const result: unknown = await response.json();
+        setMovements(extractMovements(result));
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setMovements([]);
+        setError(err instanceof Error ? err.message : "Hareket geçmişi alınırken beklenmeyen bir hata oluştu.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadMovements();
+
+    return () => controller.abort();
+  }, [stock]);
+
+  if (!stock) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
       <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#0F1115] p-5 shadow-2xl sm:p-8">
         <ModalHeader title="Hareket Geçmişi" subtitle={`${stock.name} · ${stock.code || "Kod tanımsız"}`} onClose={onClose} />
-        <MovementHistorySection stock={stock} movements={movements} compact={false} />
+        {loading && <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-400">Hareket geçmişi yükleniyor...</div>}
+        {!loading && error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div>}
+        {!loading && !error && <MovementHistorySection stock={stock} movements={movements} compact={false} />}
       </div>
     </div>
   );
@@ -1094,6 +1140,26 @@ function toStockForm(stock: StockItem | null): StockFormState {
     note: stock.note || "",
     isActive: stock.isActive,
   };
+}
+
+function extractMovements(result: unknown): StockMovement[] {
+  if (Array.isArray(result)) {
+    return result.filter(isStockMovement);
+  }
+
+  if (isRecord(result) && Array.isArray(result.data)) {
+    return result.data.filter(isStockMovement);
+  }
+
+  return [];
+}
+
+function isStockMovement(value: unknown): value is StockMovement {
+  return isRecord(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function safeNumber(value: number | null | undefined) {
