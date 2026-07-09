@@ -42,13 +42,24 @@ type StockItem = {
   unit?: string | null;
 };
 
+type Supplier = {
+  id: string;
+  name?: string | null;
+  code?: string | null;
+  defaultCurrency?: string | null;
+  isActive?: boolean | null;
+};
+
 type PurchaseFormState = {
+  supplierId: string;
   supplierName: string;
+  supplierCode: string;
   documentNo: string;
   invoiceNo: string;
   orderDate: string;
   currency: string;
   paymentType: string;
+  note: string;
 };
 
 type PurchaseFormLine = {
@@ -63,7 +74,7 @@ type PurchaseFormLine = {
 const API = "http://localhost:5000/api/v1";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60";
-const PAYMENT_TYPES = ["Nakit", "Havale", "Çek", "Vadeli"];
+const PAYMENT_TYPES = ["Nakit", "Havale", "Kredi Kartı", "Çek", "Vadeli"];
 
 export default function PurchasesPage() {
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
@@ -279,8 +290,11 @@ export default function PurchasesPage() {
 
 function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
   const [stocks, setStocks] = useState<StockItem[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stocksLoading, setStocksLoading] = useState(false);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [stocksError, setStocksError] = useState<string | null>(null);
+  const [suppliersError, setSuppliersError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<PurchaseFormState>(() => createEmptyPurchaseForm());
@@ -293,6 +307,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
     setForm(createEmptyPurchaseForm());
     setLines([createEmptyPurchaseLine()]);
     loadStocks();
+    loadSuppliers();
   }, [open]);
 
   async function loadStocks() {
@@ -316,8 +331,41 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
     }
   }
 
+  async function loadSuppliers() {
+    setSuppliersLoading(true);
+    setSuppliersError(null);
+
+    try {
+      const response = await fetch(API + "/suppliers");
+
+      if (!response.ok) {
+        throw new Error("Tedarikçi listesi alınamadı.");
+      }
+
+      const result: unknown = await response.json();
+      setSuppliers(extractSuppliers(result).filter((supplier) => supplier.isActive !== false));
+    } catch (err) {
+      setSuppliers([]);
+      setSuppliersError(err instanceof Error ? err.message : "Tedarikçi listesi alınırken beklenmeyen bir hata oluştu.");
+    } finally {
+      setSuppliersLoading(false);
+    }
+  }
+
   function updateForm(key: keyof PurchaseFormState, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function selectSupplier(supplierId: string) {
+    const supplier = suppliers.find((item) => item.id === supplierId);
+
+    setForm((current) => ({
+      ...current,
+      supplierId,
+      supplierName: supplier?.name || "",
+      supplierCode: supplier?.code || "",
+      currency: supplier?.defaultCurrency || current.currency,
+    }));
   }
 
   function updateLine(key: string, field: keyof PurchaseFormLine, value: string) {
@@ -350,8 +398,8 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
 
     setError(null);
 
-    if (!form.supplierName.trim()) {
-      setError("Tedarikçi alanı zorunludur.");
+    if (!form.supplierId || !form.supplierName.trim()) {
+      setError("Tedarikçi seçmelisiniz.");
       return;
     }
 
@@ -394,7 +442,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
         },
         body: JSON.stringify({
           supplierName: form.supplierName.trim(),
-          supplierCode: null,
+          supplierCode: form.supplierCode.trim() || null,
           documentNo: form.documentNo.trim() || null,
           invoiceNo: form.invoiceNo.trim() || null,
           orderDate: form.orderDate ? `${form.orderDate}T00:00:00` : null,
@@ -406,7 +454,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
           vatTotal: totals.vatTotal,
           grandTotal: totals.grandTotal,
           status: "Oluşturuldu",
-          note: null,
+          note: form.note.trim() || null,
           lines: preparedLines.map((line) => ({
             stockItemId: line.stock!.id,
             stockName: line.stock!.name || null,
@@ -455,15 +503,24 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
 
         {error && <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{error}</div>}
         {stocksError && <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">{stocksError}</div>}
+        {suppliersError && <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">{suppliersError}</div>}
+        {suppliersLoading && <div className="mb-5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-400">Tedarikçi listesi yükleniyor...</div>}
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="Tedarikçi">
-            <input
-              value={form.supplierName}
-              onChange={(event) => updateForm("supplierName", event.target.value)}
+            <select
+              value={form.supplierId}
+              onChange={(event) => selectSupplier(event.target.value)}
               className={CONTROL_CLASS}
-              placeholder="Tedarikçi adı"
-            />
+              disabled={suppliersLoading || suppliers.length === 0}
+            >
+              <option value="">{suppliers.length === 0 ? "Önce tedarikçi oluşturun" : "Tedarikçi seç"}</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {[supplier.code, supplier.name].filter(Boolean).join(" - ") || supplier.id}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Belge No">
             <input
@@ -505,6 +562,20 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
               ))}
             </select>
           </Field>
+          <label className="md:col-span-2 xl:col-span-3">
+            <p className="mb-2 text-sm font-bold text-zinc-300">Not</p>
+            <textarea
+              value={form.note}
+              onChange={(event) => updateForm("note", event.target.value)}
+              className={`${CONTROL_CLASS} min-h-24`}
+              placeholder="Örn: Cem’in kredi kartı ile ödendi, 3 taksit, provizyon no..."
+            />
+            {form.paymentType === "Kredi Kartı" && (
+              <p className="mt-2 text-xs font-bold text-amber-200">
+                Kredi kartı ile ödeme seçildiğinde kart sahibini ve ödeme bilgisini not alanına yazın.
+              </p>
+            )}
+          </label>
         </section>
 
         <section className="mt-7 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
@@ -631,7 +702,7 @@ function PurchaseFormModal({ open, onClose, onSaved }: { open: boolean; onClose:
           </button>
           <button
             onClick={savePurchase}
-            disabled={saving || stocksLoading}
+            disabled={saving || stocksLoading || suppliersLoading}
             className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-black transition hover:bg-emerald-400 disabled:opacity-50"
           >
             {saving ? "Kaydediliyor..." : "Kaydet"}
@@ -929,11 +1000,27 @@ function extractStocks(result: unknown): StockItem[] {
   return [];
 }
 
+function extractSuppliers(result: unknown): Supplier[] {
+  if (Array.isArray(result)) {
+    return result.filter(isSupplier);
+  }
+
+  if (isRecord(result) && Array.isArray(result.data)) {
+    return result.data.filter(isSupplier);
+  }
+
+  return [];
+}
+
 function isPurchaseOrder(value: unknown): value is PurchaseOrder {
   return isRecord(value) && typeof value.id === "string";
 }
 
 function isStockItem(value: unknown): value is StockItem {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isSupplier(value: unknown): value is Supplier {
   return isRecord(value) && typeof value.id === "string";
 }
 
@@ -967,12 +1054,15 @@ function formatNumber(value: number) {
 
 function createEmptyPurchaseForm(): PurchaseFormState {
   return {
+    supplierId: "",
     supplierName: "",
+    supplierCode: "",
     documentNo: "",
     invoiceNo: "",
     orderDate: formatDateInput(new Date()),
     currency: "TRY",
     paymentType: "Nakit",
+    note: "",
   };
 }
 
