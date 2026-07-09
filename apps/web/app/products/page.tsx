@@ -119,12 +119,12 @@ const TABS: Array<{ id: ProductTab; label: string }> = [
   { id: "cost", label: "6 Maliyet" },
   { id: "notes", label: "7 Açıklamalar" },
 ];
-const RECIPE_MATERIALS = ["Poliol", "İzosiyanat", "Crosskim", "Pigment", "Solvent", "Kalıp Ayırıcı", "Kumaş", "Yapışkan", "DTF", "Koli", "Etiket", "Diğer"];
+const RECIPE_MATERIALS = ["Poliol", "İzosiyanat", "Crosskim", "Pigment", "Solvent", "Kalıp Ayırıcı", "Kumaş", "Yapışkan", "DTF Etiket", "Koli", "Diğer"];
 
 const emptyRecipeLines: RecipeLine[] = RECIPE_MATERIALS.map((material) => ({
   material,
   quantity: "",
-  unit: material === "Koli" || material === "Etiket" ? "Adet" : "gr",
+  unit: material === "Koli" || material === "DTF Etiket" ? "Adet" : "gr",
   unitPrice: "",
 }));
 
@@ -485,9 +485,11 @@ function ProductMasterModal({
     setFormError(null);
   }, [product]);
 
-  const rawMaterialCost = useMemo(() => calculateRecipeTotal(form.recipeLines), [form.recipeLines]);
+  const totalGram = useMemo(() => calculateTotalGram(form.recipeLines), [form.recipeLines]);
+  const rawMaterialCost = useMemo(() => calculateRawMaterialCost(form.recipeLines), [form.recipeLines]);
+  const recipeCost = useMemo(() => calculateRecipeTotal(form.recipeLines), [form.recipeLines]);
   const packagingCost = useMemo(() => calculatePackagingCost(form.recipeLines), [form.recipeLines]);
-  const estimatedPairCost = rawMaterialCost + packagingCost + safeParsedNumber(form.laborCost) + safeParsedNumber(form.electricityCost) + safeParsedNumber(form.overheadCost);
+  const estimatedPairCost = recipeCost + safeParsedNumber(form.laborCost) + safeParsedNumber(form.electricityCost) + safeParsedNumber(form.overheadCost);
 
   function updateField<K extends keyof ProductFormState>(key: K, value: ProductFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -539,10 +541,11 @@ function ProductMasterModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm sm:p-5">
-      <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#080B10] shadow-2xl">
-        <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.04] p-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-4">
+      <div className="flex max-h-[96vh] w-full max-w-[96rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#080B10] shadow-2xl">
+        <div className="space-y-5 border-b border-white/10 bg-white/[0.04] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
             <p className="text-xs font-black tracking-[0.34em] text-emerald-300">PRODUCT MASTER</p>
             <h2 className="mt-2 text-2xl font-black text-white">
               {readonly ? "Ürün Detayı" : isEdit ? "Ürün Master Kartı Düzenle" : "Yeni Ürün Master Kartı"}
@@ -550,10 +553,12 @@ function ProductMasterModal({
             <p className="mt-1 text-sm text-zinc-400">
               Ürün ana verisi, üretim reçetesi, kalite toleransları ve maliyet varsayımlarını tek kartta yönetin.
             </p>
+            </div>
+            <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-black text-white transition hover:bg-white/[0.12]">
+              Kapat
+            </button>
           </div>
-          <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-black text-white transition hover:bg-white/[0.12]">
-            Kapat
-          </button>
+          <ProductSummaryBadges form={form} />
         </div>
 
         <div className="border-b border-white/10 px-5 pt-4">
@@ -562,8 +567,8 @@ function ProductMasterModal({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition ${
-                  activeTab === tab.id ? "bg-emerald-500 text-black" : "border border-white/10 bg-black/30 text-zinc-300 hover:bg-white/[0.08]"
+                className={`whitespace-nowrap rounded-xl px-5 py-3 text-sm font-black transition sm:text-base ${
+                  activeTab === tab.id ? "bg-emerald-500 text-black shadow-lg shadow-emerald-950/40" : "border border-white/10 bg-black/30 text-zinc-300 hover:bg-white/[0.08]"
                 }`}
               >
                 {tab.label}
@@ -589,7 +594,17 @@ function ProductMasterModal({
 
           {activeTab === "general" && <GeneralTab form={form} readonly={readonly} updateField={updateField} />}
           {activeTab === "production" && <ProductionTab form={form} readonly={readonly} updateField={updateField} />}
-          {activeTab === "recipe" && <RecipeTab form={form} readonly={readonly} rawMaterialCost={rawMaterialCost} updateRecipeLine={updateRecipeLine} updateField={updateField} />}
+          {activeTab === "recipe" && (
+            <RecipeTab
+              form={form}
+              readonly={readonly}
+              totalGram={totalGram}
+              rawMaterialCost={rawMaterialCost}
+              recipeCost={recipeCost}
+              updateRecipeLine={updateRecipeLine}
+              updateField={updateField}
+            />
+          )}
           {activeTab === "packaging" && <PackagingTab form={form} readonly={readonly} updateField={updateField} />}
           {activeTab === "quality" && <QualityTab form={form} readonly={readonly} updateField={updateField} />}
           {activeTab === "cost" && <CostTab form={form} readonly={readonly} rawMaterialCost={rawMaterialCost} packagingCost={packagingCost} estimatedPairCost={estimatedPairCost} updateField={updateField} />}
@@ -615,6 +630,36 @@ function ProductMasterModal({
   );
 }
 
+function ProductSummaryBadges({ form }: { form: ProductFormState }) {
+  const badges = [
+    { label: "Ürün Kodu", value: form.code || "-" },
+    { label: "Ürün Adı", value: form.name || "-" },
+    { label: "Müşteri", value: form.customerName || "-" },
+    { label: "Foam Tipi", value: form.foamType || "-" },
+    { label: "Ürün Tipi", value: form.productType || "-" },
+    { label: "Numara", value: form.number || "-" },
+    { label: "Kumaş", value: form.fabricType || "Yok" },
+    { label: "Yapışkan", value: form.adhesiveType || "Yok" },
+    { label: "DTF", value: form.hasDTFLabel ? "Var" : "Yok" },
+    { label: "Ortalama Gramaj", value: form.averageWeight ? `${form.averageWeight} gr` : "-" },
+    { label: "Yoğunluk", value: form.targetDensity || "-" },
+    { label: "Durum", value: form.isActive ? "Aktif" : "Pasif" },
+  ];
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+      {badges.map((badge) => (
+        <div key={badge.label} className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">{badge.label}</p>
+          <p className="mt-1 truncate text-sm font-black text-white" title={badge.value}>
+            {badge.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function GeneralTab({
   form,
   readonly,
@@ -636,11 +681,11 @@ function GeneralTab({
         <TextInput label="Model Kodu" value={form.modelCode} readonly={readonly} onChange={(value) => updateField("modelCode", value)} />
         <TextInput label="Numara" value={form.number} readonly={readonly} onChange={(value) => updateField("number", value)} />
         <TextInput label="Renk" value={form.color} readonly={readonly} onChange={(value) => updateField("color", value)} />
-        <SelectInput label="Üretim Şekli" value={form.productionType} readonly={readonly} options={["OEM", "FIXAR", "Fason"]} onChange={(value) => updateField("productionType", value)} />
+        <SelectInput label="Üretim Şekli" value={form.productionType} readonly={readonly} options={["FIXAR", "Fason"]} onChange={(value) => updateField("productionType", value)} />
         <SelectInput label="Foam Tipi" value={form.foamType} readonly={readonly} options={["10100", "10900"]} onChange={(value) => updateField("foamType", value)} />
-        <SelectInput label="Ürün Tipi" value={form.productType} readonly={readonly} options={["Normal", "Memory Foam", "Kids", "Ortopedik"]} onChange={(value) => updateField("productType", value)} />
+        <SelectInput label="Ürün Tipi" value={form.productType} readonly={readonly} options={["Normal", "Memory Foam"]} onChange={(value) => updateField("productType", value)} />
         <SelectInput label="Varsayılan Para Birimi" value={form.currency} readonly={readonly} options={["TRY", "USD", "EUR"]} onChange={(value) => updateField("currency", value)} />
-        <SelectInput label="Birim" value={form.unit} readonly={readonly} options={["Çift"]} onChange={(value) => updateField("unit", value)} />
+        <SelectInput label="Birim" value={form.unit} readonly={readonly} options={["Çift", "Adet", "Kg"]} onChange={(value) => updateField("unit", value)} />
         <ToggleInput label="Aktif / Pasif" checked={form.isActive} readonly={readonly} trueText="Aktif" falseText="Pasif" onChange={(value) => updateField("isActive", value)} />
       </div>
       <TextAreaInput label="Açıklama" value={form.description} readonly={readonly} onChange={(value) => updateField("description", value)} />
@@ -660,12 +705,12 @@ function ProductionTab({
   return (
     <TabPanel title="Üretim" note="Standart üretim parametreleri iş emirleri ve kapasite planlamasına temel olur.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SelectInput label="Kumaş" value={form.fabricType} readonly={readonly} options={["Yok", "Interlok", "Lacoste", "Mesh", "Polar", "Keçe", "Diğer"]} onChange={(value) => updateField("fabricType", value)} />
+        <SelectInput label="Kumaş" value={form.fabricType} readonly={readonly} options={["Yok", "Interlok", "Lacoste", "Mesh", "Diğer"]} onChange={(value) => updateField("fabricType", value)} />
         <SelectInput label="Yapışkan" value={form.adhesiveType} readonly={readonly} options={["Yok", "Normal", "Polibond"]} onChange={(value) => updateField("adhesiveType", value)} />
         <ToggleInput label="DTF" checked={form.hasDTFLabel} readonly={readonly} trueText="Var" falseText="Yok" onChange={(value) => updateField("hasDTFLabel", value)} />
         <ToggleInput label="Polibond" checked={form.hasPolibond} readonly={readonly} trueText="Var" falseText="Yok" onChange={(value) => updateField("hasPolibond", value)} />
         <TextInput label="DTF Kodu" value={form.dtfCode} readonly={readonly || !form.hasDTFLabel} onChange={(value) => updateField("dtfCode", value)} />
-        <TextInput label="Ortalama Gramaj" value={form.averageWeight} readonly={readonly} type="number" onChange={(value) => updateField("averageWeight", value)} />
+        <TextInput label="Ortalama Ürün Gramajı" value={form.averageWeight} readonly={readonly} type="number" onChange={(value) => updateField("averageWeight", value)} />
         <TextInput label="Hedef Yoğunluk" value={form.targetDensity} readonly={readonly} type="number" onChange={(value) => updateField("targetDensity", value)} />
         <TextInput label="Standart Pişme Süresi" value={form.standardCycleTime} readonly={readonly} type="number" onChange={(value) => updateField("standardCycleTime", value)} />
         <TextInput label="Standart Günlük Kapasite" value={form.standardDailyCapacity} readonly={readonly} type="number" onChange={(value) => updateField("standardDailyCapacity", value)} />
@@ -682,13 +727,17 @@ function ProductionTab({
 function RecipeTab({
   form,
   readonly,
+  totalGram,
   rawMaterialCost,
+  recipeCost,
   updateRecipeLine,
   updateField,
 }: {
   form: ProductFormState;
   readonly: boolean;
+  totalGram: number;
   rawMaterialCost: number;
+  recipeCost: number;
   updateRecipeLine: (index: number, key: keyof RecipeLine, value: string) => void;
   updateField: <K extends keyof ProductFormState>(key: K, value: ProductFormState[K]) => void;
 }) {
@@ -707,36 +756,58 @@ function RecipeTab({
           </thead>
           <tbody className="divide-y divide-white/10">
             {form.recipeLines.map((line, index) => (
-              <tr key={line.material}>
-                <td className="p-3 font-black text-white">{line.material}</td>
-                <td className="p-3">
-                  <input value={line.quantity} type="number" step="0.01" disabled={readonly} onChange={(event) => updateRecipeLine(index, "quantity", event.target.value)} className={CONTROL_CLASS} />
-                </td>
-                <td className="p-3">
-                  <input value={line.unit} disabled={readonly} onChange={(event) => updateRecipeLine(index, "unit", event.target.value)} className={CONTROL_CLASS} />
-                </td>
-                <td className="p-3">
-                  <input value={line.unitPrice} type="number" step="0.01" disabled={readonly} onChange={(event) => updateRecipeLine(index, "unitPrice", event.target.value)} className={CONTROL_CLASS} />
-                </td>
-                <td className="p-3 text-right font-black text-emerald-200">{formatCurrency(calculateLineTotal(line), form.currency)}</td>
-              </tr>
+              <FragmentRow key={line.material} line={line}>
+                <tr>
+                  <td className="p-3 font-black text-white">{line.material}</td>
+                  <td className="p-3">
+                    <input value={line.quantity} type="number" step="0.01" disabled={readonly} onChange={(event) => updateRecipeLine(index, "quantity", event.target.value)} className={CONTROL_CLASS} />
+                  </td>
+                  <td className="p-3">
+                    <input value={line.unit} disabled={readonly} onChange={(event) => updateRecipeLine(index, "unit", event.target.value)} className={CONTROL_CLASS} />
+                  </td>
+                  <td className="p-3">
+                    <input value={line.unitPrice} type="number" step="0.01" disabled={readonly} onChange={(event) => updateRecipeLine(index, "unitPrice", event.target.value)} className={CONTROL_CLASS} />
+                  </td>
+                  <td className="p-3 text-right font-black text-emerald-200">{formatCurrency(calculateLineTotal(line), form.currency)}</td>
+                </tr>
+              </FragmentRow>
             ))}
           </tbody>
         </table>
       </div>
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-          <p className="font-black">Not</p>
-          <p className="mt-1">Crosskim doğrudan makineye verilmez.</p>
-          <p>180 kg poliol kazanına ilave edilir.</p>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-black/25 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Toplam Gram</p>
+          <p className="mt-2 text-2xl font-black text-white">{formatNumber(totalGram)} gr</p>
         </div>
-        <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-right">
+        <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-200">Toplam Hammadde Maliyeti</p>
-          <p className="mt-2 text-3xl font-black text-white">{formatCurrency(rawMaterialCost, form.currency)}</p>
+          <p className="mt-2 text-2xl font-black text-white">{formatCurrency(rawMaterialCost, form.currency)}</p>
+        </div>
+        <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-4">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-200">Toplam Reçete Maliyeti</p>
+          <p className="mt-2 text-2xl font-black text-white">{formatCurrency(recipeCost, form.currency)}</p>
         </div>
       </div>
       <TextAreaInput label="Reçete Notu" value={form.recipeNote} readonly={readonly} onChange={(value) => updateField("recipeNote", value)} />
     </TabPanel>
+  );
+}
+
+function FragmentRow({ line, children }: { line: RecipeLine; children: ReactNode }) {
+  return (
+    <>
+      {children}
+      {line.material === "Crosskim" && (
+        <tr>
+          <td colSpan={5} className="px-3 pb-4 pt-0">
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm font-bold text-amber-100">
+              Crosskim doğrudan makineye verilmez. 180 kg Poliol kazanına ilave edilen katkıdır.
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -806,13 +877,17 @@ function CostTab({
 }) {
   return (
     <TabPanel title="Maliyet" note="Şimdilik frontend üzerinde hesaplanan tahmini çift maliyeti görünümü.">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <CostCard title="Hammadde" value={formatCurrency(rawMaterialCost, form.currency)} note="Reçete grid toplamı" />
         <EditableCostCard title="İşçilik" value={form.laborCost} readonly={readonly} currency={form.currency} onChange={(value) => updateField("laborCost", value)} />
         <EditableCostCard title="Elektrik" value={form.electricityCost} readonly={readonly} currency={form.currency} onChange={(value) => updateField("electricityCost", value)} />
         <CostCard title="Paketleme" value={formatCurrency(packagingCost, form.currency)} note="Koli, etiket ve diğer satırlar" />
         <EditableCostCard title="Genel Gider" value={form.overheadCost} readonly={readonly} currency={form.currency} onChange={(value) => updateField("overheadCost", value)} />
-        <CostCard title="Tahmini Çift Maliyeti" value={formatCurrency(estimatedPairCost, form.currency)} note="Hammadde + işçilik + elektrik + paketleme + gider" strong />
+      </div>
+      <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-6 shadow-xl shadow-emerald-950/20">
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-200">Tahmini Çift Maliyeti</p>
+        <p className="mt-3 text-4xl font-black text-white">{formatCurrency(estimatedPairCost, form.currency)}</p>
+        <p className="mt-2 text-sm text-emerald-100/80">Hammadde + işçilik + elektrik + paketleme + genel gider toplamı</p>
       </div>
     </TabPanel>
   );
@@ -1050,8 +1125,8 @@ function toFormState(product: Product | null): ProductFormState {
   if (!product) return cloneForm(emptyForm);
 
   const parsed = parseDescription(product.description);
-  const displayProductType = parsed.details.displayProductType || product.productType || "Normal";
-  const fabricType = parsed.details.fabricType || (product.isFabric ? "Interlok" : "Yok");
+  const displayProductType = normalizeOption(parsed.details.displayProductType || product.productType || "Normal", ["Normal", "Memory Foam"], "Normal");
+  const fabricType = normalizeOption(parsed.details.fabricType || (product.isFabric ? "Interlok" : "Yok"), ["Yok", "Interlok", "Lacoste", "Mesh", "Diğer"], "Yok");
   const adhesiveType = parsed.details.adhesiveType || (product.isAdhesive ? "Normal" : "Yok");
 
   return {
@@ -1066,8 +1141,10 @@ function toFormState(product: Product | null): ProductFormState {
     foamType: product.foamType ?? "10100",
     productType: displayProductType,
     displayProductType,
+    productionType: normalizeOption(parsed.details.productionType, ["FIXAR", "Fason"], "FIXAR"),
+    unit: normalizeOption(parsed.details.unit, ["Çift", "Adet", "Kg"], "Çift"),
     fabricType,
-    adhesiveType,
+    adhesiveType: normalizeOption(adhesiveType, ["Yok", "Normal", "Polibond"], "Yok"),
     isFabric: fabricType !== "Yok",
     isAdhesive: adhesiveType !== "Yok",
     hasDTFLabel: Boolean(product.hasDTFLabel),
@@ -1108,10 +1185,10 @@ function buildDescription(form: ProductFormState) {
     model: form.model,
     number: form.number,
     color: form.color,
-    productionType: form.productionType,
-    displayProductType: form.productType,
+    productionType: normalizeOption(form.productionType, ["FIXAR", "Fason"], "FIXAR"),
+    displayProductType: normalizeOption(form.productType, ["Normal", "Memory Foam"], "Normal"),
     currency: form.currency,
-    unit: form.unit,
+    unit: normalizeOption(form.unit, ["Çift", "Adet", "Kg"], "Çift"),
     fabricType: form.fabricType,
     adhesiveType: form.adhesiveType,
     dtfCode: form.dtfCode,
@@ -1182,11 +1259,16 @@ function parseDescription(rawDescription?: string | null): { description: string
 
 function normalizeRecipeLines(lines: unknown[]) {
   const normalized = RECIPE_MATERIALS.map((material) => {
-    const existing = lines.find((line) => typeof line === "object" && line !== null && (line as { material?: unknown }).material === material) as Partial<RecipeLine> | undefined;
+    const existing = lines.find((line) => {
+      if (typeof line !== "object" || line === null) return false;
+      const lineMaterial = (line as { material?: unknown }).material;
+      if (lineMaterial === material) return true;
+      return material === "DTF Etiket" && (lineMaterial === "DTF" || lineMaterial === "Etiket");
+    }) as Partial<RecipeLine> | undefined;
     return {
       material,
       quantity: typeof existing?.quantity === "string" ? existing.quantity : "",
-      unit: typeof existing?.unit === "string" ? existing.unit : material === "Koli" || material === "Etiket" ? "Adet" : "gr",
+      unit: typeof existing?.unit === "string" ? existing.unit : material === "Koli" || material === "DTF Etiket" ? "Adet" : "gr",
       unitPrice: typeof existing?.unitPrice === "string" ? existing.unitPrice : "",
     };
   });
@@ -1206,7 +1288,7 @@ function migrateLegacyRecipeLines(parsed: Record<string, unknown>) {
   const legacyPriceKeys: Record<string, string> = {
     Kumaş: "fabricCost",
     Yapışkan: "adhesiveCost",
-    DTF: "dtfLabelCost",
+    "DTF Etiket": "dtfLabelCost",
     Koli: "boxCost",
     Diğer: "otherCost",
   };
@@ -1266,6 +1348,11 @@ function emptyToNull(value: string) {
   return trimmed ? trimmed : null;
 }
 
+function normalizeOption(value: string | undefined | null, options: string[], fallback: string) {
+  if (!value) return fallback;
+  return options.includes(value) ? value : fallback;
+}
+
 function parseOptionalNumber(value: string) {
   if (!value.trim()) return null;
   const parsed = safeParsedNumber(value);
@@ -1296,13 +1383,25 @@ function calculateLineTotal(line: RecipeLine) {
   return safeParsedNumber(line.quantity) * safeParsedNumber(line.unitPrice);
 }
 
+function calculateTotalGram(lines: RecipeLine[]) {
+  return lines
+    .filter((line) => line.unit.toLocaleLowerCase("tr-TR") === "gr")
+    .reduce((sum, line) => sum + safeParsedNumber(line.quantity), 0);
+}
+
+function calculateRawMaterialCost(lines: RecipeLine[]) {
+  return lines
+    .filter((line) => !["Koli", "Diğer"].includes(line.material))
+    .reduce((sum, line) => sum + calculateLineTotal(line), 0);
+}
+
 function calculateRecipeTotal(lines: RecipeLine[]) {
   return lines.reduce((sum, line) => sum + calculateLineTotal(line), 0);
 }
 
 function calculatePackagingCost(lines: RecipeLine[]) {
   return lines
-    .filter((line) => ["Koli", "Etiket", "Diğer"].includes(line.material))
+    .filter((line) => ["Koli", "DTF Etiket", "Diğer"].includes(line.material))
     .reduce((sum, line) => sum + calculateLineTotal(line), 0);
 }
 
