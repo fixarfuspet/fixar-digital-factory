@@ -181,6 +181,45 @@ public class StocksController : ControllerBase
 
         return Ok(ApiResponse<object>.SuccessResponse(movements));
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateStockItemRequest request, CancellationToken cancellationToken)
+    {
+        var item = await _db.StockItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+            return NotFound(ApiResponse<object>.Fail("Stok kartı bulunamadı.", "STOCK_NOT_FOUND"));
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest(ApiResponse<object>.Fail("Stok adı zorunludur.", "NAME_REQUIRED"));
+
+        item.Name = request.Name;
+        item.Code = request.Code;
+        item.Category = request.Category;
+        item.Unit = request.Unit;
+        item.CurrentQuantity = request.CurrentQuantity;
+        item.CriticalQuantity = request.CriticalQuantity;
+        item.MinimumQuantity = request.MinimumQuantity;
+        item.MaximumQuantity = request.MaximumQuantity;
+        item.LastPurchasePrice = request.LastPurchasePrice;
+        item.Currency = request.Currency;
+        item.VatRate = request.VatRate;
+        item.SupplierName = request.SupplierName;
+        item.SupplierCode = request.SupplierCode;
+        item.LeadTimeDays = request.LeadTimeDays;
+        item.WarehouseName = request.WarehouseName;
+        item.LocationCode = request.LocationCode;
+        item.LotNumber = request.LotNumber;
+        item.ExpiryDate = request.ExpiryDate;
+        item.RecipeUsageAmount = request.RecipeUsageAmount;
+        item.WasteRate = request.WasteRate;
+        item.SafetyInfo = request.SafetyInfo;
+        item.Note = request.Note;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(ApiResponse<object>.SuccessResponse(item, "Stok kartı güncellendi."));
+    }
 }
 
 public record CreateStockItemRequest(

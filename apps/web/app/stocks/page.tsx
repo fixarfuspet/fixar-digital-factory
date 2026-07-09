@@ -349,6 +349,11 @@ export default function StocksPage() {
           setDialogMode(null);
           setDialogStock(null);
         }}
+        onSaved={() => {
+          setDialogMode(null);
+          setDialogStock(null);
+          loadStocks();
+        }}
       />
 
       <StockDeleteModal
@@ -628,7 +633,7 @@ function StockCreateModal({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-function StockEditModal({ stock, onClose }: { stock: StockItem | null; onClose: () => void }) {
+function StockEditModal({ stock, onClose, onSaved }: { stock: StockItem | null; onClose: () => void; onSaved: () => void }) {
   if (!stock) return null;
 
   return (
@@ -639,6 +644,7 @@ function StockEditModal({ stock, onClose }: { stock: StockItem | null; onClose: 
       initialStock={stock}
       submitLabel="Değişiklikleri Kaydet"
       onClose={onClose}
+      onSaved={onSaved}
     />
   );
 }
@@ -678,12 +684,14 @@ function StockFormModal({
   initialStock,
   submitLabel,
   onClose,
+  onSaved,
 }: {
   title: string;
   subtitle: string;
   initialStock: StockItem | null;
   submitLabel: string;
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   const [form, setForm] = useState<StockFormState>(() => toStockForm(initialStock));
 
@@ -692,22 +700,12 @@ function StockFormModal({
   }
 
   async function saveStockCard() {
-  if (initialStock) {
-    alert("Düzenleme için PUT endpointi henüz bağlı değil. Şimdilik sadece yeni stok kartı oluşturma aktif.");
-    return;
-  }
+    if (!form.name.trim()) {
+      alert("Stok adı zorunludur.");
+      return;
+    }
 
-  if (!form.name.trim()) {
-    alert("Stok adı zorunludur.");
-    return;
-  }
-
-  const response = await fetch(API + "/stocks", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    const body = {
       name: form.name.trim(),
       code: form.code.trim() || null,
       category: form.category.trim() || "Genel",
@@ -730,21 +728,35 @@ function StockFormModal({
       wasteRate: null,
       safetyInfo: null,
       note: form.note.trim() || null,
-    }),
-  });
+    };
 
-  const resultText = await response.text();
+    try {
+      const response = await fetch(initialStock ? `${API}/stocks/${initialStock.id}` : API + "/stocks", {
+        method: initialStock ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
 
-  if (!response.ok) {
-    alert("Stok kartı oluşturulamadı: " + resultText);
-    return;
+      const resultText = await response.text();
+
+      if (!response.ok) {
+        alert((initialStock ? "Stok kartı güncellenemedi: " : "Stok kartı oluşturulamadı: ") + resultText);
+        return;
+      }
+
+      alert(initialStock ? "Stok kartı güncellendi." : "Stok kartı oluşturuldu.");
+      onClose();
+      if (onSaved) {
+        onSaved();
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Stok kartı kaydedilirken beklenmeyen bir hata oluştu.");
+    }
   }
-
-  alert("Stok kartı oluşturuldu.");
-  onClose();
-  window.location.reload();
-}
-
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
@@ -913,7 +925,7 @@ function ModalActions({
   submitTone,
 }: {
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
   submitLabel: string;
   submitTone: "success" | "danger";
 }) {
