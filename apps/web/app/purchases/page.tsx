@@ -71,6 +71,12 @@ type PurchaseFormLine = {
   vatRate: string;
 };
 
+type PdfPageImage = {
+  dataUrl: string;
+  width: number;
+  height: number;
+};
+
 const API = "http://localhost:5000/api/v1";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60";
@@ -193,6 +199,72 @@ export default function PurchasesPage() {
       return matchesSearch && matchesSupplier && matchesStatus && matchesPayment;
     });
   }, [paymentFilter, purchases, search, statusFilter, supplierFilter]);
+  const filteredTotalAmount = useMemo(() => filteredPurchases.reduce((sum, item) => sum + safeNumber(item.grandTotal), 0), [filteredPurchases]);
+
+  function exportPurchasesCsv() {
+    if (filteredPurchases.length === 0) {
+      alert("Aktarılacak kayıt yok.");
+      return;
+    }
+
+    const headers = [
+      "Tarih",
+      "Belge No",
+      "Fatura No",
+      "Tedarikçi",
+      "Ödeme Şekli",
+      "Para Birimi",
+      "Ara Toplam",
+      "KDV Toplam",
+      "Genel Toplam",
+      "Durum",
+      "Not",
+    ];
+    const rows = filteredPurchases.map((purchase) => [
+      formatDate(purchase.orderDate ?? purchase.createdAt),
+      purchase.documentNo || "",
+      purchase.invoiceNo || "",
+      purchase.supplierName || "",
+      purchase.paymentType || "",
+      purchase.currency || "",
+      formatDecimalForCsv(safeNumber(purchase.subTotal)),
+      formatDecimalForCsv(safeNumber(purchase.vatTotal)),
+      formatDecimalForCsv(safeNumber(purchase.grandTotal)),
+      formatStatusLabel(purchase.status),
+      purchase.note || "",
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map(escapeCsvCell).join(";")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "fixar-satin-alma-kayitlari.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadPurchasesPdf() {
+    if (filteredPurchases.length === 0) {
+      alert("Aktarılacak kayıt yok.");
+      return;
+    }
+
+    const generatedAt = new Date().toLocaleString("tr-TR");
+    const pages = renderPurchaseReportPages(filteredPurchases, generatedAt, filteredTotalAmount, primaryCurrency);
+    const pdfBlob = createPdfFromJpegPages(pages);
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "fixar-satin-alma-raporu.pdf";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   const dashboardCards = [
     {
@@ -274,9 +346,25 @@ export default function PurchasesPage() {
                   {filteredPurchases.length.toLocaleString("tr-TR")} kayıt listeleniyor.
                 </p>
               </div>
-              <span className="w-fit rounded-full bg-white/[0.08] px-3 py-1 text-xs font-bold text-zinc-300">
-                Canlı API verisi
-              </span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button
+                  onClick={exportPurchasesCsv}
+                  disabled={filteredPurchases.length === 0}
+                  className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-black text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Excel’e Aktar
+                </button>
+                <button
+                  onClick={downloadPurchasesPdf}
+                  disabled={filteredPurchases.length === 0}
+                  className="rounded-xl border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-black text-white transition hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  PDF / Yazdır
+                </button>
+                <span className="w-fit rounded-full bg-white/[0.08] px-3 py-1 text-xs font-bold text-zinc-300">
+                  Canlı API verisi
+                </span>
+              </div>
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1111,7 +1199,7 @@ function TableCell({ children }: { children: ReactNode }) {
 
 function StatusBadge({ status }: { status?: string | null }) {
   const rawLabel = status || "Oluşturuldu";
-  const label = rawLabel === "Cancelled" ? "İptal edildi" : rawLabel;
+  const label = formatStatusLabel(rawLabel);
   const isDone = ["Tamamlandı", "Ödendi", "Kapandı"].includes(rawLabel);
   const isProblem = ["Cancelled", "İptal", "İptal Edildi"].includes(rawLabel);
   const className = isProblem
@@ -1209,12 +1297,206 @@ function isPurchaseCancelled(item: PurchaseOrder) {
   return (item.status || "").toLocaleLowerCase("tr-TR") === "cancelled";
 }
 
+function formatStatusLabel(status: string | null | undefined) {
+  return status === "Cancelled" ? "İptal edildi" : status || "Oluşturuldu";
+}
+
 function safeNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function formatNumber(value: number) {
   return safeNumber(value).toLocaleString("tr-TR");
+}
+
+function formatDecimalForCsv(value: number) {
+  return safeNumber(value).toLocaleString("tr-TR", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  });
+}
+
+function escapeCsvCell(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function renderPurchaseReportPages(purchases: PurchaseOrder[], generatedAt: string, totalAmount: number, currency: string): PdfPageImage[] {
+  const pageWidth = 1240;
+  const pageHeight = 1754;
+  const margin = 58;
+  const headerHeight = 184;
+  const rowHeight = 54;
+  const footerHeight = 90;
+  const rowsPerPage = Math.max(1, Math.floor((pageHeight - margin * 2 - headerHeight - footerHeight) / rowHeight));
+  const chunks: PurchaseOrder[][] = [];
+
+  for (let index = 0; index < purchases.length; index += rowsPerPage) {
+    chunks.push(purchases.slice(index, index + rowsPerPage));
+  }
+
+  return chunks.map((chunk, pageIndex) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = pageWidth;
+    canvas.height = pageHeight;
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      throw new Error("PDF raporu oluşturulamadı.");
+    }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, pageWidth, pageHeight);
+
+    ctx.fillStyle = "#064e3b";
+    ctx.fillRect(0, 0, pageWidth, 22);
+    drawReportText(ctx, "FIXAR OS - Satın Alma Raporu", margin, 78, 760, "bold 34px Arial", "#111827");
+    drawReportText(ctx, `Rapor tarihi: ${generatedAt}`, margin, 118, 520, "20px Arial", "#4b5563");
+    drawReportText(ctx, `Filtrelenmiş kayıt sayısı: ${purchases.length.toLocaleString("tr-TR")}`, margin, 148, 520, "20px Arial", "#4b5563");
+    drawReportText(ctx, `Toplam genel tutar: ${formatMoney(totalAmount, currency)}`, pageWidth - margin, 118, 520, "bold 22px Arial", "#064e3b", "right");
+
+    const columns = [
+      { title: "Tarih", width: 118 },
+      { title: "Belge No", width: 140 },
+      { title: "Fatura No", width: 140 },
+      { title: "Tedarikçi", width: 260 },
+      { title: "Ödeme Şekli", width: 160 },
+      { title: "Para Birimi", width: 118 },
+      { title: "Genel Toplam", width: 150 },
+      { title: "Durum", width: 98 },
+    ];
+    let x = margin;
+    const tableTop = margin + headerHeight;
+
+    ctx.fillStyle = "#ecfdf5";
+    ctx.fillRect(margin, tableTop, pageWidth - margin * 2, rowHeight);
+    ctx.strokeStyle = "#d1d5db";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(margin, tableTop, pageWidth - margin * 2, rowHeight);
+
+    columns.forEach((column) => {
+      ctx.strokeStyle = "#d1d5db";
+      ctx.strokeRect(x, tableTop, column.width, rowHeight);
+      drawReportText(ctx, column.title, x + 10, tableTop + 34, column.width - 20, "bold 17px Arial", "#064e3b");
+      x += column.width;
+    });
+
+    chunk.forEach((purchase, rowIndex) => {
+      const y = tableTop + rowHeight * (rowIndex + 1);
+      const values = [
+        formatDate(purchase.orderDate ?? purchase.createdAt),
+        purchase.documentNo || "-",
+        purchase.invoiceNo || "-",
+        purchase.supplierName || "-",
+        purchase.paymentType || "-",
+        purchase.currency || "-",
+        formatMoney(safeNumber(purchase.grandTotal), purchase.currency || "TRY"),
+        formatStatusLabel(purchase.status),
+      ];
+
+      x = margin;
+      ctx.fillStyle = rowIndex % 2 === 0 ? "#ffffff" : "#f9fafb";
+      ctx.fillRect(margin, y, pageWidth - margin * 2, rowHeight);
+
+      values.forEach((value, columnIndex) => {
+        const column = columns[columnIndex];
+        ctx.strokeStyle = "#e5e7eb";
+        ctx.strokeRect(x, y, column.width, rowHeight);
+        drawReportText(ctx, value, x + 10, y + 34, column.width - 20, columnIndex === 6 ? "bold 16px Arial" : "16px Arial", "#111827", columnIndex === 6 ? "right" : "left");
+        x += column.width;
+      });
+    });
+
+    const footerY = pageHeight - margin;
+    drawReportText(ctx, `Sayfa ${pageIndex + 1} / ${chunks.length}`, pageWidth - margin, footerY, 240, "18px Arial", "#6b7280", "right");
+
+    if (pageIndex === chunks.length - 1) {
+      drawReportText(ctx, `Toplam Genel Tutar: ${formatMoney(totalAmount, currency)}`, margin, footerY, 620, "bold 24px Arial", "#111827");
+    }
+
+    return {
+      dataUrl: canvas.toDataURL("image/jpeg", 0.92),
+      width: pageWidth,
+      height: pageHeight,
+    };
+  });
+}
+
+function drawReportText(
+  ctx: CanvasRenderingContext2D,
+  value: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  font: string,
+  color: string,
+  align: CanvasTextAlign = "left"
+) {
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+
+  let text = value;
+
+  while (ctx.measureText(text).width > maxWidth && text.length > 1) {
+    text = text.slice(0, -2);
+  }
+
+  if (text !== value) {
+    text = text.slice(0, Math.max(0, text.length - 1)) + "...";
+  }
+
+  ctx.fillText(text, x, y);
+}
+
+function createPdfFromJpegPages(pages: PdfPageImage[]) {
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const objects: string[] = [];
+  const pageObjectIds: number[] = [];
+
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objects.push("");
+
+  pages.forEach((page, index) => {
+    const pageObjectId = objects.length + 1;
+    const contentObjectId = pageObjectId + 1;
+    const imageObjectId = pageObjectId + 2;
+    const imageName = `Im${index + 1}`;
+    const imageBinary = atob(page.dataUrl.split(",")[1] || "");
+    const content = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/${imageName} Do\nQ`;
+
+    pageObjectIds.push(pageObjectId);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /${imageName} ${imageObjectId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`);
+    objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    objects.push(`<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBinary.length} >>\nstream\n${imageBinary}\nendstream`);
+  });
+
+  objects[1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`;
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  const bytes = new Uint8Array(pdf.length);
+
+  for (let index = 0; index < pdf.length; index += 1) {
+    bytes[index] = pdf.charCodeAt(index) & 0xff;
+  }
+
+  return new Blob([bytes], { type: "application/pdf" });
 }
 
 function createEmptyPurchaseForm(): PurchaseFormState {
