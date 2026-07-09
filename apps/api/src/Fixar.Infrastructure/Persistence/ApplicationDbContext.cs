@@ -49,6 +49,7 @@ public DbSet<StockItem> StockItems => Set<StockItem>();
 public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
 public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+public DbSet<Supplier> Suppliers => Set<Supplier>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
