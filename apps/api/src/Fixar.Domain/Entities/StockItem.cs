@@ -4,6 +4,10 @@ namespace Fixar.Domain.Entities;
 
 public class StockItem : BaseAuditableEntity
 {
+    public Guid? MaterialId { get; set; }
+
+    public Material? Material { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public string? Code { get; set; }

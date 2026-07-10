@@ -30,6 +30,10 @@ public class StocksController : ControllerBase
             .Select(x => new
             {
                 x.Id,
+                x.MaterialId,
+                MaterialCode = x.Material != null ? x.Material.Code : null,
+                MaterialName = x.Material != null ? x.Material.Name : null,
+                MaterialType = x.Material != null ? x.Material.MaterialType : null,
                 x.Name,
                 x.Code,
                 x.Category,

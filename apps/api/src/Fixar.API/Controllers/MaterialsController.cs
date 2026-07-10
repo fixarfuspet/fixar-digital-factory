@@ -100,8 +100,16 @@ public class MaterialsController : ControllerBase
         var material = new Material();
         ApplyRequest(material, request, true);
 
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
         _db.Materials.Add(material);
+        var stockValidation = await SyncStockItemForMaterial(material, cancellationToken);
+
+        if (stockValidation is not null)
+            return stockValidation;
+
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(material, "Malzeme oluşturuldu."));
     }
@@ -119,8 +127,16 @@ public class MaterialsController : ControllerBase
         if (validation is not null)
             return validation;
 
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
         ApplyRequest(material, request, false);
+        var stockValidation = await SyncStockItemForMaterial(material, cancellationToken);
+
+        if (stockValidation is not null)
+            return stockValidation;
+
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(material, "Malzeme güncellendi."));
     }
@@ -225,6 +241,85 @@ public class MaterialsController : ControllerBase
             material.IsActive = request.IsActive ?? true;
             material.CreatedAt = now;
         }
+    }
+
+    private async Task<IActionResult?> SyncStockItemForMaterial(Material material, CancellationToken cancellationToken)
+    {
+        var linkedStock = await _db.StockItems
+            .FirstOrDefaultAsync(x => x.MaterialId == material.Id, cancellationToken);
+
+        if (linkedStock is not null)
+        {
+            var hasSecondActiveStockForMaterial = await _db.StockItems
+                .AnyAsync(
+                    x => x.Id != linkedStock.Id
+                        && x.MaterialId == material.Id
+                        && x.IsActive,
+                    cancellationToken);
+
+            if (hasSecondActiveStockForMaterial)
+                return BadRequest(ApiResponse<object>.Fail("Bu malzeme için ikinci aktif stok kartı oluşturulamaz.", "MATERIAL_ACTIVE_STOCK_EXISTS"));
+
+            var conflictingLinkedStock = await _db.StockItems
+                .FirstOrDefaultAsync(
+                    x => x.Id != linkedStock.Id
+                        && x.IsActive
+                        && x.Code == material.Code
+                        && x.MaterialId.HasValue
+                        && x.MaterialId.Value != material.Id,
+                    cancellationToken);
+
+            if (conflictingLinkedStock is not null)
+                return BadRequest(ApiResponse<object>.Fail("Bu stok kartı başka bir malzemeye bağlı.", "STOCK_ALREADY_LINKED_TO_MATERIAL"));
+
+            ApplyMaterialToStockItem(linkedStock, material, preserveCurrentQuantity: true);
+            return null;
+        }
+
+        var codeMatchedStock = await _db.StockItems
+            .FirstOrDefaultAsync(x => x.Code == material.Code, cancellationToken);
+
+        if (codeMatchedStock is not null)
+        {
+            if (codeMatchedStock.MaterialId.HasValue && codeMatchedStock.MaterialId.Value != material.Id)
+                return BadRequest(ApiResponse<object>.Fail("Bu stok kartı başka bir malzemeye bağlı.", "STOCK_ALREADY_LINKED_TO_MATERIAL"));
+
+            ApplyMaterialToStockItem(codeMatchedStock, material, preserveCurrentQuantity: true);
+            return null;
+        }
+
+        var stockItem = new StockItem
+        {
+            CurrentQuantity = 0
+        };
+
+        ApplyMaterialToStockItem(stockItem, material, preserveCurrentQuantity: false);
+        _db.StockItems.Add(stockItem);
+
+        return null;
+    }
+
+    private static void ApplyMaterialToStockItem(StockItem stockItem, Material material, bool preserveCurrentQuantity)
+    {
+        var currentQuantity = stockItem.CurrentQuantity;
+
+        stockItem.MaterialId = material.Id;
+        stockItem.Code = material.Code;
+        stockItem.Name = material.Name;
+        stockItem.Category = material.Category ?? "Genel";
+        stockItem.Unit = material.Unit;
+        stockItem.SupplierName = material.DefaultSupplierName;
+        stockItem.LastPurchasePrice = material.LastPurchasePrice;
+        stockItem.MinimumQuantity = material.MinimumStock;
+        stockItem.MaximumQuantity = material.MaximumStock;
+        stockItem.CriticalQuantity = material.CriticalStock ?? 0;
+        stockItem.WarehouseName = material.WarehouseName;
+        stockItem.LocationCode = material.LocationCode;
+        stockItem.Currency = material.Currency ?? stockItem.Currency;
+        stockItem.IsActive = material.IsActive;
+
+        if (preserveCurrentQuantity)
+            stockItem.CurrentQuantity = currentQuantity;
     }
 
     private static string? TrimToNull(string? value)

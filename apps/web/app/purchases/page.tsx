@@ -42,6 +42,18 @@ type StockItem = {
   unit?: string | null;
 };
 
+type Material = {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  materialType?: string | null;
+  unit?: string | null;
+  defaultSupplierName?: string | null;
+  currency?: string | null;
+  lastPurchasePrice?: number | null;
+  isActive?: boolean | null;
+};
+
 type Supplier = {
   id: string;
   name?: string | null;
@@ -64,6 +76,7 @@ type PurchaseFormState = {
 
 type PurchaseFormLine = {
   key: string;
+  materialId: string;
   stockItemId: string;
   quantity: string;
   unit: string;
@@ -530,10 +543,13 @@ function PurchaseFormModal({
   onSaved: (message: string) => void;
 }) {
   const [stocks, setStocks] = useState<StockItem[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [stocksLoading, setStocksLoading] = useState(false);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [stocksError, setStocksError] = useState<string | null>(null);
+  const [materialsError, setMaterialsError] = useState<string | null>(null);
   const [suppliersError, setSuppliersError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -547,8 +563,24 @@ function PurchaseFormModal({
     setForm(toPurchaseForm(initialPurchase));
     setLines(toPurchaseFormLines(initialPurchase));
     loadStocks();
+    loadMaterials();
     loadSuppliers();
   }, [open, initialPurchase]);
+
+  useEffect(() => {
+    if (!open || materials.length === 0 || stocks.length === 0) return;
+
+    setLines((current) =>
+      current.map((line) => {
+        if (line.materialId || !line.stockItemId) return line;
+
+        const stock = stocks.find((item) => item.id === line.stockItemId);
+        const material = findMaterialForStock(stock, materials);
+
+        return material ? { ...line, materialId: material.id, unit: material.unit || line.unit || stock?.unit || "" } : line;
+      })
+    );
+  }, [materials, open, stocks]);
 
   async function loadStocks() {
     setStocksLoading(true);
@@ -568,6 +600,27 @@ function PurchaseFormModal({
       setStocksError(err instanceof Error ? err.message : "Stok listesi alınırken beklenmeyen bir hata oluştu.");
     } finally {
       setStocksLoading(false);
+    }
+  }
+
+  async function loadMaterials() {
+    setMaterialsLoading(true);
+    setMaterialsError(null);
+
+    try {
+      const response = await fetch(API + "/materials");
+
+      if (!response.ok) {
+        throw new Error("Malzeme listesi alınamadı.");
+      }
+
+      const result: unknown = await response.json();
+      setMaterials(extractMaterials(result).filter((material) => material.isActive !== false));
+    } catch (err) {
+      setMaterials([]);
+      setMaterialsError(err instanceof Error ? err.message : "Malzeme listesi alınırken beklenmeyen bir hata oluştu.");
+    } finally {
+      setMaterialsLoading(false);
     }
   }
 
@@ -618,12 +671,34 @@ function PurchaseFormModal({
       current.map((line) => {
         if (line.key !== key) return line;
 
-        if (field !== "stockItemId") {
+        if (field !== "materialId") {
           return { ...line, [field]: value };
         }
 
-        const stock = stocks.find((item) => item.id === value);
-        return { ...line, stockItemId: value, unit: stock?.unit || line.unit };
+        const material = materials.find((item) => item.id === value);
+        const stock = findStockForMaterial(material, stocks);
+
+        if (material) {
+          setForm((currentForm) => {
+            const defaultSupplier = suppliers.find((supplier) => normalizeText(supplier.name) === normalizeText(material.defaultSupplierName));
+
+            return {
+              ...currentForm,
+              currency: material.currency || currentForm.currency,
+              supplierId: currentForm.supplierId || defaultSupplier?.id || "",
+              supplierName: currentForm.supplierName || defaultSupplier?.name || "",
+              supplierCode: currentForm.supplierCode || defaultSupplier?.code || "",
+            };
+          });
+        }
+
+        return {
+          ...line,
+          materialId: value,
+          stockItemId: stock?.id || "",
+          unit: material?.unit || line.unit,
+          unitPrice: material?.lastPurchasePrice === null || material?.lastPurchasePrice === undefined ? line.unitPrice : String(material.lastPurchasePrice),
+        };
       })
     );
   }
@@ -649,21 +724,28 @@ function PurchaseFormModal({
     }
 
     const preparedLines = lines.map((line) => {
-      const stock = stocks.find((item) => item.id === line.stockItemId);
+      const material = materials.find((item) => item.id === line.materialId);
+      const stock = findStockForMaterial(material, stocks);
       const quantity = Number(line.quantity || 0);
       const unitPrice = Number(line.unitPrice || 0);
 
       return {
+        material,
         stock,
         quantity,
         unitPrice,
         lineTotal: quantity * unitPrice,
-        unit: line.unit.trim() || stock?.unit || "adet",
+        unit: material?.unit || line.unit.trim() || stock?.unit || "adet",
       };
     });
 
+    if (preparedLines.some((line) => !line.material)) {
+      setError("Her satır için Material Master kartı seçmelisiniz.");
+      return;
+    }
+
     if (preparedLines.some((line) => !line.stock)) {
-      setError("Her satır için stok seçmelisiniz.");
+      setError("Bu malzeme için eşleşen stok kartı bulunamadı. Material.Code ile Stock.Code aynı olmalıdır.");
       return;
     }
 
@@ -702,7 +784,7 @@ function PurchaseFormModal({
           note: form.note.trim() || null,
           lines: preparedLines.map((line) => ({
             stockItemId: line.stock!.id,
-            stockName: line.stock!.name || null,
+            stockName: line.material!.name || line.stock!.name || null,
             quantity: line.quantity,
             unit: line.unit,
             unitPrice: line.unitPrice,
@@ -748,6 +830,7 @@ function PurchaseFormModal({
 
         {error && <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{error}</div>}
         {stocksError && <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">{stocksError}</div>}
+        {materialsError && <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">{materialsError}</div>}
         {suppliersError && <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">{suppliersError}</div>}
         {suppliersLoading && <div className="mb-5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-400">Tedarikçi listesi yükleniyor...</div>}
 
@@ -828,7 +911,7 @@ function PurchaseFormModal({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-xl font-black">Ürün Satırları</h3>
-              <p className="mt-1 text-sm text-zinc-400">Stok, miktar, fiyat ve KDV bilgilerini girin.</p>
+              <p className="mt-1 text-sm text-zinc-400">Material Master kartı seçin; birim, fiyat ve stok eşleşmesi otomatik dolsun.</p>
             </div>
             <button
               onClick={addLine}
@@ -839,12 +922,12 @@ function PurchaseFormModal({
             </button>
           </div>
 
-          {stocksLoading ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-5 text-sm text-zinc-400">Stok listesi yükleniyor...</div>
+          {stocksLoading || materialsLoading ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-5 text-sm text-zinc-400">Malzeme ve stok listesi yükleniyor...</div>
           ) : (
             <div className="mt-4 space-y-3">
               <div className="hidden grid-cols-[minmax(220px,1.5fr)_120px_110px_140px_100px_140px_44px] gap-3 px-1 text-xs font-black uppercase tracking-[0.14em] text-zinc-500 xl:grid">
-                <span>Stok</span>
+                <span>Malzeme</span>
                 <span>Miktar</span>
                 <span>Birim</span>
                 <span>Birim Fiyat</span>
@@ -856,25 +939,36 @@ function PurchaseFormModal({
               {lines.map((line) => {
                 const lineNetTotal = safeNumber(Number(line.quantity || 0)) * safeNumber(Number(line.unitPrice || 0));
                 const lineVatTotal = lineNetTotal * safeNumber(Number(line.vatRate || 0)) / 100;
+                const selectedMaterial = materials.find((material) => material.id === line.materialId);
+                const matchedStock = findStockForMaterial(selectedMaterial, stocks);
+                const supplierMismatch =
+                  Boolean(form.supplierName && selectedMaterial?.defaultSupplierName) &&
+                  normalizeText(form.supplierName) !== normalizeText(selectedMaterial?.defaultSupplierName);
 
                 return (
                   <div
                     key={line.key}
                     className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-black/20 p-3 xl:grid-cols-[minmax(220px,1.5fr)_120px_110px_140px_100px_140px_44px]"
                   >
-                    <Field label="Stok" compact>
+                    <Field label="Malzeme" compact>
                       <select
-                        value={line.stockItemId}
-                        onChange={(event) => updateLine(line.key, "stockItemId", event.target.value)}
+                        value={line.materialId}
+                        onChange={(event) => updateLine(line.key, "materialId", event.target.value)}
                         className={CONTROL_CLASS}
                       >
-                        <option value="">Stok seç</option>
-                        {stocks.map((stock) => (
-                          <option key={stock.id} value={stock.id}>
-                            {[stock.code, stock.name].filter(Boolean).join(" - ") || stock.id}
+                        <option value="">Malzeme seç</option>
+                        {materials.map((material) => (
+                          <option key={material.id} value={material.id}>
+                            {formatMaterialOption(material)}
                           </option>
                         ))}
                       </select>
+                      {selectedMaterial && !matchedStock && (
+                        <p className="mt-2 text-xs font-bold text-red-200">Bu malzeme için eşleşen stok kartı bulunamadı.</p>
+                      )}
+                      {supplierMismatch && (
+                        <p className="mt-2 text-xs font-bold text-amber-200">Seçilen malzemenin varsayılan tedarikçisi farklıdır.</p>
+                      )}
                     </Field>
                     <Field label="Miktar" compact>
                       <input
@@ -888,9 +982,10 @@ function PurchaseFormModal({
                     <Field label="Birim" compact>
                       <input
                         value={line.unit}
-                        onChange={(event) => updateLine(line.key, "unit", event.target.value)}
                         className={CONTROL_CLASS}
                         placeholder="kg"
+                        readOnly
+                        disabled
                       />
                     </Field>
                     <Field label="Birim Fiyat" compact>
@@ -948,7 +1043,7 @@ function PurchaseFormModal({
           </button>
           <button
             onClick={savePurchase}
-            disabled={saving || stocksLoading || suppliersLoading}
+            disabled={saving || stocksLoading || materialsLoading || suppliersLoading}
             className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-black transition hover:bg-emerald-400 disabled:opacity-50"
           >
             {saving ? "Kaydediliyor..." : initialPurchase ? "Değişiklikleri Kaydet" : "Kaydet"}
@@ -961,6 +1056,8 @@ function PurchaseFormModal({
 
 function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | null; onClose: () => void }) {
   const [purchase, setPurchase] = useState<PurchaseOrder | null>(null);
+  const [stocks, setStocks] = useState<StockItem[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -978,11 +1075,15 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
       setLoading(true);
       setError(null);
       setPurchase(null);
+      setStocks([]);
+      setMaterials([]);
 
       try {
-        const response = await fetch(`${API}/purchases/${purchaseId}`, {
-          signal: controller.signal,
-        });
+        const [response, stocksResponse, materialsResponse] = await Promise.all([
+          fetch(`${API}/purchases/${purchaseId}`, { signal: controller.signal }),
+          fetch(API + "/stocks", { signal: controller.signal }),
+          fetch(API + "/materials", { signal: controller.signal }),
+        ]);
 
         if (!response.ok) {
           throw new Error("Satın alma detayı alınamadı.");
@@ -996,6 +1097,8 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
         }
 
         setPurchase(detail);
+        setStocks(stocksResponse.ok ? extractStocks(await stocksResponse.json()) : []);
+        setMaterials(materialsResponse.ok ? extractMaterials(await materialsResponse.json()) : []);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Satın alma detayı alınırken beklenmeyen bir hata oluştu.");
@@ -1090,7 +1193,7 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
                     <table className="w-full min-w-[760px] border-collapse text-left">
                       <thead className="bg-white/[0.06] text-xs uppercase tracking-[0.16em] text-zinc-400">
                         <tr>
-                          <TableHead>Stok adı</TableHead>
+                          <TableHead>Malzeme</TableHead>
                           <TableHead>Miktar</TableHead>
                           <TableHead>Birim</TableHead>
                           <TableHead>Birim fiyat</TableHead>
@@ -1101,7 +1204,7 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
                         {lines.map((line, index) => (
                           <tr key={line.id ?? `${line.stockItemId}-${index}`} className="transition hover:bg-white/[0.04]">
                             <TableCell>
-                              <span className="font-black text-white">{line.stockName || "-"}</span>
+                              <MaterialDetailCell line={line} stocks={stocks} materials={materials} />
                             </TableCell>
                             <TableCell>{formatNumber(safeNumber(line.quantity))}</TableCell>
                             <TableCell>{line.unit || "-"}</TableCell>
@@ -1172,6 +1275,22 @@ function DetailInfo({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
       <p className="text-xs text-zinc-500">{label}</p>
       <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function MaterialDetailCell({ line, stocks, materials }: { line: PurchaseOrderLine; stocks: StockItem[]; materials: Material[] }) {
+  const stock = stocks.find((item) => item.id === line.stockItemId);
+  const material = findMaterialForStock(stock, materials);
+
+  if (!material) {
+    return <span className="font-black text-white">{line.stockName || "-"}</span>;
+  }
+
+  return (
+    <div>
+      <p className="font-black text-white">{[material.code, material.name].filter(Boolean).join(" - ") || line.stockName || "-"}</p>
+      <p className="mt-1 text-xs font-bold text-emerald-200">{material.materialType || "-"}</p>
     </div>
   );
 }
@@ -1247,6 +1366,18 @@ function extractStocks(result: unknown): StockItem[] {
   return [];
 }
 
+function extractMaterials(result: unknown): Material[] {
+  if (Array.isArray(result)) {
+    return result.filter(isMaterial);
+  }
+
+  if (isRecord(result) && Array.isArray(result.data)) {
+    return result.data.filter(isMaterial);
+  }
+
+  return [];
+}
+
 function extractSuppliers(result: unknown): Supplier[] {
   if (Array.isArray(result)) {
     return result.filter(isSupplier);
@@ -1267,12 +1398,38 @@ function isStockItem(value: unknown): value is StockItem {
   return isRecord(value) && typeof value.id === "string";
 }
 
+function isMaterial(value: unknown): value is Material {
+  return isRecord(value) && typeof value.id === "string";
+}
+
 function isSupplier(value: unknown): value is Supplier {
   return isRecord(value) && typeof value.id === "string";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function findStockForMaterial(material: Material | undefined, stocks: StockItem[]) {
+  if (!material?.code) return undefined;
+
+  return stocks.find((stock) => normalizeText(stock.code) === normalizeText(material.code));
+}
+
+function findMaterialForStock(stock: StockItem | undefined, materials: Material[]) {
+  if (!stock?.code) return undefined;
+
+  return materials.find((material) => normalizeText(material.code) === normalizeText(stock.code));
+}
+
+function formatMaterialOption(material: Material) {
+  return `${[material.code, material.name].filter(Boolean).join(" - ") || material.id} | ${material.materialType || "-"} | ${material.unit || "-"}${
+    material.defaultSupplierName ? ` | ${material.defaultSupplierName}` : ""
+  }`;
+}
+
+function normalizeText(value: string | null | undefined) {
+  return String(value || "").trim().toLocaleLowerCase("tr-TR");
 }
 
 function isTodayPurchase(item: PurchaseOrder) {
@@ -1532,6 +1689,7 @@ function toPurchaseForm(purchase: PurchaseOrder | null): PurchaseFormState {
 function createEmptyPurchaseLine(): PurchaseFormLine {
   return {
     key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    materialId: "",
     stockItemId: "",
     quantity: "",
     unit: "",
@@ -1547,6 +1705,7 @@ function toPurchaseFormLines(purchase: PurchaseOrder | null): PurchaseFormLine[]
 
   return purchase.lines.map((line) => ({
     key: line.id || `${line.stockItemId}-${Math.random().toString(36).slice(2)}`,
+    materialId: "",
     stockItemId: line.stockItemId || "",
     quantity: line.quantity === null || line.quantity === undefined ? "" : String(line.quantity),
     unit: line.unit || "",
