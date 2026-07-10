@@ -70,5 +70,11 @@ public DbSet<Material> Materials => Set<Material>();
         builder.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins");
         builder.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
         builder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens");
+
+        builder.Entity<Material>()
+            .HasMany(x => x.StockItems)
+            .WithOne(x => x.Material)
+            .HasForeignKey(x => x.MaterialId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
