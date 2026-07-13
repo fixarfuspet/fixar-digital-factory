@@ -113,17 +113,39 @@ type WorkOrderRequirementLine = {
   materialId: string;
   materialCode?: string | null;
   materialName?: string | null;
-  requiredQuantity?: number | null;
-  unit?: string | null;
+  recipeQuantity?: number | null;
+  recipeUnit?: string | null;
+  wastePercent?: number | null;
+  netRequiredQuantity?: number | null;
+  wasteQuantity?: number | null;
+  totalRequiredQuantity?: number | null;
+  stockItemId?: string | null;
+  stockCode?: string | null;
   availableStock?: number | null;
+  reservedQuantity?: number | null;
+  freeStock?: number | null;
+  stockUnit?: string | null;
+  conversionApplied?: boolean | null;
+  conversionFactor?: number | null;
   shortageQuantity?: number | null;
+  coveragePercent?: number | null;
+  isSufficient?: boolean | null;
+  materialUnitPrice?: number | null;
   currency?: string | null;
   estimatedMaterialCost?: number | null;
+  warning?: string | null;
+  isUnitMismatch?: boolean | null;
 };
 
 type RequirementPayload = {
+  materialCount?: number | null;
+  sufficientMaterialCount?: number | null;
+  shortageMaterialCount?: number | null;
+  hasShortage?: boolean | null;
+  canStartProduction?: boolean | null;
   items?: WorkOrderRequirementLine[];
   totalsByCurrency?: Record<string, number>;
+  warnings?: string[];
 };
 
 type WorkOrder = {
@@ -160,6 +182,13 @@ type WorkOrder = {
   notes?: string | null;
   cancellationReason?: string | null;
   requirements?: RequirementPayload | null;
+  hasRecipe?: boolean | null;
+  hasMaterialShortage?: boolean | null;
+  shortageMaterialCount?: number | null;
+  materialCoveragePercent?: number | null;
+  estimatedMaterialCostByCurrency?: Record<string, number>;
+  canStartProduction?: boolean | null;
+  materialWarnings?: string[];
   stationAssignments?: unknown[];
   updatedAt?: string | null;
 };
@@ -286,7 +315,33 @@ export default function WorkOrdersPage() {
         return;
       }
 
-      await apiPost<unknown>("/work-orders/" + workOrder.id + path, {});
+      let body: Record<string, unknown> = {};
+      if (path === "/start") {
+        const requirements = await apiGet<RequirementPayload>("/work-orders/" + workOrder.id + "/requirements");
+        const blockingLines = (requirements.items ?? []).filter((line) =>
+          line.isUnitMismatch || !line.stockItemId || safeNumber(line.shortageQuantity) > 0
+        );
+
+        if (blockingLines.length > 0) {
+          const summary = blockingLines
+            .map((line) => `${line.materialCode || "-"} ${line.materialName || ""}: ${getRequirementStatus(line)} (${formatNumber(line.shortageQuantity)} ${line.stockUnit || ""})`)
+            .join("\n");
+          const reason = window.prompt(
+            "Bu iş emrinde hammadde uyarıları var.\n\n" +
+              summary +
+              "\n\nEksik stokla başlatmak için gerekçe yazın. Vazgeçmek için boş bırakın."
+          );
+
+          if (!reason?.trim()) {
+            alert("Eksik stok override gerekçesi zorunludur.");
+            return;
+          }
+
+          body = { allowMaterialShortage: true, shortageReason: reason.trim() };
+        }
+      }
+
+      await apiPost<unknown>("/work-orders/" + workOrder.id + path, body);
       await loadData();
       setSuccessMessage(path === "/start" ? "İş emri üretimde durumuna alındı." : "İş emri durumu güncellendi.");
     } catch (err) {
@@ -405,6 +460,7 @@ export default function WorkOrdersPage() {
                       <th className="py-3 pr-4">Başlangıç</th>
                       <th className="py-3 pr-4">Termin</th>
                       <th className="py-3 pr-4">Durum</th>
+                      <th className="py-3 pr-4">Malzeme</th>
                       <th className="py-3 pr-4">Öncelik</th>
                       <th className="py-3 text-right">İşlemler</th>
                     </tr>
@@ -427,6 +483,7 @@ export default function WorkOrdersPage() {
                           <td className="py-4 pr-4">{formatDate(order.plannedStartDate)}</td>
                           <td className="py-4 pr-4">{formatDate(order.plannedEndDate)}</td>
                           <td className="py-4 pr-4"><StatusBadge status={order.status} /></td>
+                          <td className="py-4 pr-4"><MaterialReadinessBadge order={order} /></td>
                           <td className="py-4 pr-4">{translatePriority(order.priority)}</td>
                           <td className="py-4">
                             <div className="flex justify-end gap-2">
@@ -817,35 +874,56 @@ function MaterialsTab({ requirements, materials, stocks, totals }: { requirement
       {!requirements && <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-5 text-sm font-bold text-amber-100">Bu iş emrine bağlı aktif reçete bulunmadığı için hammadde ihtiyacı hesaplanamıyor.</div>}
       {requirements && (
         <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <MetricCard label="Malzeme Sayısı" value={formatNumber(requirements.materialCount ?? lines.length)} />
+            <MetricCard label="Yeterli Malzeme" value={formatNumber(requirements.sufficientMaterialCount ?? lines.filter((line) => line.isSufficient).length)} tone="emerald" />
+            <MetricCard label="Eksik Malzeme" value={formatNumber(requirements.shortageMaterialCount ?? lines.filter((line) => !line.isSufficient).length)} tone={requirements.hasShortage ? "red" : "cyan"} />
+            <MetricCard label="Üretime Başlanabilir" value={requirements.canStartProduction ? "Evet" : "Hayır"} tone={requirements.canStartProduction ? "emerald" : "red"} />
+            <MetricCard label="Karşılama" value={`${formatNumber(averageCoverage(lines))}%`} tone={requirements.hasShortage ? "amber" : "emerald"} />
+          </div>
+          {requirements.warnings && requirements.warnings.length > 0 && (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm font-bold text-amber-100">
+              {requirements.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+            </div>
+          )}
           <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
-            <table className="min-w-[1120px] w-full text-left text-sm">
+            <table className="min-w-[1480px] w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-xs uppercase tracking-[0.16em] text-zinc-500">
                   <th className="p-3">Malzeme</th>
                   <th className="p-3">Kod</th>
                   <th className="p-3">Tip</th>
-                  <th className="p-3">Birim</th>
-                  <th className="p-3">Gerekli</th>
-                  <th className="p-3">Stok</th>
+                  <th className="p-3">Reçete Tüketimi</th>
+                  <th className="p-3">Fire %</th>
+                  <th className="p-3">Toplam İhtiyaç</th>
+                  <th className="p-3">Mevcut Stok</th>
                   <th className="p-3">Eksik</th>
+                  <th className="p-3">Karşılama</th>
+                  <th className="p-3">Birim Fiyat</th>
+                  <th className="p-3">Para Birimi</th>
                   <th className="p-3">Tahmini Maliyet</th>
+                  <th className="p-3">Durum</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
                 {lines.map((line) => {
                   const material = materials.find((item) => item.id === line.materialId);
                   const stock = findStockForMaterial(material, stocks);
-                  const shortage = safeNumber(line.shortageQuantity);
                   return (
                     <tr key={line.materialId}>
                       <td className="p-3 font-black text-white">{line.materialName || material?.name || "-"}</td>
                       <td className="p-3 font-mono text-xs text-emerald-200">{line.materialCode || material?.code || "-"}</td>
                       <td className="p-3">{material?.materialType || "-"}</td>
-                      <td className="p-3">{line.unit || material?.unit || "-"}</td>
-                      <td className="p-3">{formatNumber(line.requiredQuantity)}</td>
-                      <td className="p-3">{formatNumber(line.availableStock ?? stock?.currentQuantity)}</td>
-                      <td className="p-3"><StockStatusBadge status={shortage > 0 ? "Yetersiz" : "Yeterli"} /></td>
-                      <td className="p-3">{formatMoney(safeNumber(line.estimatedMaterialCost), line.currency || material?.currency || "TRY")}</td>
+                      <td className="p-3">{formatNumber(line.recipeQuantity)} {line.recipeUnit || ""}</td>
+                      <td className="p-3">{formatNumber(line.wastePercent)}</td>
+                      <td className="p-3">{formatNumber(line.totalRequiredQuantity)} {line.stockUnit || material?.unit || ""}</td>
+                      <td className="p-3">{formatNumber(line.availableStock ?? stock?.currentQuantity)} {line.stockUnit || stock?.unit || ""}</td>
+                      <td className="p-3">{formatNumber(line.shortageQuantity)} {line.stockUnit || ""}</td>
+                      <td className="p-3">{formatNumber(line.coveragePercent)}%</td>
+                      <td className="p-3">{line.materialUnitPrice == null ? "-" : formatNumber(line.materialUnitPrice)}</td>
+                      <td className="p-3">{line.currency || material?.currency || "-"}</td>
+                      <td className="p-3">{line.estimatedMaterialCost == null ? "-" : formatMoney(line.estimatedMaterialCost, line.currency || material?.currency || "TRY")}</td>
+                      <td className="p-3"><StockStatusBadge status={getRequirementStatus(line)} /></td>
                     </tr>
                   );
                 })}
@@ -982,8 +1060,8 @@ function DashboardCard({ title, value, note, tone }: { title: string; value: str
   );
 }
 
-function MetricCard({ label, value, tone = "zinc" }: { label: string; value: string; tone?: "emerald" | "cyan" | "red" | "zinc" }) {
-  const toneClass = tone === "emerald" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : tone === "cyan" ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-200" : tone === "red" ? "border-red-400/30 bg-red-500/10 text-red-200" : "border-white/10 bg-black/25 text-zinc-300";
+function MetricCard({ label, value, tone = "zinc" }: { label: string; value: string; tone?: "emerald" | "cyan" | "amber" | "red" | "zinc" }) {
+  const toneClass = tone === "emerald" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : tone === "cyan" ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-200" : tone === "amber" ? "border-amber-400/30 bg-amber-500/10 text-amber-200" : tone === "red" ? "border-red-400/30 bg-red-500/10 text-red-200" : "border-white/10 bg-black/25 text-zinc-300";
   return (
     <div className={`rounded-xl border p-4 ${toneClass}`}>
       <p className="text-xs font-black uppercase tracking-[0.18em] opacity-80">{label}</p>
@@ -1003,8 +1081,33 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{label}</span>;
 }
 
+function MaterialReadinessBadge({ order }: { order: WorkOrder }) {
+  const hasUnitMismatch = (order.materialWarnings ?? []).some((warning) => normalizeText(warning).includes("dönüşüm"));
+  const label = !order.hasRecipe
+    ? "Reçete Yok"
+    : hasUnitMismatch
+      ? "Birim Uyumsuzluğu"
+      : order.hasMaterialShortage
+        ? "Hammadde Eksik"
+        : "Üretime Hazır";
+  const className = !order.hasRecipe || hasUnitMismatch
+    ? "bg-red-500/15 text-red-200"
+    : order.hasMaterialShortage
+      ? "bg-amber-500/15 text-amber-200"
+      : "bg-emerald-500/15 text-emerald-200";
+
+  return <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{label}</span>;
+}
+
 function StockStatusBadge({ status }: { status: string }) {
-  const className = status === "Yeterli" ? "bg-emerald-500/15 text-emerald-200" : "bg-red-500/15 text-red-200";
+  const className =
+    status === "Yeterli"
+      ? "bg-emerald-500/15 text-emerald-200"
+      : status === "Fiyat Bulunamadı"
+        ? "bg-zinc-500/15 text-zinc-200"
+        : status === "Eksik"
+          ? "bg-amber-500/15 text-amber-200"
+          : "bg-red-500/15 text-red-200";
   return <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{status}</span>;
 }
 
@@ -1073,6 +1176,19 @@ function buildRequirementTotals(requirements: RequirementPayload | null, recipe:
   }
 
   return [{ currency: "TRY", total: 0 }];
+}
+
+function averageCoverage(lines: WorkOrderRequirementLine[]) {
+  if (lines.length === 0) return 0;
+  return lines.reduce((sum, line) => sum + safeNumber(line.coveragePercent), 0) / lines.length;
+}
+
+function getRequirementStatus(line: WorkOrderRequirementLine) {
+  if (line.isUnitMismatch) return "Birim Uyumsuz";
+  if (!line.stockItemId) return "Stok Kartı Yok";
+  if (safeNumber(line.shortageQuantity) > 0) return "Eksik";
+  if (line.materialUnitPrice == null || line.estimatedMaterialCost == null) return "Fiyat Bulunamadı";
+  return "Yeterli";
 }
 
 async function apiGet<T>(path: string): Promise<T> {
@@ -1154,6 +1270,13 @@ function mapWorkOrder(value: unknown): WorkOrder | null {
     shift: nullableNumber(value.shift),
     isActive: typeof value.isActive === "boolean" ? value.isActive : true,
     isCancelled: typeof value.isCancelled === "boolean" ? value.isCancelled : false,
+    hasRecipe: typeof value.hasRecipe === "boolean" ? value.hasRecipe : false,
+    hasMaterialShortage: typeof value.hasMaterialShortage === "boolean" ? value.hasMaterialShortage : true,
+    shortageMaterialCount: nullableNumber(value.shortageMaterialCount),
+    materialCoveragePercent: nullableNumber(value.materialCoveragePercent),
+    estimatedMaterialCostByCurrency: isRecord(value.estimatedMaterialCostByCurrency) ? value.estimatedMaterialCostByCurrency as Record<string, number> : {},
+    canStartProduction: typeof value.canStartProduction === "boolean" ? value.canStartProduction : false,
+    materialWarnings: Array.isArray(value.materialWarnings) ? value.materialWarnings.filter((item): item is string => typeof item === "string") : [],
     updatedAt: nullableString(value.updatedAt),
   };
 }

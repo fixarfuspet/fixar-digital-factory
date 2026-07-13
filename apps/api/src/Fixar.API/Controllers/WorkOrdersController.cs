@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Asp.Versioning;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
+using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -76,7 +78,8 @@ public class WorkOrdersController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var progress = await LoadProgress(workOrders.Select(x => x.Id), cancellationToken);
-        return Ok(ApiResponse<object>.SuccessResponse(workOrders.Select(x => ToListResponse(x, GetProgress(progress, x.Id))).ToList()));
+        var materialSummaries = await LoadMaterialPlanningSummaries(workOrders, cancellationToken);
+        return Ok(ApiResponse<object>.SuccessResponse(workOrders.Select(x => ToListResponse(x, GetProgress(progress, x.Id), GetMaterialSummary(materialSummaries, x.Id))).ToList()));
     }
 
     [HttpGet("available-for-planning")]
@@ -89,8 +92,9 @@ public class WorkOrdersController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var progress = await LoadProgress(workOrders.Select(x => x.Id), cancellationToken);
+        var materialSummaries = await LoadMaterialPlanningSummaries(workOrders, cancellationToken);
         var response = workOrders
-            .Select(x => ToAvailableResponse(x, GetProgress(progress, x.Id)))
+            .Select(x => ToAvailableResponse(x, GetProgress(progress, x.Id), GetMaterialSummary(materialSummaries, x.Id)))
             .Where(x => x.RemainingToAssignPairs > 0)
             .ToList();
 
@@ -106,6 +110,7 @@ public class WorkOrdersController : ControllerBase
 
         var progress = await LoadProgress(new[] { id }, cancellationToken);
         var requirements = await CalculateRequirements(workOrder, cancellationToken);
+        var materialSummary = requirements?.Summary ?? MaterialPlanningSummary.NoRecipe;
         var assignments = await _db.StationAssignments
             .Where(x => x.WorkOrderId == id)
             .OrderBy(x => x.StationNumberSnapshot)
@@ -122,7 +127,7 @@ public class WorkOrdersController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(workOrder, GetProgress(progress, id), requirements, assignments)));
+        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(workOrder, GetProgress(progress, id), materialSummary, requirements, assignments)));
     }
 
     [HttpPost]
@@ -153,7 +158,7 @@ public class WorkOrdersController : ControllerBase
         await transaction.CommitAsync(cancellationToken);
 
         var created = await QueryWorkOrders().FirstAsync(x => x.Id == workOrder.Id, cancellationToken);
-        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(created, WorkOrderProgress.Empty, null, Array.Empty<object>()), "İş emri oluşturuldu."));
+        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(created, WorkOrderProgress.Empty, MaterialPlanningSummary.NoRecipe, null, Array.Empty<object>()), "İş emri oluşturuldu."));
     }
 
     [HttpPut("{id:guid}")]
@@ -189,7 +194,8 @@ public class WorkOrdersController : ControllerBase
 
         var updated = await QueryWorkOrders().FirstAsync(x => x.Id == id, cancellationToken);
         var updatedProgress = GetProgress(await LoadProgress(new[] { id }, cancellationToken), id);
-        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(updated, updatedProgress, null, Array.Empty<object>()), "İş emri güncellendi."));
+        var requirements = await CalculateRequirements(updated, cancellationToken);
+        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(updated, updatedProgress, requirements?.Summary ?? MaterialPlanningSummary.NoRecipe, requirements, Array.Empty<object>()), "İş emri güncellendi."));
     }
 
     [HttpPost("{id:guid}/plan")]
@@ -199,7 +205,85 @@ public class WorkOrdersController : ControllerBase
     public Task<IActionResult> MarkReady(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "Ready", cancellationToken);
 
     [HttpPost("{id:guid}/start")]
-    public Task<IActionResult> Start(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "InProduction", cancellationToken);
+    public async Task<IActionResult> Start(Guid id, [FromBody] StartWorkOrderRequest? request, CancellationToken cancellationToken)
+    {
+        var workOrder = await QueryWorkOrders().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (workOrder is null)
+            return NotFound(ApiResponse<object>.Fail("İş emri bulunamadı.", "WORK_ORDER_NOT_FOUND"));
+
+        if (!CanTransition(workOrder.Status, "InProduction"))
+            return BadRequest(ApiResponse<object>.Fail("Bu iş emri için durum geçişi geçersiz.", "INVALID_STATUS_TRANSITION"));
+
+        var requirements = await CalculateRequirements(workOrder, cancellationToken);
+        if (requirements is null)
+        {
+            await AddAuditLog("WorkOrder Start Blocked by Shortage", workOrder.Id, new
+            {
+                Reason = "RecipeRequired",
+                workOrder.WorkOrderNumber
+            }, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            return BadRequest(ApiResponse<object>.Fail("İş emrinin üretime başlaması için aktif reçete zorunludur.", "RECIPE_REQUIRED"));
+        }
+
+        await AddAuditLog("WorkOrder Material Check", workOrder.Id, new
+        {
+            workOrder.WorkOrderNumber,
+            requirements.HasShortage,
+            requirements.ShortageMaterialCount,
+            requirements.CanStartProduction,
+            requirements.Warnings
+        }, cancellationToken);
+
+        var hasBlockingIssue = requirements.Items.Count == 0 ||
+            requirements.Items.Any(x => x.IsUnitMismatch || x.StockItemId is null) ||
+            requirements.HasShortage;
+
+        if (hasBlockingIssue)
+        {
+            if (request?.AllowMaterialShortage != true)
+            {
+                await AddAuditLog("WorkOrder Start Blocked by Shortage", workOrder.Id, new
+                {
+                    workOrder.WorkOrderNumber,
+                    requirements.ShortageMaterialCount,
+                    requirements.Warnings
+                }, cancellationToken);
+                await _db.SaveChangesAsync(cancellationToken);
+                return BadRequest(ApiResponse<object>.Fail("İş emrinin üretime başlaması için yeterli hammadde bulunmuyor.", "MATERIAL_SHORTAGE"));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.ShortageReason))
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                return BadRequest(ApiResponse<object>.Fail("Hammadde eksikliği override nedeni zorunludur.", "SHORTAGE_REASON_REQUIRED"));
+            }
+
+            if (requirements.Items.Any(x => x.IsUnitMismatch))
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                return BadRequest(ApiResponse<object>.Fail("Birim uyumsuzluğu bulunan iş emri üretime başlatılamaz.", "UNIT_CONVERSION_UNSUPPORTED"));
+            }
+
+            await AddAuditLog("WorkOrder Started with Material Shortage Override", workOrder.Id, new
+            {
+                workOrder.WorkOrderNumber,
+                ShortageReason = request.ShortageReason.Trim(),
+                requirements.ShortageMaterialCount,
+                requirements.Warnings
+            }, cancellationToken);
+        }
+
+        var utcNow = DateTime.UtcNow;
+        workOrder.Status = "InProduction";
+        workOrder.UpdatedAt = utcNow;
+        workOrder.UpdatedBy = GetActor();
+        workOrder.ActualStartDate ??= utcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        var progress = GetProgress(await LoadProgress(new[] { id }, cancellationToken), id);
+        return Ok(ApiResponse<object>.SuccessResponse(ToListResponse(workOrder, progress, requirements.Summary), "İş emri durumu güncellendi."));
+    }
 
     [HttpPost("{id:guid}/pause")]
     public Task<IActionResult> Pause(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "Paused", cancellationToken);
@@ -234,7 +318,8 @@ public class WorkOrdersController : ControllerBase
         workOrder.UpdatedBy = GetActor();
         await _db.SaveChangesAsync(cancellationToken);
 
-        return Ok(ApiResponse<object>.SuccessResponse(ToListResponse(workOrder, progress), "İş emri tamamlandı."));
+        var requirements = await CalculateRequirements(workOrder, cancellationToken);
+        return Ok(ApiResponse<object>.SuccessResponse(ToListResponse(workOrder, progress, requirements?.Summary ?? MaterialPlanningSummary.NoRecipe), "İş emri tamamlandı."));
     }
 
     [HttpPost("{id:guid}/cancel")]
@@ -268,7 +353,7 @@ public class WorkOrdersController : ControllerBase
         workOrder.UpdatedBy = GetActor();
         await _db.SaveChangesAsync(cancellationToken);
 
-        return Ok(ApiResponse<object>.SuccessResponse(ToListResponse(workOrder, WorkOrderProgress.Empty), "İş emri iptal edildi."));
+        return Ok(ApiResponse<object>.SuccessResponse(ToListResponse(workOrder, WorkOrderProgress.Empty, MaterialPlanningSummary.NoRecipe), "İş emri iptal edildi."));
     }
 
     [HttpPost("{id:guid}/duplicate")]
@@ -308,7 +393,7 @@ public class WorkOrdersController : ControllerBase
         await transaction.CommitAsync(cancellationToken);
 
         var created = await QueryWorkOrders().FirstAsync(x => x.Id == duplicate.Id, cancellationToken);
-        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(created, WorkOrderProgress.Empty, null, Array.Empty<object>()), "İş emri kopyalandı."));
+        return Ok(ApiResponse<object>.SuccessResponse(ToDetailResponse(created, WorkOrderProgress.Empty, MaterialPlanningSummary.NoRecipe, null, Array.Empty<object>()), "İş emri kopyalandı."));
     }
 
     [HttpGet("{id:guid}/requirements")]
@@ -425,11 +510,27 @@ public class WorkOrdersController : ControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
         var progress = GetProgress(await LoadProgress(new[] { id }, cancellationToken), id);
-        return Ok(ApiResponse<object>.SuccessResponse(ToListResponse(workOrder, progress), "İş emri durumu güncellendi."));
+        var materialSummaries = await LoadMaterialPlanningSummaries(new[] { workOrder }, cancellationToken);
+        return Ok(ApiResponse<object>.SuccessResponse(ToListResponse(workOrder, progress, GetMaterialSummary(materialSummaries, id)), "İş emri durumu güncellendi."));
     }
 
     private static WorkOrderProgress GetProgress(IReadOnlyDictionary<Guid, WorkOrderProgress> progress, Guid id)
         => progress.TryGetValue(id, out var value) ? value : WorkOrderProgress.Empty;
+
+    private static MaterialPlanningSummary GetMaterialSummary(IReadOnlyDictionary<Guid, MaterialPlanningSummary> summaries, Guid id)
+        => summaries.TryGetValue(id, out var value) ? value : MaterialPlanningSummary.NoRecipe;
+
+    private async Task<Dictionary<Guid, MaterialPlanningSummary>> LoadMaterialPlanningSummaries(IEnumerable<WorkOrder> workOrders, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<Guid, MaterialPlanningSummary>();
+        foreach (var workOrder in workOrders)
+        {
+            var requirements = await CalculateRequirements(workOrder, cancellationToken);
+            result[workOrder.Id] = requirements?.Summary ?? MaterialPlanningSummary.NoRecipe;
+        }
+
+        return result;
+    }
 
     private static bool CanTransition(string current, string next)
     {
@@ -524,68 +625,230 @@ public class WorkOrdersController : ControllerBase
         });
     }
 
-    private async Task<object?> CalculateRequirements(WorkOrder workOrder, CancellationToken cancellationToken)
+    private async Task<WorkOrderRequirementsResponse?> CalculateRequirements(WorkOrder workOrder, CancellationToken cancellationToken)
     {
         if (!workOrder.RecipeId.HasValue)
             return null;
 
         var recipe = await _db.Recipes
+            .Include(x => x.Product)
             .Include(x => x.Items)
             .ThenInclude(x => x.Material)
-            .FirstOrDefaultAsync(x => x.Id == workOrder.RecipeId.Value, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == workOrder.RecipeId.Value && x.IsActive, cancellationToken);
 
-        if (recipe is null)
+        if (recipe is null || recipe.Items.Count == 0)
             return null;
 
         var materialIds = recipe.Items.Select(x => x.MaterialId).ToList();
-        var stocks = await _db.StockItems
-            .Where(x => x.MaterialId.HasValue && materialIds.Contains(x.MaterialId.Value))
-            .GroupBy(x => x.MaterialId!.Value)
-            .Select(x => new { MaterialId = x.Key, Quantity = x.Sum(y => y.CurrentQuantity) })
-            .ToDictionaryAsync(x => x.MaterialId, x => x.Quantity, cancellationToken);
+        var materialCodes = recipe.Items.Select(x => x.Material.Code).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+        var stockItems = await _db.StockItems
+            .Where(x =>
+                (x.MaterialId.HasValue && materialIds.Contains(x.MaterialId.Value)) ||
+                (x.Code != null && materialCodes.Contains(x.Code)))
+            .ToListAsync(cancellationToken);
 
+        var purchasePrices = await _db.PurchaseOrderLines
+            .Include(x => x.PurchaseOrder)
+            .Include(x => x.StockItem)
+            .Where(x => x.StockItem.MaterialId.HasValue && materialIds.Contains(x.StockItem.MaterialId.Value) && x.PurchaseOrder.Status != "Cancelled")
+            .OrderByDescending(x => x.PurchaseOrder.OrderDate)
+            .ToListAsync(cancellationToken);
+
+        var warnings = new List<string>();
         var items = recipe.Items
             .OrderBy(x => x.Sequence)
             .Select(item =>
             {
-                var totalQuantity = item.Quantity + item.Quantity * item.WastePercent / 100;
-                var requiredQuantity = recipe.OutputQuantity > 0
-                    ? totalQuantity * workOrder.PlannedPairs / recipe.OutputQuantity
+                var rowWarnings = new List<string>();
+                var matchedStocks = stockItems
+                    .Where(x => x.MaterialId == item.MaterialId ||
+                        (!x.MaterialId.HasValue && string.Equals(x.Code, item.Material.Code, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                if (matchedStocks.Count > 1)
+                    rowWarnings.Add($"{item.Material.Code} malzemesi için birden fazla stok kartı bulundu.");
+
+                var stock = matchedStocks.Count == 1 ? matchedStocks[0] : null;
+                if (stock is null)
+                    rowWarnings.Add("Malzeme için bağlı stok kartı bulunamadı.");
+
+                var stockUnit = stock?.Unit ?? item.Material.Unit;
+                var conversion = ResolveUnitConversion(item.Unit, stockUnit);
+                if (!conversion.IsSupported)
+                    rowWarnings.Add("Reçete birimi ile stok birimi arasında desteklenen bir dönüşüm bulunamadı.");
+
+                var netRequired = recipe.OutputQuantity > 0
+                    ? item.Quantity * workOrder.PlannedPairs / recipe.OutputQuantity
                     : 0;
-                stocks.TryGetValue(item.MaterialId, out var availableStock);
-                var unitPrice = item.Material.LastPurchasePrice ?? 0;
-                var currency = string.IsNullOrWhiteSpace(item.Material.Currency) ? "TRY" : item.Material.Currency;
-                return new RequirementItemResponse(
+                var wasteQuantity = netRequired * item.WastePercent / 100;
+                var totalRequiredRecipeUnit = netRequired + wasteQuantity;
+                var totalRequiredStockUnit = conversion.IsSupported ? totalRequiredRecipeUnit * conversion.Factor : totalRequiredRecipeUnit;
+                var availableStock = stock?.CurrentQuantity ?? 0;
+                var reservedQuantity = 0m;
+                var freeStock = Math.Max(availableStock - reservedQuantity, 0);
+                var shortageQuantity = conversion.IsSupported ? Math.Max(totalRequiredStockUnit - freeStock, 0) : totalRequiredStockUnit;
+                var coveragePercent = totalRequiredStockUnit > 0 && conversion.IsSupported
+                    ? Math.Min(100, freeStock / totalRequiredStockUnit * 100)
+                    : 0;
+                var price = ResolveMaterialPrice(item.Material, stock, purchasePrices);
+                if (price.UnitPrice is null)
+                    rowWarnings.Add("Malzeme için güncel alış fiyatı bulunamadı.");
+
+                warnings.AddRange(rowWarnings.Select(x => $"{item.Material.Code}: {x}"));
+                return new WorkOrderRequirementItemResponse(
                     item.MaterialId,
                     item.Material.Code,
                     item.Material.Name,
-                    Math.Round(requiredQuantity, 4),
+                    Round(item.Quantity),
                     item.Unit,
-                    availableStock,
-                    Math.Max(requiredQuantity - availableStock, 0),
-                    currency,
-                    Math.Round(requiredQuantity * unitPrice, 4));
+                    Round(item.WastePercent),
+                    Round(netRequired),
+                    Round(wasteQuantity),
+                    Round(totalRequiredStockUnit),
+                    stock?.Id,
+                    stock?.Code,
+                    Round(availableStock),
+                    Round(reservedQuantity),
+                    Round(freeStock),
+                    stockUnit,
+                    conversion.Applied,
+                    conversion.IsSupported ? Round(conversion.Factor) : null,
+                    Round(shortageQuantity),
+                    Round(coveragePercent),
+                    conversion.IsSupported && stock is not null && shortageQuantity <= 0,
+                    price.UnitPrice,
+                    price.Currency,
+                    price.UnitPrice.HasValue ? Round(totalRequiredStockUnit * price.UnitPrice.Value) : null,
+                    rowWarnings.Count > 0 ? string.Join(" ", rowWarnings) : null,
+                    !conversion.IsSupported);
             })
             .ToList();
 
         var totalsByCurrency = items
+            .Where(x => x.EstimatedMaterialCost.HasValue)
             .GroupBy(x => x.Currency)
-            .ToDictionary(x => x.Key, x => x.Sum(y => y.EstimatedMaterialCost));
+            .ToDictionary(x => x.Key, x => Round(x.Sum(y => y.EstimatedMaterialCost!.Value)));
+        var sufficientCount = items.Count(x => x.IsSufficient);
+        var shortageCount = items.Count(x => x.ShortageQuantity > 0 || x.StockItemId is null || x.IsUnitMismatch);
+        var totalCoverage = items.Count > 0 ? Round(items.Average(x => x.CoveragePercent)) : 0;
+        var hasShortage = shortageCount > 0;
+        var canStart = items.Count > 0 && !hasShortage && items.All(x => !x.IsUnitMismatch);
+        var summary = new MaterialPlanningSummary(
+            HasRecipe: true,
+            HasMaterialShortage: hasShortage,
+            ShortageMaterialCount: shortageCount,
+            MaterialCoveragePercent: totalCoverage,
+            EstimatedMaterialCostByCurrency: totalsByCurrency,
+            CanStartProduction: canStart,
+            MaterialWarnings: warnings);
 
-        return new
-        {
+        return new WorkOrderRequirementsResponse(
             workOrder.Id,
             workOrder.WorkOrderNumber,
-            workOrder.RecipeId,
+            workOrder.ProductId,
+            workOrder.ProductCodeSnapshot ?? workOrder.Product.Code,
+            workOrder.ProductNameSnapshot ?? workOrder.Product.Name,
+            recipe.Id,
             recipe.Code,
             recipe.Name,
             workOrder.PlannedPairs,
-            Items = items,
-            TotalsByCurrency = totalsByCurrency
+            Round(recipe.OutputQuantity),
+            recipe.OutputUnit,
+            items.Count,
+            sufficientCount,
+            shortageCount,
+            hasShortage,
+            canStart,
+            totalsByCurrency,
+            DateTime.UtcNow,
+            warnings,
+            items,
+            items
+                .Where(x => x.ShortageQuantity > 0)
+                .Select(x => new PurchaseSuggestionResponse(
+                    x.MaterialId,
+                    x.MaterialCode,
+                    x.MaterialName,
+                    x.ShortageQuantity,
+                    x.StockUnit,
+                    recipe.Items.First(y => y.MaterialId == x.MaterialId).Material.DefaultSupplierId,
+                    recipe.Items.First(y => y.MaterialId == x.MaterialId).Material.DefaultSupplierName,
+                    x.MaterialUnitPrice,
+                    x.Currency))
+                .ToList(),
+            summary);
+    }
+
+    private static UnitConversionResult ResolveUnitConversion(string recipeUnit, string stockUnit)
+    {
+        var from = NormalizeUnit(recipeUnit);
+        var to = NormalizeUnit(stockUnit);
+
+        if (from == to)
+            return new UnitConversionResult(true, false, 1);
+
+        return (from, to) switch
+        {
+            ("g", "kg") => new UnitConversionResult(true, true, 0.001m),
+            ("kg", "g") => new UnitConversionResult(true, true, 1000m),
+            ("ml", "litre") => new UnitConversionResult(true, true, 0.001m),
+            ("litre", "ml") => new UnitConversionResult(true, true, 1000m),
+            _ => new UnitConversionResult(false, false, 1)
         };
     }
 
-    private static object ToListResponse(WorkOrder workOrder, WorkOrderProgress progress)
+    private static string NormalizeUnit(string? unit)
+    {
+        var normalized = (unit ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "gr" or "gram" or "gramaj" => "g",
+            "g" => "g",
+            "kg" or "kilogram" => "kg",
+            "lt" or "l" or "liter" or "litre" => "litre",
+            "ml" => "ml",
+            "adet" => "adet",
+            "çift" or "cift" => "çift",
+            "metre" or "m" => "metre",
+            _ => normalized
+        };
+    }
+
+    private static MaterialPriceResult ResolveMaterialPrice(Material material, StockItem? stock, List<PurchaseOrderLine> purchasePrices)
+    {
+        if (material.LastPurchasePrice.HasValue)
+            return new MaterialPriceResult(material.LastPurchasePrice.Value, string.IsNullOrWhiteSpace(material.Currency) ? stock?.Currency ?? "TRY" : material.Currency);
+
+        if (stock?.LastPurchasePrice.HasValue == true)
+            return new MaterialPriceResult(stock.LastPurchasePrice.Value, string.IsNullOrWhiteSpace(stock.Currency) ? material.Currency ?? "TRY" : stock.Currency);
+
+        var purchaseLine = purchasePrices.FirstOrDefault(x => x.StockItem.MaterialId == material.Id);
+        if (purchaseLine is not null)
+            return new MaterialPriceResult(purchaseLine.UnitPrice, string.IsNullOrWhiteSpace(purchaseLine.PurchaseOrder.Currency) ? stock?.Currency ?? material.Currency ?? "TRY" : purchaseLine.PurchaseOrder.Currency);
+
+        return new MaterialPriceResult(null, string.IsNullOrWhiteSpace(material.Currency) ? stock?.Currency ?? "TRY" : material.Currency);
+    }
+
+    private async Task AddAuditLog(string eventName, Guid workOrderId, object payload, CancellationToken cancellationToken)
+    {
+        _db.AuditLogs.Add(new AuditLog
+        {
+            Id = Guid.NewGuid(),
+            UserName = GetActor(),
+            Action = AuditAction.Update,
+            EntityName = eventName,
+            EntityId = workOrderId.ToString(),
+            NewValues = JsonSerializer.Serialize(payload),
+            Timestamp = DateTime.UtcNow,
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+        });
+
+        await Task.CompletedTask;
+    }
+
+    private static decimal Round(decimal value) => Math.Round(value, 4);
+
+    private static object ToListResponse(WorkOrder workOrder, WorkOrderProgress progress, MaterialPlanningSummary materialSummary)
     {
         return new
         {
@@ -619,14 +882,21 @@ public class WorkOrdersController : ControllerBase
             workOrder.Shift,
             workOrder.IsActive,
             workOrder.IsCancelled,
+            materialSummary.HasRecipe,
+            materialSummary.HasMaterialShortage,
+            materialSummary.ShortageMaterialCount,
+            materialSummary.MaterialCoveragePercent,
+            EstimatedMaterialCostByCurrency = materialSummary.EstimatedMaterialCostByCurrency,
+            materialSummary.CanStartProduction,
+            MaterialWarnings = materialSummary.MaterialWarnings,
             workOrder.CreatedAt,
             workOrder.UpdatedAt
         };
     }
 
-    private static object ToDetailResponse(WorkOrder workOrder, WorkOrderProgress progress, object? requirements, object assignments)
+    private static object ToDetailResponse(WorkOrder workOrder, WorkOrderProgress progress, MaterialPlanningSummary materialSummary, object? requirements, object assignments)
     {
-        var list = ToListResponse(workOrder, progress);
+        var list = ToListResponse(workOrder, progress, materialSummary);
         return new
         {
             WorkOrder = list,
@@ -637,7 +907,7 @@ public class WorkOrdersController : ControllerBase
         };
     }
 
-    private static AvailableWorkOrderResponse ToAvailableResponse(WorkOrder workOrder, WorkOrderProgress progress)
+    private static AvailableWorkOrderResponse ToAvailableResponse(WorkOrder workOrder, WorkOrderProgress progress, MaterialPlanningSummary materialSummary)
     {
         return new AvailableWorkOrderResponse(
             workOrder.Id,
@@ -657,7 +927,12 @@ public class WorkOrdersController : ControllerBase
             workOrder.Status,
             workOrder.RecipeId,
             workOrder.Recipe?.Code,
-            workOrder.Recipe?.Name);
+            workOrder.Recipe?.Name,
+            materialSummary.HasRecipe,
+            materialSummary.HasMaterialShortage,
+            materialSummary.ShortageMaterialCount,
+            materialSummary.CanStartProduction,
+            materialSummary.MaterialCoveragePercent);
     }
 
     private static object ToProgressResponse(WorkOrder workOrder, WorkOrderProgress progress)
@@ -706,20 +981,107 @@ public record SaveWorkOrderRequest(
     bool IsActive = true
 );
 
+public record StartWorkOrderRequest(bool AllowMaterialShortage = false, string? ShortageReason = null);
+
 public record CompleteWorkOrderRequest(bool AllowShortCompletion, string? Reason);
 
 public record CancelWorkOrderRequest(string CancellationReason);
 
-public record RequirementItemResponse(
+public record WorkOrderRequirementItemResponse(
     Guid MaterialId,
     string MaterialCode,
     string MaterialName,
-    decimal RequiredQuantity,
-    string Unit,
+    decimal RecipeQuantity,
+    string RecipeUnit,
+    decimal WastePercent,
+    decimal NetRequiredQuantity,
+    decimal WasteQuantity,
+    decimal TotalRequiredQuantity,
+    Guid? StockItemId,
+    string? StockCode,
     decimal AvailableStock,
+    decimal ReservedQuantity,
+    decimal FreeStock,
+    string StockUnit,
+    bool ConversionApplied,
+    decimal? ConversionFactor,
     decimal ShortageQuantity,
+    decimal CoveragePercent,
+    bool IsSufficient,
+    decimal? MaterialUnitPrice,
     string Currency,
-    decimal EstimatedMaterialCost
+    decimal? EstimatedMaterialCost,
+    string? Warning,
+    bool IsUnitMismatch
+);
+
+public record PurchaseSuggestionResponse(
+    Guid MaterialId,
+    string MaterialCode,
+    string MaterialName,
+    decimal ShortageQuantity,
+    string Unit,
+    Guid? PreferredSupplierId,
+    string? PreferredSupplierName,
+    decimal? LastPurchasePrice,
+    string Currency
+);
+
+public record WorkOrderRequirementsResponse(
+    Guid WorkOrderId,
+    string WorkOrderNumber,
+    Guid ProductId,
+    string? ProductCode,
+    string? ProductName,
+    Guid RecipeId,
+    string RecipeCode,
+    string RecipeName,
+    int PlannedPairs,
+    decimal RecipeOutputQuantity,
+    string RecipeOutputUnit,
+    int MaterialCount,
+    int SufficientMaterialCount,
+    int ShortageMaterialCount,
+    bool HasShortage,
+    bool CanStartProduction,
+    Dictionary<string, decimal> TotalsByCurrency,
+    DateTime CalculatedAt,
+    List<string> Warnings,
+    List<WorkOrderRequirementItemResponse> Items,
+    List<PurchaseSuggestionResponse> PurchaseSuggestions,
+    MaterialPlanningSummary Summary
+);
+
+public record MaterialPlanningSummary(
+    bool HasRecipe,
+    bool HasMaterialShortage,
+    int ShortageMaterialCount,
+    decimal MaterialCoveragePercent,
+    Dictionary<string, decimal> EstimatedMaterialCostByCurrency,
+    bool CanStartProduction,
+    List<string> MaterialWarnings
+)
+{
+    public static MaterialPlanningSummary NoRecipe => new(
+        false,
+        true,
+        0,
+        0,
+        new Dictionary<string, decimal>(),
+        false,
+        new List<string> { "İş emrine bağlı aktif reçete bulunamadı." });
+}
+
+public record UnitConversionResult(bool IsSupported, bool Applied, decimal Factor);
+
+public record MaterialPriceResult(decimal? UnitPrice, string Currency);
+
+public record WorkOrderMaterialPlanningFields(
+    bool HasRecipe,
+    bool HasMaterialShortage,
+    int ShortageMaterialCount,
+    bool CanStartProduction,
+    decimal MaterialCoveragePercent
 );
 
 public record AvailableWorkOrderResponse(
@@ -740,7 +1102,12 @@ public record AvailableWorkOrderResponse(
     string Status,
     Guid? RecipeId,
     string? RecipeCode,
-    string? RecipeName
+    string? RecipeName,
+    bool HasRecipe,
+    bool HasMaterialShortage,
+    int ShortageMaterialCount,
+    bool CanStartProduction,
+    decimal MaterialCoveragePercent
 );
 
 public record WorkOrderProgress(int AssignedPairs, int ProducedPairs, int GoodPairs, int FirePairs)
