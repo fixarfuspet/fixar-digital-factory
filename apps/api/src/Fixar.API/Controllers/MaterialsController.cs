@@ -70,7 +70,7 @@ public class MaterialsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var materials = await _db.Materials
+        var materials = await ProjectMaterialList()
             .OrderBy(x => x.Category)
             .ThenBy(x => x.Name)
             .ToListAsync(cancellationToken);
@@ -81,7 +81,8 @@ public class MaterialsController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var material = await _db.Materials.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var material = await ProjectMaterialDetail()
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (material is null)
             return NotFound(ApiResponse<object>.Fail("Malzeme bulunamadı.", "MATERIAL_NOT_FOUND"));
@@ -111,7 +112,8 @@ public class MaterialsController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return Ok(ApiResponse<object>.SuccessResponse(material, "Malzeme oluşturuldu."));
+        var created = await ProjectMaterialDetail().FirstAsync(x => x.Id == material.Id, cancellationToken);
+        return Ok(ApiResponse<object>.SuccessResponse(created, "Malzeme oluşturuldu."));
     }
 
     [HttpPut("{id:guid}")]
@@ -138,7 +140,188 @@ public class MaterialsController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return Ok(ApiResponse<object>.SuccessResponse(material, "Malzeme güncellendi."));
+        var updated = await ProjectMaterialDetail().FirstAsync(x => x.Id == id, cancellationToken);
+        return Ok(ApiResponse<object>.SuccessResponse(updated, "Malzeme güncellendi."));
+    }
+
+    private IQueryable<MaterialListDto> ProjectMaterialList()
+    {
+        return _db.Materials
+            .AsNoTracking()
+            .Select(x => new MaterialListDto
+            {
+                Id = x.Id,
+                Code = x.Code,
+                Name = x.Name,
+                Description = x.Description,
+                Category = x.Category,
+                SubCategory = x.SubCategory,
+                MaterialType = x.MaterialType,
+                Unit = x.Unit,
+                Density = x.Density,
+                DefaultSupplierId = x.DefaultSupplierId,
+                DefaultSupplierName = x.DefaultSupplierName,
+                PreferredSupplierId = x.DefaultSupplierId,
+                PreferredSupplierName = x.DefaultSupplierName,
+                Currency = x.Currency,
+                LastPurchasePrice = x.LastPurchasePrice,
+                MinimumStock = x.MinimumStock,
+                MaximumStock = x.MaximumStock,
+                CriticalStock = x.CriticalStock,
+                WarehouseName = x.WarehouseName,
+                LocationCode = x.LocationCode,
+                LotTrackingEnabled = x.LotTrackingEnabled,
+                ExpiryTrackingEnabled = x.ExpiryTrackingEnabled,
+                TechnicalSpecification = x.TechnicalSpecification,
+                SafetyInformation = x.SafetyInformation,
+                StockItemId = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => (Guid?)s.Id)
+                    .FirstOrDefault(),
+                StockCode = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => s.Code)
+                    .FirstOrDefault(),
+                CurrentQuantity = x.StockItems.Sum(s => s.CurrentQuantity),
+                MinimumStockLevel = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => s.MinimumQuantity)
+                    .FirstOrDefault(),
+                MaximumStockLevel = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => s.MaximumQuantity)
+                    .FirstOrDefault(),
+                IsLowStock = x.StockItems.Any(s => s.CriticalQuantity > 0 && s.CurrentQuantity <= s.CriticalQuantity),
+                RecipeUsageCount = x.RecipeItems.Count,
+                ActiveRecipeUsageCount = x.RecipeItems.Count(i => i.Recipe.IsActive),
+                IsActive = x.IsActive,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt
+            });
+    }
+
+    private IQueryable<MaterialDetailDto> ProjectMaterialDetail()
+    {
+        return _db.Materials
+            .AsNoTracking()
+            .Select(x => new MaterialDetailDto
+            {
+                Id = x.Id,
+                Code = x.Code,
+                Name = x.Name,
+                Description = x.Description,
+                Category = x.Category,
+                SubCategory = x.SubCategory,
+                MaterialType = x.MaterialType,
+                Unit = x.Unit,
+                Density = x.Density,
+                DefaultSupplierId = x.DefaultSupplierId,
+                DefaultSupplierName = x.DefaultSupplierName,
+                PreferredSupplierId = x.DefaultSupplierId,
+                PreferredSupplierName = x.DefaultSupplierName,
+                Currency = x.Currency,
+                LastPurchasePrice = x.LastPurchasePrice,
+                MinimumStock = x.MinimumStock,
+                MaximumStock = x.MaximumStock,
+                CriticalStock = x.CriticalStock,
+                WarehouseName = x.WarehouseName,
+                LocationCode = x.LocationCode,
+                LotTrackingEnabled = x.LotTrackingEnabled,
+                ExpiryTrackingEnabled = x.ExpiryTrackingEnabled,
+                TechnicalSpecification = x.TechnicalSpecification,
+                SafetyInformation = x.SafetyInformation,
+                ChemicalRole = x.ChemicalRole,
+                MixingRatio = x.MixingRatio,
+                ContainerWeight = x.ContainerWeight,
+                AddedToPoliolBatch = x.AddedToPoliolBatch,
+                CrosskimApplicationNote = x.CrosskimApplicationNote,
+                FabricType = x.FabricType,
+                FabricWeightGsm = x.FabricWeightGsm,
+                FabricColor = x.FabricColor,
+                FabricWidth = x.FabricWidth,
+                FabricRollLength = x.FabricRollLength,
+                AdhesiveType = x.AdhesiveType,
+                CustomerName = x.CustomerName,
+                DtfCode = x.DtfCode,
+                DtfName = x.DtfName,
+                DtfWidth = x.DtfWidth,
+                DtfHeight = x.DtfHeight,
+                ApplicationPosition = x.ApplicationPosition,
+                ApplicationNote = x.ApplicationNote,
+                PackagingType = x.PackagingType,
+                BoxPairCapacity = x.BoxPairCapacity,
+                BoxDimensions = x.BoxDimensions,
+                BoxWeight = x.BoxWeight,
+                StockItemId = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => (Guid?)s.Id)
+                    .FirstOrDefault(),
+                StockCode = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => s.Code)
+                    .FirstOrDefault(),
+                CurrentQuantity = x.StockItems.Sum(s => s.CurrentQuantity),
+                MinimumStockLevel = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => s.MinimumQuantity)
+                    .FirstOrDefault(),
+                MaximumStockLevel = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => s.MaximumQuantity)
+                    .FirstOrDefault(),
+                IsLowStock = x.StockItems.Any(s => s.CriticalQuantity > 0 && s.CurrentQuantity <= s.CriticalQuantity),
+                RecipeUsageCount = x.RecipeItems.Count,
+                ActiveRecipeUsageCount = x.RecipeItems.Count(i => i.Recipe.IsActive),
+                SupplierSummary = new MaterialSupplierSummaryDto
+                {
+                    PreferredSupplierId = x.DefaultSupplierId,
+                    PreferredSupplierName = x.DefaultSupplierName
+                },
+                StockSummary = x.StockItems
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenBy(s => s.Name)
+                    .Select(s => new MaterialStockSummaryDto
+                    {
+                        StockItemId = s.Id,
+                        StockCode = s.Code,
+                        StockName = s.Name,
+                        CurrentQuantity = s.CurrentQuantity,
+                        Unit = s.Unit,
+                        MinimumStockLevel = s.MinimumQuantity,
+                        MaximumStockLevel = s.MaximumQuantity,
+                        CriticalStockLevel = s.CriticalQuantity,
+                        WarehouseName = s.WarehouseName,
+                        LocationCode = s.LocationCode,
+                        LastPurchasePrice = s.LastPurchasePrice,
+                        Currency = s.Currency,
+                        IsLowStock = s.CriticalQuantity > 0 && s.CurrentQuantity <= s.CriticalQuantity,
+                        IsActive = s.IsActive
+                    })
+                    .FirstOrDefault(),
+                LastPurchaseSummary = x.StockItems
+                    .SelectMany(s => s.Movements)
+                    .Where(m => m.UnitPrice.HasValue)
+                    .OrderByDescending(m => m.MovementDate)
+                    .Select(m => new MaterialPurchaseSummaryDto
+                    {
+                        UnitPrice = m.UnitPrice,
+                        MovementDate = m.MovementDate,
+                        SourceType = m.SourceType,
+                        SourceDocumentNo = m.SourceDocumentNo
+                    })
+                    .FirstOrDefault(),
+                IsActive = x.IsActive,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt
+            });
     }
 
     private async Task<IActionResult?> ValidateRequest(CreateMaterialRequest request, Guid? materialId, Material? currentMaterial, CancellationToken cancellationToken)
@@ -326,6 +509,115 @@ public class MaterialsController : ControllerBase
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
+}
+
+public class MaterialListDto
+{
+    public Guid Id { get; init; }
+    public string Code { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public string? Category { get; init; }
+    public string? SubCategory { get; init; }
+    public string MaterialType { get; init; } = string.Empty;
+    public string Unit { get; init; } = string.Empty;
+    public decimal? Density { get; init; }
+    public Guid? DefaultSupplierId { get; init; }
+    public string? DefaultSupplierName { get; init; }
+    public Guid? PreferredSupplierId { get; init; }
+    public string? PreferredSupplierName { get; init; }
+    public string? Currency { get; init; }
+    public decimal? LastPurchasePrice { get; init; }
+    public decimal? MinimumStock { get; init; }
+    public decimal? MaximumStock { get; init; }
+    public decimal? CriticalStock { get; init; }
+    public string? WarehouseName { get; init; }
+    public string? LocationCode { get; init; }
+    public bool LotTrackingEnabled { get; init; }
+    public bool ExpiryTrackingEnabled { get; init; }
+    public string? TechnicalSpecification { get; init; }
+    public string? SafetyInformation { get; init; }
+    public Guid? StockItemId { get; init; }
+    public string? StockCode { get; init; }
+    public decimal CurrentQuantity { get; init; }
+    public decimal? MinimumStockLevel { get; init; }
+    public decimal? MaximumStockLevel { get; init; }
+    public bool IsLowStock { get; init; }
+    public int RecipeUsageCount { get; init; }
+    public int ActiveRecipeUsageCount { get; init; }
+    public bool IsActive { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime UpdatedAt { get; init; }
+}
+
+public class MaterialDetailDto : MaterialListDto
+{
+    public string? TechnicalName { get; init; }
+    public string? Manufacturer { get; init; }
+    public string? Brand { get; init; }
+    public string? CountryOfOrigin { get; init; }
+    public int? LeadTimeDays { get; init; }
+    public int? ShelfLifeDays { get; init; }
+    public string? StorageConditions { get; init; }
+    public string? SafetyNotes { get; init; }
+    public string? Notes { get; init; }
+    public string? ChemicalRole { get; init; }
+    public decimal? MixingRatio { get; init; }
+    public decimal? ContainerWeight { get; init; }
+    public bool AddedToPoliolBatch { get; init; }
+    public string? CrosskimApplicationNote { get; init; }
+    public string? FabricType { get; init; }
+    public decimal? FabricWeightGsm { get; init; }
+    public string? FabricColor { get; init; }
+    public decimal? FabricWidth { get; init; }
+    public decimal? FabricRollLength { get; init; }
+    public string? AdhesiveType { get; init; }
+    public string? CustomerName { get; init; }
+    public string? DtfCode { get; init; }
+    public string? DtfName { get; init; }
+    public decimal? DtfWidth { get; init; }
+    public decimal? DtfHeight { get; init; }
+    public string? ApplicationPosition { get; init; }
+    public string? ApplicationNote { get; init; }
+    public string? PackagingType { get; init; }
+    public int? BoxPairCapacity { get; init; }
+    public string? BoxDimensions { get; init; }
+    public decimal? BoxWeight { get; init; }
+    public MaterialSupplierSummaryDto? SupplierSummary { get; init; }
+    public MaterialStockSummaryDto? StockSummary { get; init; }
+    public MaterialPurchaseSummaryDto? LastPurchaseSummary { get; init; }
+}
+
+public class MaterialStockSummaryDto
+{
+    public Guid StockItemId { get; init; }
+    public string? StockCode { get; init; }
+    public string StockName { get; init; } = string.Empty;
+    public decimal CurrentQuantity { get; init; }
+    public string Unit { get; init; } = string.Empty;
+    public decimal? MinimumStockLevel { get; init; }
+    public decimal? MaximumStockLevel { get; init; }
+    public decimal CriticalStockLevel { get; init; }
+    public string? WarehouseName { get; init; }
+    public string? LocationCode { get; init; }
+    public decimal? LastPurchasePrice { get; init; }
+    public string Currency { get; init; } = "TRY";
+    public bool IsLowStock { get; init; }
+    public bool IsActive { get; init; }
+}
+
+public class MaterialSupplierSummaryDto
+{
+    public Guid? PreferredSupplierId { get; init; }
+    public string? PreferredSupplierName { get; init; }
+}
+
+public class MaterialPurchaseSummaryDto
+{
+    public decimal? UnitPrice { get; init; }
+    public DateTime MovementDate { get; init; }
+    public string? SourceType { get; init; }
+    public string? SourceDocumentNo { get; init; }
 }
 
 public record CreateMaterialRequest(
