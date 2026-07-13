@@ -69,4 +69,8 @@ public class Machine : BaseAuditableEntity
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    public ICollection<Operator> DefaultOperators { get; set; } = new List<Operator>();
+
+    public ICollection<Operator> CurrentOperators { get; set; } = new List<Operator>();
 }
