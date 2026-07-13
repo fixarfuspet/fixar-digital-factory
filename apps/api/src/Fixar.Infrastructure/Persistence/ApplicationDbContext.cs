@@ -48,6 +48,9 @@ public DbSet<ProductionBox> ProductionBoxes => Set<ProductionBox>();
 public DbSet<ProductionBoxEvent> ProductionBoxEvents => Set<ProductionBoxEvent>();
 public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 public DbSet<StationAssignment> StationAssignments => Set<StationAssignment>();
+public DbSet<StationAssignmentFire> StationAssignmentFires => Set<StationAssignmentFire>();
+public DbSet<StationAssignmentDowntime> StationAssignmentDowntimes => Set<StationAssignmentDowntime>();
+public DbSet<StationAssignmentEvent> StationAssignmentEvents => Set<StationAssignmentEvent>();
 public DbSet<StockItem> StockItems => Set<StockItem>();
 
 public DbSet<StockMovement> StockMovements => Set<StockMovement>();
@@ -55,6 +58,10 @@ public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
 public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
 public DbSet<Supplier> Suppliers => Set<Supplier>();
 public DbSet<Material> Materials => Set<Material>();
+public DbSet<ProductionSession> ProductionSessions => Set<ProductionSession>();
+public DbSet<ProductionStation> ProductionStations => Set<ProductionStation>();
+public DbSet<ProductionEvent> ProductionEvents => Set<ProductionEvent>();
+public DbSet<ProductionDowntime> ProductionDowntimes => Set<ProductionDowntime>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -98,5 +105,115 @@ public DbSet<Material> Materials => Set<Material>();
             .WithMany(x => x.CurrentOperators)
             .HasForeignKey(x => x.CurrentMachineId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionSession>()
+            .HasMany(x => x.Stations)
+            .WithOne(x => x.ProductionSession)
+            .HasForeignKey(x => x.ProductionSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionSession>()
+            .HasMany(x => x.Events)
+            .WithOne(x => x.ProductionSession)
+            .HasForeignKey(x => x.ProductionSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionSession>()
+            .HasMany(x => x.Downtimes)
+            .WithOne(x => x.ProductionSession)
+            .HasForeignKey(x => x.ProductionSessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionStation>()
+            .HasMany(x => x.Events)
+            .WithOne(x => x.ProductionStation)
+            .HasForeignKey(x => x.ProductionStationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionStation>()
+            .HasMany(x => x.Downtimes)
+            .WithOne(x => x.ProductionStation)
+            .HasForeignKey(x => x.ProductionStationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionSession>()
+            .HasOne(x => x.Machine)
+            .WithMany()
+            .HasForeignKey(x => x.MachineId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionSession>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionSession>()
+            .HasOne(x => x.Operator)
+            .WithMany()
+            .HasForeignKey(x => x.OperatorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionStation>()
+            .HasOne(x => x.Mold)
+            .WithMany()
+            .HasForeignKey(x => x.MoldId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionStation>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionStation>()
+            .HasOne(x => x.Operator)
+            .WithMany()
+            .HasForeignKey(x => x.OperatorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StationAssignment>()
+            .HasMany(x => x.Fires)
+            .WithOne(x => x.StationAssignment)
+            .HasForeignKey(x => x.StationAssignmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StationAssignment>()
+            .HasMany(x => x.Downtimes)
+            .WithOne(x => x.StationAssignment)
+            .HasForeignKey(x => x.StationAssignmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StationAssignment>()
+            .HasMany(x => x.Events)
+            .WithOne(x => x.StationAssignment)
+            .HasForeignKey(x => x.StationAssignmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StationAssignmentFire>()
+            .HasIndex(x => x.StationAssignmentId);
+
+        builder.Entity<StationAssignmentFire>()
+            .HasIndex(x => x.RecordedAt);
+
+        builder.Entity<StationAssignmentDowntime>()
+            .HasIndex(x => x.StationAssignmentId);
+
+        builder.Entity<StationAssignmentDowntime>()
+            .HasIndex(x => x.IsOpen);
+
+        builder.Entity<StationAssignmentDowntime>()
+            .HasIndex(x => x.StationAssignmentId)
+            .IsUnique()
+            .HasFilter("\"IsOpen\" = true AND \"IsCancelled\" = false");
+
+        builder.Entity<StationAssignmentEvent>()
+            .HasIndex(x => x.StationAssignmentId);
+
+        builder.Entity<StationAssignmentEvent>()
+            .HasIndex(x => x.EventTime);
+
+        builder.Entity<StationAssignmentEvent>()
+            .HasIndex(x => x.EventType);
     }
 }

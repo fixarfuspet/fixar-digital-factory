@@ -3,6 +3,7 @@ using System;
 using Fixar.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fixar.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260713134644_AddLiveProduction")]
+    partial class AddLiveProduction
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1828,9 +1831,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("FinishedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("FirePairs")
-                        .HasColumnType("integer");
-
                     b.Property<Guid>("InjectionStationId")
                         .HasColumnType("uuid");
 
@@ -1839,15 +1839,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("LastModifiedBy")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("LastReleaseAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("LastReleaseTurn")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("LastTurnAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("MoldId")
                         .HasColumnType("uuid");
@@ -1864,9 +1855,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.Property<int>("ProducedPairs")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("ReleaseFrequencyTurns")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1877,12 +1865,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("TotalTurns")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TurnsSinceLastRelease")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasIndex("InjectionStationId");
@@ -1892,296 +1874,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrderItemId");
 
                     b.ToTable("StationAssignments");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.StationAssignmentDowntime", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CancellationReason")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("CancelledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CancelledBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DowntimeType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("DurationMinutes")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime?>("EndedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EndedBy")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("InjectionStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsCancelled")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsOpen")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LastModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("MachineId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("OperatorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OperatorNameSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("OrderItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PreviousAssignmentStatus")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("StartedBy")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("StationAssignmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("StationNumberSnapshot")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsOpen");
-
-                    b.HasIndex("StationAssignmentId")
-                        .IsUnique()
-                        .HasFilter("\"IsOpen\" = true AND \"IsCancelled\" = false");
-
-                    b.ToTable("StationAssignmentDowntimes");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.StationAssignmentEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("EventTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("InjectionStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LastModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("MetadataJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("MoldCodeSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("MoldId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("MoldNameSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("OperatorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OperatorNameSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("OrderItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ProductCodeSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ProductNameSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("Quantity")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("text");
-
-                    b.Property<string>("RecordedBy")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("StationAssignmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("StationNumberSnapshot")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EventTime");
-
-                    b.HasIndex("EventType");
-
-                    b.HasIndex("StationAssignmentId");
-
-                    b.ToTable("StationAssignmentEvents");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.StationAssignmentFire", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CancellationReason")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("CancelledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CancelledBy")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("FirePairs")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("InjectionStationId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsCancelled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LastModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("MoldCodeSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("MoldId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("MoldNameSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("OperatorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("OperatorNameSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("OrderItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ProductCodeSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ProductNameSnapshot")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ReasonType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("RecordedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RecordedBy")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("StationAssignmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("StationNumberSnapshot")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecordedAt");
-
-                    b.HasIndex("StationAssignmentId");
-
-                    b.ToTable("StationAssignmentFires");
                 });
 
             modelBuilder.Entity("Fixar.Domain.Entities.StockItem", b =>
@@ -2939,39 +2631,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.Navigation("OrderItem");
                 });
 
-            modelBuilder.Entity("Fixar.Domain.Entities.StationAssignmentDowntime", b =>
-                {
-                    b.HasOne("Fixar.Domain.Entities.StationAssignment", "StationAssignment")
-                        .WithMany("Downtimes")
-                        .HasForeignKey("StationAssignmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("StationAssignment");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.StationAssignmentEvent", b =>
-                {
-                    b.HasOne("Fixar.Domain.Entities.StationAssignment", "StationAssignment")
-                        .WithMany("Events")
-                        .HasForeignKey("StationAssignmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("StationAssignment");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.StationAssignmentFire", b =>
-                {
-                    b.HasOne("Fixar.Domain.Entities.StationAssignment", "StationAssignment")
-                        .WithMany("Fires")
-                        .HasForeignKey("StationAssignmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("StationAssignment");
-                });
-
             modelBuilder.Entity("Fixar.Domain.Entities.StockItem", b =>
                 {
                     b.HasOne("Fixar.Domain.Entities.Material", "Material")
@@ -3121,15 +2780,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Fixar.Domain.Entities.PurchaseOrder", b =>
                 {
                     b.Navigation("Lines");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.StationAssignment", b =>
-                {
-                    b.Navigation("Downtimes");
-
-                    b.Navigation("Events");
-
-                    b.Navigation("Fires");
                 });
 
             modelBuilder.Entity("Fixar.Domain.Entities.StockItem", b =>

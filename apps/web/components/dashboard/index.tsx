@@ -1,4 +1,4 @@
-export { DashboardHeader } from "./DashboardHeader";
+export { DashboardHeader } from "../../app/components/dashboard/DashboardHeader";
 
 export function AiAssistantCard() { return <div>AI Assistant</div>; }
 export function CriticalStockAlerts() { return <div>Critical Stock Alerts</div>; }
