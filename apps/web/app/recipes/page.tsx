@@ -61,10 +61,15 @@ type RecipeLine = {
 
 type RecipeRecord = {
   id: string;
+  code: string;
+  name: string;
   productId: string;
   version: string;
   revisionNo: string;
   isActive: boolean;
+  isDefault: boolean;
+  outputQuantity: string;
+  outputUnit: string;
   startDate: string;
   endDate: string;
   lines: RecipeLine[];
@@ -93,10 +98,15 @@ type RecipeRecord = {
 
 type ApiResponse<T> = {
   data?: T;
+  message?: string;
+  errorCode?: string;
 };
 
-const API = "http://localhost:5000/api/v1";
+const API =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
+  "http://localhost:5000/api/v1";
 const PRODUCT_MARKER = "\n\n---FIXAR_PRODUCT_MASTER_JSON---\n";
+const RECIPE_MARKER = "\n\n---FIXAR_RECIPE_UI_JSON---\n";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
 const RECIPE_ROLES = ["Poliol", "İzosiyanat", "Crosskim", "Pigment", "Solvent", "Kalıp Ayırıcı", "Kumaş", "Yapışkan", "DTF", "İşçilik", "Diğer"];
@@ -121,25 +131,33 @@ export default function RecipesPage() {
   const [dialogRecipe, setDialogRecipe] = useState<RecipeRecord | null>(null);
 
   useEffect(() => {
-    loadMasters();
+    loadData();
   }, []);
 
-  async function loadMasters() {
+  async function loadData() {
     setLoading(true);
     setError(null);
 
     try {
-      const [productsResponse, materialsResponse] = await Promise.all([fetch(API + "/products"), fetch(API + "/materials")]);
+      const [productsResponse, materialsResponse, recipesResponse] = await Promise.all([
+        fetch(API + "/products"),
+        fetch(API + "/materials"),
+        fetch(API + "/recipes?includeItems=true"),
+      ]);
 
-      if (!productsResponse.ok || !materialsResponse.ok) {
-        throw new Error("Product veya Material Master listesi alınamadı.");
+      if (!productsResponse.ok || !materialsResponse.ok || !recipesResponse.ok) {
+        throw new Error("Product, Material veya reçete listesi alınamadı.");
       }
 
-      setProducts(extractProducts(await productsResponse.json()).filter((product) => product.isActive !== false));
-      setMaterials(extractMaterials(await materialsResponse.json()).filter((material) => material.isActive !== false));
+      const productList = extractProducts(await productsResponse.json()).filter((product) => product.isActive !== false);
+      const materialList = extractMaterials(await materialsResponse.json()).filter((material) => material.isActive !== false);
+      setProducts(productList);
+      setMaterials(materialList);
+      setRecipes(extractRecipes(await recipesResponse.json(), materialList));
     } catch (err) {
       setProducts([]);
       setMaterials([]);
+      setRecipes([]);
       setError(err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.");
     } finally {
       setLoading(false);
@@ -158,12 +176,10 @@ export default function RecipesPage() {
   }
 
   function handleSaved(recipe: RecipeRecord, message: string) {
-    setRecipes((current) => {
-      const exists = current.some((item) => item.id === recipe.id);
-      return exists ? current.map((item) => (item.id === recipe.id ? recipe : item)) : [recipe, ...current];
-    });
+    setRecipes((current) => [recipe, ...current.filter((item) => item.id !== recipe.id)]);
     closeDialog();
     setSuccessMessage(message);
+    loadData();
   }
 
   const filteredRecipes = useMemo(() => {
@@ -172,7 +188,7 @@ export default function RecipesPage() {
 
     return recipes.filter((recipe) => {
       const product = products.find((item) => item.id === recipe.productId);
-      return [product?.code, product?.name, product?.foamType, recipe.version, recipe.revisionNo]
+      return [recipe.code, recipe.name, product?.code, product?.name, product?.foamType, recipe.version, recipe.revisionNo]
         .filter(Boolean)
         .some((value) => String(value).toLocaleLowerCase("tr-TR").includes(normalizedSearch));
     });
@@ -186,10 +202,10 @@ export default function RecipesPage() {
   }).length;
   const totalMaterialCount = recipes.reduce((sum, recipe) => sum + recipe.lines.filter((line) => line.materialId).length, 0);
   const averageCost = recipes.length
-    ? recipes.reduce((sum, recipe) => sum + calculateRecipeTotals(recipe.lines, materials).totalCost + safeParsedNumber(recipe.laborCost) + safeParsedNumber(recipe.electricityCost) + safeParsedNumber(recipe.packagingCost) + safeParsedNumber(recipe.overheadCost), 0) / recipes.length
+    ? recipes.reduce((sum, recipe) => sum + calculateRecipeTotals(recipe.lines, materials).totalCost, 0) / recipes.length
     : 0;
   const dashboardCards = [
-    { title: "Toplam Reçete", value: recipes.length.toLocaleString("tr-TR"), note: "Frontend reçete kaydı", tone: "emerald" as DashboardTone },
+    { title: "Toplam Reçete", value: recipes.length.toLocaleString("tr-TR"), note: "Veritabanı reçete kaydı", tone: "emerald" as DashboardTone },
     { title: "Aktif Reçete", value: activeCount.toLocaleString("tr-TR"), note: "Üretime açık", tone: "cyan" as DashboardTone },
     { title: "Memory Foam", value: memoryFoamCount.toLocaleString("tr-TR"), note: "Ürün tipi", tone: "amber" as DashboardTone },
     { title: "Normal PU", value: normalPuCount.toLocaleString("tr-TR"), note: "10100 normal ürün", tone: "blue" as DashboardTone },
@@ -211,11 +227,11 @@ export default function RecipesPage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={loadMasters}
+                onClick={loadData}
                 disabled={loading}
                 className="rounded-xl border border-white/10 bg-white/[0.08] px-5 py-3 text-sm font-black text-white transition hover:bg-white/[0.14] disabled:opacity-50"
               >
-                {loading ? "Yenileniyor..." : "Masterları Yenile"}
+                {loading ? "Yenileniyor..." : "Listeyi Yenile"}
               </button>
               <button onClick={() => openDialog("create")} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400">
                 + Yeni Reçete
@@ -264,35 +280,36 @@ export default function RecipesPage() {
                 <table className="min-w-[1040px] w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-zinc-500">
-                      <th className="py-3 pr-4">Ürün</th>
-                      <th className="py-3 pr-4">Kod</th>
-                      <th className="py-3 pr-4">Foam</th>
-                      <th className="py-3 pr-4">Versiyon</th>
-                      <th className="py-3 pr-4">Toplam Gram</th>
-                      <th className="py-3 pr-4">Toplam Maliyet</th>
-                      <th className="py-3 pr-4">Durum</th>
-                      <th className="py-3 pr-4">Revizyon</th>
-                      <th className="py-3 pr-4">Güncelleme</th>
-                      <th className="py-3 text-right">İşlemler</th>
+                          <th className="py-3 pr-4">Reçete Kodu</th>
+                          <th className="py-3 pr-4">Reçete Adı</th>
+                          <th className="py-3 pr-4">Ürün</th>
+                          <th className="py-3 pr-4">Versiyon</th>
+                          <th className="py-3 pr-4">Malzeme</th>
+                          <th className="py-3 pr-4">Çıktı</th>
+                          <th className="py-3 pr-4">Varsayılan</th>
+                          <th className="py-3 pr-4">Toplam Gram</th>
+                          <th className="py-3 pr-4">Malzeme Maliyeti</th>
+                          <th className="py-3 pr-4">Durum</th>
+                          <th className="py-3 text-right">İşlemler</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/10">
                     {filteredRecipes.map((recipe) => {
                       const product = products.find((item) => item.id === recipe.productId);
                       const totals = calculateRecipeTotals(recipe.lines, materials);
-                      const fullCost = totals.totalCost + safeParsedNumber(recipe.laborCost) + safeParsedNumber(recipe.electricityCost) + safeParsedNumber(recipe.packagingCost) + safeParsedNumber(recipe.overheadCost);
 
                       return (
                         <tr key={recipe.id} className="align-middle text-zinc-200 transition hover:bg-white/[0.04]">
-                          <td className="py-4 pr-4 font-black text-white">{product?.name || "-"}</td>
-                          <td className="py-4 pr-4 font-mono text-xs text-emerald-200">{product?.code || "-"}</td>
-                          <td className="py-4 pr-4">{product?.foamType || "-"}</td>
+                          <td className="py-4 pr-4 font-mono text-xs text-emerald-200">{recipe.code || "-"}</td>
+                          <td className="py-4 pr-4 font-black text-white">{recipe.name || "-"}</td>
+                          <td className="py-4 pr-4">{[product?.code, product?.name].filter(Boolean).join(" - ") || "-"}</td>
                           <td className="py-4 pr-4">{recipe.version || "-"}</td>
+                          <td className="py-4 pr-4">{recipe.lines.filter((line) => line.materialId).length.toLocaleString("tr-TR")}</td>
+                          <td className="py-4 pr-4">{formatNumber(safeParsedNumber(recipe.outputQuantity))} {recipe.outputUnit || "Çift"}</td>
+                          <td className="py-4 pr-4">{recipe.isDefault ? "Evet" : "Hayır"}</td>
                           <td className="py-4 pr-4">{formatNumber(totals.totalGram)} gr</td>
-                          <td className="py-4 pr-4">{formatMoney(fullCost, getRecipeCurrency(recipe, materials))}</td>
+                          <td className="py-4 pr-4">{formatCurrencyTotals(totals.totalsByCurrency)}</td>
                           <td className="py-4 pr-4"><StatusBadge active={recipe.isActive} /></td>
-                          <td className="py-4 pr-4">{recipe.revisionNo || "-"}</td>
-                          <td className="py-4 pr-4">{formatDate(recipe.updatedAt)}</td>
                           <td className="py-4">
                             <div className="flex justify-end gap-2">
                               <button onClick={() => openDialog("detail", recipe)} className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-black text-cyan-100 transition hover:bg-cyan-400/20">Detay</button>
@@ -342,6 +359,7 @@ function RecipeModal({
   const [activeTab, setActiveTab] = useState<RecipeTab>("general");
   const [form, setForm] = useState<RecipeRecord>(() => recipe ? cloneRecipe(recipe) : createEmptyRecipe());
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const readonly = mode === "detail";
   const product = products.find((item) => item.id === form.productId);
   const productDetails = parseProductDetails(product?.description);
@@ -378,11 +396,29 @@ function RecipeModal({
     }));
   }
 
-  function saveRecipe() {
+  async function saveRecipe() {
     setError(null);
 
     if (!form.productId) {
       setError("Product Master seçmelisiniz.");
+      setActiveTab("general");
+      return;
+    }
+
+    if (!form.code.trim()) {
+      setError("Reçete kodu zorunludur.");
+      setActiveTab("general");
+      return;
+    }
+
+    if (!form.name.trim()) {
+      setError("Reçete adı zorunludur.");
+      setActiveTab("general");
+      return;
+    }
+
+    if (safeParsedNumber(form.version) <= 0) {
+      setError("Versiyon pozitif sayı olmalıdır.");
       setActiveTab("general");
       return;
     }
@@ -393,7 +429,64 @@ function RecipeModal({
       return;
     }
 
-    onSaved({ ...cloneRecipe(form), updatedAt: new Date().toISOString() }, mode === "edit" ? "Reçete güncellendi." : "Reçete oluşturuldu.");
+    const selectedLines = form.lines.filter((line) => line.materialId && line.quantity.trim());
+    if (selectedLines.length === 0) {
+      setError("Reçetede en az bir malzeme bulunmalıdır.");
+      setActiveTab("materials");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(mode === "edit" && recipe ? `${API}/recipes/${recipe.id}` : `${API}/recipes`, {
+        method: mode === "edit" ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toRecipeRequest(form, selectedLines, materials)),
+      });
+      const result = await response.json() as ApiResponse<unknown>;
+      if (!response.ok) throw new Error(result.message || "Reçete kaydedilemedi.");
+      const saved = recipeFromApi(result.data, materials);
+      if (!saved) throw new Error("API reçete cevabı okunamadı.");
+      onSaved(saved, result.message || (mode === "edit" ? "Reçete güncellendi." : "Reçete oluşturuldu."));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reçete kaydedilirken beklenmeyen bir hata oluştu.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runRecipeAction(action: "activate" | "deactivate" | "set-default" | "duplicate") {
+    if (!recipe) return;
+    setError(null);
+    setSaving(true);
+
+    try {
+      let endpoint = `${API}/recipes/${recipe.id}/${action}`;
+      let body: unknown = undefined;
+      if (action === "duplicate") {
+        const nextVersion = Math.max(1, Number(form.version) || 1) + 1;
+        body = {
+          code: `${form.code}-KOPYA-${Date.now().toString().slice(-4)}`,
+          name: `${form.name} Kopya`,
+          version: nextVersion,
+        };
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const result = await response.json() as ApiResponse<unknown>;
+      if (!response.ok) throw new Error(result.message || "İşlem tamamlanamadı.");
+      const updated = recipeFromApi(result.data, materials);
+      if (!updated) throw new Error("API reçete cevabı okunamadı.");
+      onSaved(updated, result.message || "İşlem tamamlandı.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "İşlem sırasında beklenmeyen bir hata oluştu.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -443,9 +536,22 @@ function RecipeModal({
             {readonly ? "Kapat" : "Vazgeç"}
           </button>
           {!readonly && (
-            <button onClick={saveRecipe} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400">
-              Kaydet
+            <button disabled={saving} onClick={saveRecipe} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400 disabled:opacity-50">
+              {saving ? "Kaydediliyor..." : "Kaydet"}
             </button>
+          )}
+          {mode === "edit" && recipe && (
+            <>
+              <button disabled={saving} onClick={() => runRecipeAction(form.isActive ? "deactivate" : "activate")} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-5 py-3 text-sm font-black text-amber-100 transition hover:bg-amber-500/20 disabled:opacity-50">
+                {form.isActive ? "Pasif Yap" : "Aktif Yap"}
+              </button>
+              <button disabled={saving || !form.isActive} onClick={() => runRecipeAction("set-default")} className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-5 py-3 text-sm font-black text-cyan-100 transition hover:bg-cyan-500/20 disabled:opacity-50">
+                Varsayılan Yap
+              </button>
+              <button disabled={saving} onClick={() => runRecipeAction("duplicate")} className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-5 py-3 text-sm font-black text-violet-100 transition hover:bg-violet-500/20 disabled:opacity-50">
+                Kopyala
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -501,6 +607,8 @@ function GeneralTab({
   return (
     <TabPanel title="Genel" note="Product Master seçimi reçetenin ürün teknik bilgisini otomatik doldurur.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <TextInput label="Reçete Kodu" value={form.code} readonly={readonly} onChange={(value) => updateForm("code", value)} />
+        <TextInput label="Reçete Adı" value={form.name} readonly={readonly} onChange={(value) => updateForm("name", value)} />
         <Field label="Product Master seç">
           <select value={form.productId} disabled={readonly} onChange={(event) => selectProduct(event.target.value)} className={CONTROL_CLASS}>
             <option value="">Ürün ara / seç</option>
@@ -518,9 +626,19 @@ function GeneralTab({
         <ReadOnlyInfo label="Yapışkan" value={details.adhesiveType || (product?.isAdhesive ? "Var" : "Yok")} />
         <ReadOnlyInfo label="Gramaj" value={formatNumber(product?.averageWeight)} />
         <ReadOnlyInfo label="Yoğunluk" value={formatNumber(product?.targetDensity)} />
-        <TextInput label="Versiyon" value={form.version} readonly={readonly} onChange={(value) => updateForm("version", value)} />
+        <TextInput label="Versiyon" value={form.version} readonly={readonly} type="number" onChange={(value) => updateForm("version", value)} />
         <TextInput label="Revizyon" value={form.revisionNo} readonly={readonly} onChange={(value) => updateForm("revisionNo", value)} />
+        <TextInput label="Çıktı Miktarı" value={form.outputQuantity} readonly={readonly} type="number" onChange={(value) => updateForm("outputQuantity", value)} />
+        <Field label="Çıktı Birimi">
+          <select value={form.outputUnit} disabled={readonly} onChange={(event) => updateForm("outputUnit", event.target.value)} className={CONTROL_CLASS}>
+            <option value="Çift">Çift</option>
+            <option value="Adet">Adet</option>
+            <option value="Kg">Kg</option>
+            <option value="gr">gr</option>
+          </select>
+        </Field>
         <ToggleInput label="Aktif" checked={form.isActive} readonly={readonly} trueText="Aktif" falseText="Pasif" onChange={(value) => updateForm("isActive", value)} />
+        <ToggleInput label="Varsayılan" checked={form.isDefault} readonly={readonly} trueText="Varsayılan" falseText="Standart değil" onChange={(value) => updateForm("isDefault", value)} />
         <TextInput label="Başlangıç tarihi" value={form.startDate} readonly={readonly} type="date" onChange={(value) => updateForm("startDate", value)} />
         <TextInput label="Bitiş tarihi" value={form.endDate} readonly={readonly} type="date" onChange={(value) => updateForm("endDate", value)} />
       </div>
@@ -835,15 +953,21 @@ type RecipeTotals = {
   totalGram: number;
   rawMaterialCost: number;
   totalCost: number;
+  totalsByCurrency: Record<string, number>;
 };
 
 function createEmptyRecipe(): RecipeRecord {
   return {
     id: `recipe-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    code: "",
+    name: "",
     productId: "",
-    version: "V1",
+    version: "1",
     revisionNo: "R0",
     isActive: true,
+    isDefault: false,
+    outputQuantity: "1",
+    outputUnit: "Çift",
     startDate: formatDateInput(new Date()),
     endDate: "",
     lines: RECIPE_ROLES.map((role, index) => ({
@@ -894,15 +1018,22 @@ function calculateRecipeTotals(lines: RecipeLine[], materials: Material[]): Reci
       const wasteRate = safeParsedNumber(line.wasteRate);
       const netUsage = quantity + quantity * wasteRate / 100;
       const lineCost = netUsage * safeNumber(material?.lastPurchasePrice);
+      const currency = material?.currency || "TRY";
       const isGram = (material?.unit || "").toLocaleLowerCase("tr-TR") === "gr";
+
+      const totalsByCurrency = {
+        ...totals.totalsByCurrency,
+        [currency]: safeNumber(totals.totalsByCurrency[currency]) + lineCost,
+      };
 
       return {
         totalGram: totals.totalGram + (isGram ? netUsage : 0),
         rawMaterialCost: totals.rawMaterialCost + lineCost,
         totalCost: totals.totalCost + lineCost,
+        totalsByCurrency,
       };
     },
-    { totalGram: 0, rawMaterialCost: 0, totalCost: 0 }
+    { totalGram: 0, rawMaterialCost: 0, totalCost: 0, totalsByCurrency: {} as Record<string, number> }
   );
 }
 
@@ -930,6 +1061,14 @@ function extractMaterials(result: unknown): Material[] {
   return [];
 }
 
+function extractRecipes(result: unknown, materials: Material[]): RecipeRecord[] {
+  if (Array.isArray(result)) return result.map((item) => recipeFromApi(item, materials)).filter(isRecipeRecord);
+  if (isRecord(result) && Array.isArray((result as ApiResponse<unknown[]>).data)) {
+    return (result as ApiResponse<unknown[]>).data!.map((item) => recipeFromApi(item, materials)).filter(isRecipeRecord);
+  }
+  return [];
+}
+
 function isProduct(value: unknown): value is Product {
   return isRecord(value) && typeof value.id === "string";
 }
@@ -938,8 +1077,185 @@ function isMaterial(value: unknown): value is Material {
   return isRecord(value) && typeof value.id === "string";
 }
 
+function isRecipeRecord(value: RecipeRecord | null): value is RecipeRecord {
+  return value !== null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function recipeFromApi(value: unknown, materials: Material[]): RecipeRecord | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value, "id");
+  if (!id) return null;
+
+  const notes = readString(value, "notes");
+  const meta = parseRecipeMeta(notes);
+  const items = readArray(value, "items");
+  const lines = mergeApiItemsWithDefaultLines(items, materials);
+  const effectiveFrom = readString(value, "effectiveFrom");
+  const effectiveTo = readString(value, "effectiveTo");
+  const updatedAt = readString(value, "updatedAt") || new Date().toISOString();
+
+  return {
+    ...createEmptyRecipe(),
+    ...meta,
+    id,
+    code: readString(value, "code"),
+    name: readString(value, "name"),
+    productId: readString(value, "productId"),
+    version: String(readNumber(value, "version") || 1),
+    isActive: readBoolean(value, "isActive", true),
+    isDefault: readBoolean(value, "isDefault", false),
+    outputQuantity: String(readNumber(value, "outputQuantity") || 1),
+    outputUnit: readString(value, "outputUnit") || "Çift",
+    startDate: toDateInput(effectiveFrom),
+    endDate: toDateInput(effectiveTo),
+    lines,
+    generalNote: meta.generalNote || stripRecipeMeta(notes),
+    updatedAt,
+  };
+}
+
+function mergeApiItemsWithDefaultLines(items: unknown[], materials: Material[]) {
+  const baseLines = RECIPE_ROLES.map((role, index) => ({
+    key: `${role}-${index}`,
+    order: index + 1,
+    role,
+    materialId: "",
+    quantity: "",
+    wasteRate: "0",
+    note: "",
+  }));
+
+  items.forEach((item, index) => {
+    if (!isRecord(item)) return;
+    const sequence = readNumber(item, "sequence") || index + 1;
+    const materialId = readString(item, "materialId");
+    const material = materials.find((entry) => entry.id === materialId);
+    const role = material?.materialType || readString(item, "materialType") || RECIPE_ROLES[index] || "Diğer";
+    const line = {
+      key: readString(item, "id") || `api-${materialId}-${index}`,
+      order: sequence,
+      role,
+      materialId,
+      quantity: String(readNumber(item, "quantity") || ""),
+      wasteRate: String(readNumber(item, "wastePercent") || 0),
+      note: readString(item, "notes"),
+    };
+
+    if (index < baseLines.length) {
+      baseLines[index] = line;
+    } else {
+      baseLines.push(line);
+    }
+  });
+
+  return baseLines.sort((left, right) => left.order - right.order);
+}
+
+function toRecipeRequest(form: RecipeRecord, selectedLines: RecipeLine[], materials: Material[]) {
+  return {
+    code: form.code.trim(),
+    name: form.name.trim(),
+    productId: form.productId,
+    version: Math.max(1, Math.trunc(safeParsedNumber(form.version))),
+    description: form.productionNote || null,
+    outputQuantity: safeParsedNumber(form.outputQuantity) || 1,
+    outputUnit: form.outputUnit.trim() || "Çift",
+    isActive: form.isActive,
+    isDefault: form.isDefault,
+    effectiveFrom: form.startDate ? new Date(`${form.startDate}T00:00:00.000Z`).toISOString() : null,
+    effectiveTo: form.endDate ? new Date(`${form.endDate}T00:00:00.000Z`).toISOString() : null,
+    notes: buildRecipeNotes(form),
+    items: selectedLines.map((line, index) => {
+      const material = materials.find((item) => item.id === line.materialId);
+      return {
+        materialId: line.materialId,
+        quantity: safeParsedNumber(line.quantity),
+        unit: material?.unit || null,
+        wastePercent: safeParsedNumber(line.wasteRate),
+        isOptional: false,
+        sequence: line.order || index + 1,
+        notes: line.note || null,
+      };
+    }),
+  };
+}
+
+function buildRecipeNotes(form: RecipeRecord) {
+  const meta = {
+    revisionNo: form.revisionNo,
+    standardWeight: form.standardWeight,
+    standardDensity: form.standardDensity,
+    standardCycleTime: form.standardCycleTime,
+    standardWasteRate: form.standardWasteRate,
+    standardMold: form.standardMold,
+    standardMachine: form.standardMachine,
+    standardDailyCapacity: form.standardDailyCapacity,
+    cuttingMachine: form.cuttingMachine,
+    operationNote: form.operationNote,
+    laborCost: form.laborCost,
+    electricityCost: form.electricityCost,
+    packagingCost: form.packagingCost,
+    overheadCost: form.overheadCost,
+    revisionDescription: form.revisionDescription,
+    updatedBy: form.updatedBy,
+    revisionDate: form.revisionDate,
+    productionNote: form.productionNote,
+    qualityNote: form.qualityNote,
+    customerNote: form.customerNote,
+    generalNote: form.generalNote,
+  };
+
+  return `${form.generalNote || ""}${RECIPE_MARKER}${JSON.stringify(meta)}`;
+}
+
+function parseRecipeMeta(notes: string): Partial<RecipeRecord> {
+  const markerIndex = notes.indexOf(RECIPE_MARKER);
+  if (markerIndex === -1) return {};
+
+  try {
+    return JSON.parse(notes.slice(markerIndex + RECIPE_MARKER.length)) as Partial<RecipeRecord>;
+  } catch {
+    return {};
+  }
+}
+
+function stripRecipeMeta(notes: string) {
+  const markerIndex = notes.indexOf(RECIPE_MARKER);
+  return markerIndex === -1 ? notes : notes.slice(0, markerIndex);
+}
+
+function readString(value: Record<string, unknown>, key: string) {
+  const raw = value[key] ?? value[toPascalCase(key)];
+  return typeof raw === "string" ? raw : "";
+}
+
+function readNumber(value: Record<string, unknown>, key: string) {
+  const raw = value[key] ?? value[toPascalCase(key)];
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = Number(raw.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function readBoolean(value: Record<string, unknown>, key: string, fallback: boolean) {
+  const raw = value[key] ?? value[toPascalCase(key)];
+  return typeof raw === "boolean" ? raw : fallback;
+}
+
+function readArray(value: Record<string, unknown>, key: string) {
+  const raw = value[key] ?? value[toPascalCase(key)];
+  return Array.isArray(raw) ? raw : [];
+}
+
+function toPascalCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function formatMaterialOption(material: Material) {
@@ -974,6 +1290,12 @@ function formatMoney(value: number, currency: string) {
   return value.toLocaleString("tr-TR", { style: "currency", currency: currency || "TRY", maximumFractionDigits: 2 });
 }
 
+function formatCurrencyTotals(totalsByCurrency: Record<string, number>) {
+  const entries = Object.entries(totalsByCurrency).filter(([, value]) => value > 0);
+  if (entries.length === 0) return formatMoney(0, "TRY");
+  return entries.map(([currency, value]) => formatMoney(value, currency)).join(" / ");
+}
+
 function formatDateInput(value: Date) {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, "0");
@@ -985,4 +1307,11 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("tr-TR");
+}
+
+function toDateInput(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatDateInput(date);
 }

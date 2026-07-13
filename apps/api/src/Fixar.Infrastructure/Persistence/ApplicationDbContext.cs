@@ -58,6 +58,8 @@ public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
 public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
 public DbSet<Supplier> Suppliers => Set<Supplier>();
 public DbSet<Material> Materials => Set<Material>();
+public DbSet<Recipe> Recipes => Set<Recipe>();
+public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
 public DbSet<ProductionSession> ProductionSessions => Set<ProductionSession>();
 public DbSet<ProductionStation> ProductionStations => Set<ProductionStation>();
 public DbSet<ProductionEvent> ProductionEvents => Set<ProductionEvent>();
@@ -93,6 +95,54 @@ public DbSet<ProductionDowntime> ProductionDowntimes => Set<ProductionDowntime>(
             .WithOne(x => x.Product)
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Product>()
+            .HasMany(x => x.Recipes)
+            .WithOne(x => x.Product)
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Recipe>()
+            .HasIndex(x => x.Code)
+            .IsUnique();
+
+        builder.Entity<Recipe>()
+            .HasIndex(x => x.ProductId);
+
+        builder.Entity<Recipe>()
+            .HasIndex(x => x.IsActive);
+
+        builder.Entity<Recipe>()
+            .HasIndex(x => new { x.ProductId, x.Version })
+            .IsUnique();
+
+        builder.Entity<Recipe>()
+            .HasIndex(x => new { x.ProductId, x.IsDefault })
+            .IsUnique()
+            .HasDatabaseName("IX_Recipes_ProductId_IsDefault_Active")
+            .HasFilter("\"IsDefault\" = true AND \"IsActive\" = true");
+
+        builder.Entity<Recipe>()
+            .HasMany(x => x.Items)
+            .WithOne(x => x.Recipe)
+            .HasForeignKey(x => x.RecipeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Material>()
+            .HasMany(x => x.RecipeItems)
+            .WithOne(x => x.Material)
+            .HasForeignKey(x => x.MaterialId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<RecipeItem>()
+            .HasIndex(x => x.RecipeId);
+
+        builder.Entity<RecipeItem>()
+            .HasIndex(x => x.MaterialId);
+
+        builder.Entity<RecipeItem>()
+            .HasIndex(x => new { x.RecipeId, x.MaterialId })
+            .IsUnique();
 
         builder.Entity<Operator>()
             .HasOne(x => x.DefaultMachine)

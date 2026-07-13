@@ -97,4 +97,6 @@ public class Material : BaseAuditableEntity
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<StockItem> StockItems { get; set; } = new List<StockItem>();
+
+    public ICollection<RecipeItem> RecipeItems { get; set; } = new List<RecipeItem>();
 }
