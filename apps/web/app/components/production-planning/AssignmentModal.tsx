@@ -37,6 +37,36 @@ type ActiveAssignment = {
   status?: string;
 };
 
+type AvailableWorkOrder = {
+  id: string;
+  workOrderNumber: string;
+  customerName?: string | null;
+  productId: string;
+  productCode?: string | null;
+  productName?: string | null;
+  orderItemId: string;
+  plannedPairs: number;
+  assignedPairs: number;
+  producedPairs: number;
+  remainingToAssignPairs: number;
+  priority: string;
+  status: string;
+  recipeCode?: string | null;
+  recipeName?: string | null;
+};
+
+type ProductionRecipe = {
+  code: string;
+  name: string;
+  revision: string;
+  materialType: string;
+  polyol: string;
+  iso: string;
+  additive: string;
+  polyolSetting: string;
+  isoSetting: string;
+};
+
 const API = "http://localhost:5000/api/v1";
 const PAIRS_PER_MOLD_HOUR = 9;
 
@@ -45,9 +75,12 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [operators, setOperators] = useState<LookupItem[]>([]);
   const [activeAssignments, setActiveAssignments] = useState<ActiveAssignment[]>([]);
+  const [workOrders, setWorkOrders] = useState<AvailableWorkOrder[]>([]);
 
+  const [workOrderId, setWorkOrderId] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [orderItemId, setOrderItemId] = useState("");
+  const [plannedPairs, setPlannedPairs] = useState("");
   const [operatorName, setOperatorName] = useState("");
   const [dailyWorkHours, setDailyWorkHours] = useState(18);
   const [note, setNote] = useState("");
@@ -67,6 +100,10 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
     fetch(API + "/station-assignments/active")
       .then((r) => r.json())
       .then((r) => setActiveAssignments(r.data ?? []));
+
+    fetch(API + "/work-orders/available-for-planning")
+      .then((r) => r.json())
+      .then((r) => setWorkOrders(r.data ?? []));
   }, [open]);
 
   useEffect(() => {
@@ -102,8 +139,21 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
   );
 
   const selectedItem = orderItems.find((x) => x.id === orderItemId);
+  const selectedWorkOrder = workOrders.find((x) => x.id === workOrderId);
   const season = getCurrentSeason();
-  const recipe = getRecipe(selectedItem?.productName ?? "", season);
+  const recipe: ProductionRecipe = selectedWorkOrder?.recipeCode
+    ? {
+        code: selectedWorkOrder.recipeCode,
+        name: selectedWorkOrder.recipeName ?? "WorkOrder Reçetesi",
+        revision: "-",
+        materialType: "Recipe/BOM",
+        polyol: "-",
+        iso: "-",
+        additive: "-",
+        polyolSetting: "-",
+        isoSetting: "-",
+      }
+    : getRecipe(selectedItem?.productName ?? selectedWorkOrder?.productName ?? "", season);
   const moldInfo = getMoldInfo(selectedItem?.moldName ?? "");
 
   const activeSameMoldCount = getActiveSameMoldCount(
@@ -123,8 +173,21 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
       : 0;
 
   async function startJob() {
-    if (!station || !orderItemId || !operatorName) {
-      alert("Müşteri, sipariş kalemi ve operatör seçmelisin.");
+    const assignmentOrderItemId = selectedWorkOrder?.orderItemId ?? orderItemId;
+    const assignmentPlannedPairs = selectedWorkOrder ? Number(plannedPairs) : 0;
+
+    if (!station || !assignmentOrderItemId || !operatorName) {
+      alert("İş emri veya sipariş kalemi ve operatör seçmelisin.");
+      return;
+    }
+
+    if (selectedWorkOrder && (!Number.isFinite(assignmentPlannedPairs) || assignmentPlannedPairs <= 0)) {
+      alert("İş emrine atanacak çift miktarı 0'dan büyük olmalıdır.");
+      return;
+    }
+
+    if (selectedWorkOrder && assignmentPlannedPairs > selectedWorkOrder.remainingToAssignPairs) {
+      alert("Atanacak çift miktarı iş emrinin kalan atanabilir miktarını aşamaz.");
       return;
     }
 
@@ -137,8 +200,10 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
       },
       body: JSON.stringify({
         stationNumber: station,
-        orderItemId: orderItemId,
+        orderItemId: assignmentOrderItemId,
         moldId: selectedItem?.moldId ?? null,
+        workOrderId: selectedWorkOrder?.id ?? null,
+        plannedPairs: assignmentPlannedPairs,
         operatorName: operatorName,
         note:
           "Reçete: " +
@@ -206,11 +271,52 @@ if (!response.ok) {
         </div>
 
         <div className="grid gap-5">
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5">
+            <Field label="WorkOrder ile Ata">
+              <select
+                value={workOrderId}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const selected = workOrders.find((x) => x.id === value);
+                  setWorkOrderId(value);
+                  setOrderItemId(selected?.orderItemId ?? "");
+                  setPlannedPairs(selected ? String(selected.remainingToAssignPairs) : "");
+                }}
+                className="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white"
+              >
+                <option value="">Opsiyonel: iş emri seç</option>
+                {workOrders.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.workOrderNumber} / {x.customerName ?? "-"} / {x.productName ?? "-"} / {x.remainingToAssignPairs.toLocaleString("tr-TR")} çift atanabilir
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {selectedWorkOrder && (
+              <div className="mt-4 grid gap-3 text-sm md:grid-cols-4">
+                <Info label="Müşteri" value={selectedWorkOrder.customerName ?? "-"} />
+                <Info label="Ürün" value={selectedWorkOrder.productName ?? "-"} />
+                <Info label="Reçete" value={[selectedWorkOrder.recipeCode, selectedWorkOrder.recipeName].filter(Boolean).join(" - ") || "-"} />
+                <Field label="Atanacak Çift">
+                  <input
+                    type="number"
+                    min={1}
+                    max={selectedWorkOrder.remainingToAssignPairs}
+                    value={plannedPairs}
+                    onChange={(event) => setPlannedPairs(event.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white"
+                  />
+                </Field>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Field label="Müşteri">
               <select
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
+                disabled={!!selectedWorkOrder}
                 className="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white"
               >
                 <option value="">Seçiniz...</option>
@@ -226,6 +332,7 @@ if (!response.ok) {
               <select
                 value={orderItemId}
                 onChange={(e) => setOrderItemId(e.target.value)}
+                disabled={!!selectedWorkOrder}
                 className="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white"
               >
                 <option value="">Seçiniz...</option>

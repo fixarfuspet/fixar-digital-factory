@@ -60,6 +60,7 @@ public DbSet<Supplier> Suppliers => Set<Supplier>();
 public DbSet<Material> Materials => Set<Material>();
 public DbSet<Recipe> Recipes => Set<Recipe>();
 public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
+public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
 public DbSet<ProductionSession> ProductionSessions => Set<ProductionSession>();
 public DbSet<ProductionStation> ProductionStations => Set<ProductionStation>();
 public DbSet<ProductionEvent> ProductionEvents => Set<ProductionEvent>();
@@ -143,6 +144,52 @@ public DbSet<ProductionDowntime> ProductionDowntimes => Set<ProductionDowntime>(
         builder.Entity<RecipeItem>()
             .HasIndex(x => new { x.RecipeId, x.MaterialId })
             .IsUnique();
+
+        builder.Entity<WorkOrder>()
+            .HasIndex(x => x.WorkOrderNumber)
+            .IsUnique();
+
+        builder.Entity<WorkOrder>()
+            .HasIndex(x => x.OrderItemId);
+
+        builder.Entity<WorkOrder>()
+            .HasIndex(x => x.ProductId);
+
+        builder.Entity<WorkOrder>()
+            .HasIndex(x => x.RecipeId);
+
+        builder.Entity<WorkOrder>()
+            .HasIndex(x => x.Status);
+
+        builder.Entity<WorkOrder>()
+            .HasIndex(x => x.IsActive);
+
+        builder.Entity<WorkOrder>()
+            .HasIndex(x => x.PlannedStartDate);
+
+        builder.Entity<WorkOrder>()
+            .HasOne(x => x.OrderItem)
+            .WithMany(x => x.WorkOrders)
+            .HasForeignKey(x => x.OrderItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<WorkOrder>()
+            .HasOne(x => x.Product)
+            .WithMany(x => x.WorkOrders)
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<WorkOrder>()
+            .HasOne(x => x.Recipe)
+            .WithMany(x => x.WorkOrders)
+            .HasForeignKey(x => x.RecipeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<WorkOrder>()
+            .HasOne(x => x.AssignedMachine)
+            .WithMany(x => x.WorkOrders)
+            .HasForeignKey(x => x.AssignedMachineId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Operator>()
             .HasOne(x => x.DefaultMachine)
@@ -239,6 +286,15 @@ public DbSet<ProductionDowntime> ProductionDowntimes => Set<ProductionDowntime>(
             .WithOne(x => x.StationAssignment)
             .HasForeignKey(x => x.StationAssignmentId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StationAssignment>()
+            .HasOne(x => x.WorkOrder)
+            .WithMany(x => x.StationAssignments)
+            .HasForeignKey(x => x.WorkOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<StationAssignment>()
+            .HasIndex(x => x.WorkOrderId);
 
         builder.Entity<StationAssignmentFire>()
             .HasIndex(x => x.StationAssignmentId);

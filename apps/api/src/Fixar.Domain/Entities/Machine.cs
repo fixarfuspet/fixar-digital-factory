@@ -73,4 +73,6 @@ public class Machine : BaseAuditableEntity
     public ICollection<Operator> DefaultOperators { get; set; } = new List<Operator>();
 
     public ICollection<Operator> CurrentOperators { get; set; } = new List<Operator>();
+
+    public ICollection<WorkOrder> WorkOrders { get; set; } = new List<WorkOrder>();
 }

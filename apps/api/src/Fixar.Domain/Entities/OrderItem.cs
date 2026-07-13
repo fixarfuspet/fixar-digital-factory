@@ -28,4 +28,6 @@ public class OrderItem : BaseAuditableEntity
     public string Status { get; set; } = "Bekliyor";
 
     public string? Note { get; set; }
+
+    public ICollection<WorkOrder> WorkOrders { get; set; } = new List<WorkOrder>();
 }

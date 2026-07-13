@@ -65,8 +65,10 @@ public class ProductionPlanningLookupsController : ControllerBase
                 Items = x.Items.Select(i => new
 {
     i.Id,
+    ProductId = i.ProductId ?? x.ProductId,
     MoldId = i.MoldId,
     ProductName = i.Product != null ? i.Product.Name : x.Product.Name,
+    ProductCode = i.Product != null ? i.Product.Code : x.Product.Code,
     MoldName = i.Mold != null ? i.Mold.Name : "-",
     i.QuantityPairs,
     i.ProducedPairs,

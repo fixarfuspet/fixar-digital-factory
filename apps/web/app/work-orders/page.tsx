@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
@@ -26,6 +25,26 @@ type Product = {
   isActive?: boolean | null;
 };
 
+type Recipe = {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  productId?: string | null;
+  foamType?: string | null;
+  version?: string | null;
+  revision?: string | null;
+  totalGram?: number | null;
+  totalCost?: number | null;
+  isActive?: boolean | null;
+};
+
+type Machine = {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  isActive?: boolean | null;
+};
+
 type Material = {
   id: string;
   code?: string | null;
@@ -48,6 +67,28 @@ type StockItem = {
   unit?: string | null;
 };
 
+type OrderItemLookup = {
+  id: string;
+  productId?: string | null;
+  moldId?: string | null;
+  productName?: string | null;
+  moldName?: string | null;
+  quantityPairs?: number | null;
+  producedPairs?: number | null;
+  remainingPairs?: number | null;
+  productionType?: string | null;
+  fabricColor?: string | null;
+};
+
+type OrderLookup = {
+  id: string;
+  customerName?: string | null;
+  productName?: string | null;
+  quantity?: number | null;
+  remainingQuantity?: number | null;
+  items?: OrderItemLookup[];
+};
+
 type ProductDetails = {
   model?: string;
   number?: string;
@@ -55,10 +96,6 @@ type ProductDetails = {
   productionType?: string;
   fabricType?: string;
   adhesiveType?: string;
-  productImageName?: string;
-  productImageDataUrl?: string;
-  moldImageName?: string;
-  moldImageDataUrl?: string;
   standardWasteRate?: string;
   standardMold?: string;
   standardDailyCapacity?: string;
@@ -72,77 +109,86 @@ type ProductDetails = {
   qualityNote?: string;
 };
 
-type WorkOrderMaterialLine = {
-  key: string;
-  role: string;
+type WorkOrderRequirementLine = {
   materialId: string;
-  usagePerPair: string;
-  wasteRate: string;
-  note: string;
+  materialCode?: string | null;
+  materialName?: string | null;
+  requiredQuantity?: number | null;
+  unit?: string | null;
+  availableStock?: number | null;
+  shortageQuantity?: number | null;
+  currency?: string | null;
+  estimatedMaterialCost?: number | null;
 };
 
-type OperationLine = {
-  key: string;
-  operation: string;
-  status: string;
-  responsible: string;
-  estimatedTime: string;
-  actualTime: string;
-  note: string;
+type RequirementPayload = {
+  items?: WorkOrderRequirementLine[];
+  totalsByCurrency?: Record<string, number>;
 };
 
 type WorkOrder = {
   id: string;
-  workOrderNo: string;
+  workOrderNumber: string;
+  orderNumber: string;
+  orderItemId: string;
+  customerId?: string | null;
+  customerName?: string | null;
   productId: string;
-  version: string;
-  revisionNo: string;
-  customerName: string;
-  orderNo: string;
-  plannedPairs: string;
-  producedPairs: string;
+  productCode?: string | null;
+  productName?: string | null;
+  recipeId?: string | null;
+  recipeCode?: string | null;
+  recipeName?: string | null;
+  plannedPairs: number;
+  assignedPairs: number;
+  producedPairs: number;
+  goodPairs: number;
+  firePairs: number;
+  remainingPairs: number;
+  progressPercent: number;
   priority: string;
-  startDate: string;
-  dueDate: string;
   status: string;
-  machine: string;
-  mold: string;
-  operatorName: string;
+  plannedStartDate?: string | null;
+  plannedEndDate?: string | null;
+  actualStartDate?: string | null;
+  actualEndDate?: string | null;
+  assignedMachineId?: string | null;
+  assignedMachineCode?: string | null;
+  shift?: number | null;
+  isActive?: boolean | null;
+  isCancelled?: boolean | null;
+  notes?: string | null;
+  cancellationReason?: string | null;
+  requirements?: RequirementPayload | null;
+  stationAssignments?: unknown[];
+  updatedAt?: string | null;
+};
+
+type WorkOrderForm = {
+  id: string;
+  orderItemId: string;
+  recipeId: string;
+  plannedPairs: string;
+  priority: string;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  assignedMachineId: string;
   shift: string;
-  plannedStart: string;
-  plannedEnd: string;
-  estimatedProductionTime: string;
-  estimatedDailyCapacity: string;
-  estimatedWasteRate: string;
-  operationNote: string;
-  materialLines: WorkOrderMaterialLine[];
-  operations: OperationLine[];
-  productionNote: string;
-  customerNote: string;
-  qualityNote: string;
-  generalNote: string;
-  updatedAt: string;
+  notes: string;
 };
 
 type ApiResponse<T> = {
   data?: T;
-};
-
-type MaterialTotals = {
-  totalCost: number;
-  totalGram: number;
-  missingCount: number;
-  criticalCount: number;
+  message?: string;
+  errorMessage?: string;
+  errorCode?: string;
+  success?: boolean;
 };
 
 const API = "http://localhost:5000/api/v1";
 const PRODUCT_MARKER = "\n\n---FIXAR_PRODUCT_MASTER_JSON---\n";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
-const WORK_ORDER_STATUSES = ["Taslak", "Hazır", "Üretimde", "Tamamlandı", "İptal"];
-const PRIORITIES = ["Normal", "Yüksek", "Acil"];
-const OPERATION_NAMES = ["Enjeksiyon", "Pişirme", "Kesim", "DTF", "Kalite", "Paketleme", "Depo"];
-const RECIPE_ROLES = ["Poliol", "İzosiyanat", "Crosskim", "Pigment", "Solvent", "Kalıp Ayırıcı", "Kumaş", "Yapışkan", "DTF", "İşçilik", "Diğer"];
 const TABS: Array<{ id: WorkOrderTab; label: string }> = [
   { id: "general", label: "1 Genel" },
   { id: "product", label: "2 Ürün Bilgileri" },
@@ -152,12 +198,20 @@ const TABS: Array<{ id: WorkOrderTab; label: string }> = [
   { id: "quality", label: "6 Kalite" },
   { id: "notes", label: "7 Notlar" },
 ];
+const PRIORITY_OPTIONS = [
+  { value: "Normal", label: "Normal" },
+  { value: "High", label: "Yüksek" },
+  { value: "Urgent", label: "Acil" },
+];
 
 export default function WorkOrdersPage() {
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [stocks, setStocks] = useState<StockItem[]>([]);
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [orders, setOrders] = useState<OrderLookup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -166,41 +220,51 @@ export default function WorkOrdersPage() {
   const [dialogWorkOrder, setDialogWorkOrder] = useState<WorkOrder | null>(null);
 
   useEffect(() => {
-    loadMasters();
+    void loadData();
   }, []);
 
-  async function loadMasters() {
+  async function loadData() {
     setLoading(true);
     setError(null);
 
     try {
-      const [productsResponse, materialsResponse, stocksResponse] = await Promise.all([
-        fetch(API + "/products"),
-        fetch(API + "/materials"),
-        fetch(API + "/stocks"),
+      const [workOrdersData, productsData, recipesData, materialsData, stocksData, machinesData, ordersData] = await Promise.all([
+        apiGet<unknown>("/work-orders"),
+        apiGet<unknown>("/products"),
+        apiGet<unknown>("/recipes?includeItems=true"),
+        apiGet<unknown>("/materials"),
+        apiGet<unknown>("/stocks"),
+        apiGet<unknown>("/machines"),
+        apiGet<unknown>("/production-planning/lookups/orders"),
       ]);
 
-      if (!productsResponse.ok || !materialsResponse.ok || !stocksResponse.ok) {
-        throw new Error("Master veriler alınamadı.");
-      }
-
-      setProducts(extractProducts(await productsResponse.json()).filter((item) => item.isActive !== false));
-      setMaterials(extractMaterials(await materialsResponse.json()).filter((item) => item.isActive !== false));
-      setStocks(extractStocks(await stocksResponse.json()));
+      setWorkOrders(extractArray(workOrdersData).map(mapWorkOrder).filter(Boolean) as WorkOrder[]);
+      setProducts(extractArray(productsData).filter(isProduct).filter((item) => item.isActive !== false));
+      setRecipes(extractArray(recipesData).filter(isRecipe).filter((item) => item.isActive !== false));
+      setMaterials(extractArray(materialsData).filter(isMaterial).filter((item) => item.isActive !== false));
+      setStocks(extractArray(stocksData).filter(isStockItem));
+      setMachines(extractArray(machinesData).filter(isMachine).filter((item) => item.isActive !== false));
+      setOrders(extractArray(ordersData).filter(isOrderLookup));
     } catch (err) {
-      setProducts([]);
-      setMaterials([]);
-      setStocks([]);
       setError(err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.");
     } finally {
       setLoading(false);
     }
   }
 
-  function openDialog(mode: DialogMode, workOrder: WorkOrder | null = null) {
+  async function openDialog(mode: DialogMode, workOrder: WorkOrder | null = null) {
     setSuccessMessage(null);
-    setDialogWorkOrder(workOrder);
     setDialogMode(mode);
+    setDialogWorkOrder(workOrder);
+
+    if (workOrder?.id && mode !== "create") {
+      try {
+        const detail = await apiGet<unknown>("/work-orders/" + workOrder.id);
+        setDialogWorkOrder(mapDetailWorkOrder(detail) ?? workOrder);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "İş emri detayı alınamadı.");
+      }
+    }
   }
 
   function closeDialog() {
@@ -208,45 +272,58 @@ export default function WorkOrdersPage() {
     setDialogWorkOrder(null);
   }
 
-  function handleSaved(workOrder: WorkOrder, message: string) {
-    setWorkOrders((current) => {
-      const exists = current.some((item) => item.id === workOrder.id);
-      return exists ? current.map((item) => (item.id === workOrder.id ? workOrder : item)) : [workOrder, ...current];
-    });
+  async function handleSaved(message: string) {
+    await loadData();
     closeDialog();
     setSuccessMessage(message);
   }
 
-  function startProduction(workOrder: WorkOrder) {
-    setWorkOrders((current) =>
-      current.map((item) => (item.id === workOrder.id ? { ...item, status: "Üretimde", updatedAt: new Date().toISOString() } : item))
-    );
-    setSuccessMessage("İş emri üretimde durumuna alındı.");
+  async function transitionWorkOrder(workOrder: WorkOrder) {
+    try {
+      const path = getNextTransitionPath(workOrder.status);
+      if (!path) {
+        alert("Bu iş emri için üretim başlatma geçişi uygun değil.");
+        return;
+      }
+
+      await apiPost<unknown>("/work-orders/" + workOrder.id + path, {});
+      await loadData();
+      setSuccessMessage(path === "/start" ? "İş emri üretimde durumuna alındı." : "İş emri durumu güncellendi.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "İş emri durumu güncellenemedi.");
+    }
   }
 
+  const orderItems = useMemo(() => flattenOrderItems(orders), [orders]);
   const filteredWorkOrders = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase("tr-TR");
+    const normalizedSearch = normalizeText(search);
     if (!normalizedSearch) return workOrders;
 
-    return workOrders.filter((order) => {
-      const product = products.find((item) => item.id === order.productId);
-      return [order.workOrderNo, order.orderNo, product?.name, product?.code, order.customerName, order.status]
+    return workOrders.filter((order) =>
+      [
+        order.workOrderNumber,
+        order.orderNumber,
+        order.customerName,
+        order.productCode,
+        order.productName,
+        translateStatus(order.status),
+        translatePriority(order.priority),
+      ]
         .filter(Boolean)
-        .some((value) => String(value).toLocaleLowerCase("tr-TR").includes(normalizedSearch));
-    });
-  }, [products, search, workOrders]);
+        .some((value) => normalizeText(String(value)).includes(normalizedSearch))
+    );
+  }, [search, workOrders]);
 
   const today = formatDateInput(new Date());
-  const totalPlannedPairs = workOrders.reduce((sum, order) => sum + safeParsedNumber(order.plannedPairs), 0);
   const dashboardCards = [
-    { title: "Toplam İş Emri", value: workOrders.length.toLocaleString("tr-TR"), note: "Frontend iş emri", tone: "emerald" as DashboardTone },
-    { title: "Bekleyen", value: countByStatus(workOrders, "Taslak"), note: "Taslak kayıt", tone: "zinc" as DashboardTone },
-    { title: "Hazırlanıyor", value: countByStatus(workOrders, "Hazır"), note: "Üretime hazır", tone: "cyan" as DashboardTone },
-    { title: "Üretimde", value: countByStatus(workOrders, "Üretimde"), note: "Canlı üretime aday", tone: "amber" as DashboardTone },
-    { title: "Tamamlanan", value: countByStatus(workOrders, "Tamamlandı"), note: "Kapanan emir", tone: "blue" as DashboardTone },
-    { title: "İptal", value: countByStatus(workOrders, "İptal"), note: "Durdurulan emir", tone: "red" as DashboardTone },
-    { title: "Bugünkü Üretim", value: workOrders.filter((order) => order.startDate === today).length.toLocaleString("tr-TR"), note: "Bugün başlayan", tone: "violet" as DashboardTone },
-    { title: "Toplam Planlanan Çift", value: formatNumber(totalPlannedPairs), note: "Tüm iş emirleri", tone: "emerald" as DashboardTone },
+    { title: "Toplam İş Emri", value: workOrders.length.toLocaleString("tr-TR"), note: "Veritabanındaki kayıt", tone: "emerald" as DashboardTone },
+    { title: "Bekleyen", value: countByStatus(workOrders, "Draft"), note: "Taslak iş emri", tone: "zinc" as DashboardTone },
+    { title: "Hazırlanıyor", value: countByStatuses(workOrders, ["Planned", "Ready"]), note: "Planlandı / hazır", tone: "cyan" as DashboardTone },
+    { title: "Üretimde", value: countByStatuses(workOrders, ["InProduction", "Paused"]), note: "Atamaya açık üretim", tone: "amber" as DashboardTone },
+    { title: "Tamamlanan", value: countByStatus(workOrders, "Completed"), note: "Kapanan emir", tone: "blue" as DashboardTone },
+    { title: "İptal", value: countByStatus(workOrders, "Cancelled"), note: "İptal edilen", tone: "red" as DashboardTone },
+    { title: "Bugünkü Üretim", value: workOrders.filter((order) => dateOnly(order.actualStartDate) === today).length.toLocaleString("tr-TR"), note: "Bugün başlayan", tone: "violet" as DashboardTone },
+    { title: "Toplam Planlanan Çift", value: formatNumber(workOrders.reduce((sum, order) => sum + order.plannedPairs, 0)), note: "WorkOrder planı", tone: "emerald" as DashboardTone },
   ];
 
   return (
@@ -258,18 +335,18 @@ export default function WorkOrdersPage() {
               <p className="text-xs font-black tracking-[0.38em] text-emerald-300">FIXAR OS</p>
               <h1 className="mt-2 text-3xl font-black sm:text-4xl">İş Emri Yönetimi</h1>
               <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-                Product, Recipe, Material ve Stock master verilerinden beslenen üretim başlangıç noktası.
+                Sipariş kalemi, Product Master ve Recipe/BOM üzerinden veritabanına kaydedilen üretim iş emirleri.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={loadMasters}
+                onClick={() => void loadData()}
                 disabled={loading}
                 className="rounded-xl border border-white/10 bg-white/[0.08] px-5 py-3 text-sm font-black text-white transition hover:bg-white/[0.14] disabled:opacity-50"
               >
-                {loading ? "Yenileniyor..." : "Masterları Yenile"}
+                {loading ? "Yenileniyor..." : "Verileri Yenile"}
               </button>
-              <button onClick={() => openDialog("create")} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400">
+              <button onClick={() => void openDialog("create")} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400">
                 + Yeni İş Emri
               </button>
             </div>
@@ -291,7 +368,7 @@ export default function WorkOrdersPage() {
               </div>
               <div className="w-full xl:max-w-md">
                 <Field label="Arama">
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} className={CONTROL_CLASS} placeholder="İş emri, ürün, müşteri, durum" />
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} className={CONTROL_CLASS} placeholder="İş emri, sipariş, ürün, müşteri, durum" />
                 </Field>
               </div>
             </div>
@@ -300,20 +377,20 @@ export default function WorkOrdersPage() {
 
             {!loading && error && (
               <div className="mt-5 rounded-xl border border-red-400/30 bg-red-500/10 p-5 text-sm text-red-100">
-                <p className="font-black">Master veriler yüklenemedi.</p>
+                <p className="font-black">Veriler yüklenemedi.</p>
                 <p className="mt-1 text-red-200">{error}</p>
               </div>
             )}
 
             {!loading && !error && filteredWorkOrders.length === 0 && (
               <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-8 text-center text-zinc-300">
-                Henüz iş emri yok. Product Master seçerek yeni iş emri oluşturun.
+                Henüz iş emri yok. Sipariş kalemi seçerek yeni iş emri oluşturun.
               </div>
             )}
 
             {!loading && !error && filteredWorkOrders.length > 0 && (
               <div className="mt-5 overflow-x-auto">
-                <table className="min-w-[1240px] w-full text-left text-sm">
+                <table className="min-w-[1320px] w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-zinc-500">
                       <th className="py-3 pr-4">İş Emri No</th>
@@ -323,6 +400,7 @@ export default function WorkOrdersPage() {
                       <th className="py-3 pr-4">Foam</th>
                       <th className="py-3 pr-4">Planlanan Çift</th>
                       <th className="py-3 pr-4">Üretilen</th>
+                      <th className="py-3 pr-4">Fire</th>
                       <th className="py-3 pr-4">Kalan</th>
                       <th className="py-3 pr-4">Başlangıç</th>
                       <th className="py-3 pr-4">Termin</th>
@@ -335,28 +413,26 @@ export default function WorkOrdersPage() {
                     {filteredWorkOrders.map((order) => {
                       const product = products.find((item) => item.id === order.productId);
                       const details = parseProductDetails(product?.description);
-                      const planned = safeParsedNumber(order.plannedPairs);
-                      const produced = safeParsedNumber(order.producedPairs);
-
                       return (
                         <tr key={order.id} className="align-middle text-zinc-200 transition hover:bg-white/[0.04]">
-                          <td className="py-4 pr-4 font-mono text-xs text-emerald-200">{order.workOrderNo}</td>
-                          <td className="py-4 pr-4 font-black text-white">{product?.name || "-"}</td>
+                          <td className="py-4 pr-4 font-mono text-xs text-emerald-200">{order.workOrderNumber}</td>
+                          <td className="py-4 pr-4 font-black text-white">{order.productName || product?.name || "-"}</td>
                           <td className="py-4 pr-4">{order.customerName || product?.customerName || "-"}</td>
                           <td className="py-4 pr-4">{details.number || "-"}</td>
                           <td className="py-4 pr-4">{product?.foamType || "-"}</td>
-                          <td className="py-4 pr-4">{formatNumber(planned)}</td>
-                          <td className="py-4 pr-4">{formatNumber(produced)}</td>
-                          <td className="py-4 pr-4">{formatNumber(Math.max(planned - produced, 0))}</td>
-                          <td className="py-4 pr-4">{formatDate(order.startDate)}</td>
-                          <td className="py-4 pr-4">{formatDate(order.dueDate)}</td>
+                          <td className="py-4 pr-4">{formatNumber(order.plannedPairs)}</td>
+                          <td className="py-4 pr-4">{formatNumber(order.producedPairs)}</td>
+                          <td className="py-4 pr-4">{formatNumber(order.firePairs)}</td>
+                          <td className="py-4 pr-4">{formatNumber(order.remainingPairs)}</td>
+                          <td className="py-4 pr-4">{formatDate(order.plannedStartDate)}</td>
+                          <td className="py-4 pr-4">{formatDate(order.plannedEndDate)}</td>
                           <td className="py-4 pr-4"><StatusBadge status={order.status} /></td>
-                          <td className="py-4 pr-4">{order.priority}</td>
+                          <td className="py-4 pr-4">{translatePriority(order.priority)}</td>
                           <td className="py-4">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => openDialog("detail", order)} className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-black text-cyan-100 transition hover:bg-cyan-400/20">Detay</button>
-                              <button onClick={() => openDialog("edit", order)} className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-100 transition hover:bg-emerald-400/20">Düzenle</button>
-                              <button onClick={() => startProduction(order)} disabled={order.status === "Üretimde" || order.status === "Tamamlandı" || order.status === "İptal"} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-40">Üretimi Başlat</button>
+                              <button onClick={() => void openDialog("detail", order)} className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-black text-cyan-100 transition hover:bg-cyan-400/20">Detay</button>
+                              <button onClick={() => void openDialog("edit", order)} disabled={isLocked(order)} className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-40">Düzenle</button>
+                              <button onClick={() => void transitionWorkOrder(order)} disabled={!getNextTransitionPath(order.status)} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-40">{getTransitionLabel(order.status)}</button>
                             </div>
                           </td>
                         </tr>
@@ -375,8 +451,11 @@ export default function WorkOrdersPage() {
           mode={dialogMode}
           workOrder={dialogWorkOrder}
           products={products}
+          recipes={recipes}
           materials={materials}
           stocks={stocks}
+          machines={machines}
+          orderItems={orderItems}
           onClose={closeDialog}
           onSaved={handleSaved}
         />
@@ -389,85 +468,111 @@ function WorkOrderModal({
   mode,
   workOrder,
   products,
+  recipes,
   materials,
   stocks,
+  machines,
+  orderItems,
   onClose,
   onSaved,
 }: {
   mode: DialogMode;
   workOrder: WorkOrder | null;
   products: Product[];
+  recipes: Recipe[];
   materials: Material[];
   stocks: StockItem[];
+  machines: Machine[];
+  orderItems: FlattenedOrderItem[];
   onClose: () => void;
-  onSaved: (workOrder: WorkOrder, message: string) => void;
+  onSaved: (message: string) => Promise<void>;
 }) {
   const [activeTab, setActiveTab] = useState<WorkOrderTab>("general");
-  const [form, setForm] = useState<WorkOrder>(() => (workOrder ? cloneWorkOrder(workOrder) : createEmptyWorkOrder()));
+  const [form, setForm] = useState<WorkOrderForm>(() => createForm(workOrder));
+  const [requirements, setRequirements] = useState<RequirementPayload | null>(workOrder?.requirements ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const readonly = mode === "detail";
-  const product = products.find((item) => item.id === form.productId);
+  const selectedOrderItem = orderItems.find((item) => item.id === form.orderItemId);
+  const product = products.find((item) => item.id === selectedOrderItem?.productId || item.id === workOrder?.productId);
+  const productRecipes = recipes.filter((recipe) => recipe.productId === product?.id);
+  const selectedRecipe = recipes.find((recipe) => recipe.id === form.recipeId);
+  const selectedMachine = machines.find((machine) => machine.id === form.assignedMachineId);
   const details = parseProductDetails(product?.description);
-  const materialTotals = calculateMaterialTotals(form, materials, stocks);
-  const checks = buildChecks(form, product, materials, stocks);
+  const requirementTotals = buildRequirementTotals(requirements, selectedRecipe);
+  const checks = buildChecks(form, selectedOrderItem, product, selectedRecipe, requirements);
 
-  function updateForm<K extends keyof WorkOrder>(key: K, value: WorkOrder[K]) {
+  useEffect(() => {
+    if (!workOrder?.id) return;
+    if (workOrder.requirements) {
+      setRequirements(workOrder.requirements);
+      return;
+    }
+
+    void apiGet<RequirementPayload>("/work-orders/" + workOrder.id + "/requirements")
+      .then(setRequirements)
+      .catch(() => setRequirements(null));
+  }, [workOrder]);
+
+  function updateForm<K extends keyof WorkOrderForm>(key: K, value: WorkOrderForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function selectProduct(productId: string) {
-    const selected = products.find((item) => item.id === productId);
-    const productDetails = parseProductDetails(selected?.description);
-
+  function selectOrderItem(orderItemId: string) {
+    const item = orderItems.find((entry) => entry.id === orderItemId);
+    const recipe = recipes.find((entry) => entry.productId === item?.productId);
     setForm((current) => ({
       ...current,
-      productId,
-      customerName: selected?.customerName || current.customerName,
-      mold: productDetails.standardMold || current.mold,
-      estimatedProductionTime: selected?.standardCycleTime ? String(selected.standardCycleTime) : current.estimatedProductionTime,
-      estimatedDailyCapacity: productDetails.standardDailyCapacity || current.estimatedDailyCapacity,
-      estimatedWasteRate: productDetails.standardWasteRate || current.estimatedWasteRate,
-      operationNote: productDetails.defaultOperationNote || current.operationNote,
-      materialLines: createMaterialLinesFromMasters(materials, selected),
+      orderItemId,
+      recipeId: recipe?.id ?? "",
+      plannedPairs: item?.remainingPairs ? String(item.remainingPairs) : current.plannedPairs,
     }));
+    setRequirements(null);
   }
 
-  function updateMaterialLine(key: string, field: keyof WorkOrderMaterialLine, value: string) {
-    setForm((current) => ({
-      ...current,
-      materialLines: current.materialLines.map((line) => (line.key === key ? { ...line, [field]: value } : line)),
-    }));
-  }
-
-  function updateOperation(key: string, field: keyof OperationLine, value: string) {
-    setForm((current) => ({
-      ...current,
-      operations: current.operations.map((line) => (line.key === key ? { ...line, [field]: value } : line)),
-    }));
-  }
-
-  function saveWorkOrder() {
+  async function saveWorkOrder() {
     setError(null);
 
-    if (!form.workOrderNo.trim()) {
-      setError("İş emri no zorunludur.");
+    if (!form.orderItemId) {
+      setError("Sipariş kalemi seçmelisiniz.");
       setActiveTab("general");
       return;
     }
 
-    if (!form.productId) {
-      setError("Product Master seçmelisiniz.");
-      setActiveTab("general");
-      return;
-    }
-
-    if (safeParsedNumber(form.plannedPairs) <= 0) {
+    const plannedPairs = parseInteger(form.plannedPairs);
+    if (plannedPairs <= 0) {
       setError("Planlanan üretim miktarı 0'dan büyük olmalıdır.");
       setActiveTab("general");
       return;
     }
 
-    onSaved({ ...cloneWorkOrder(form), updatedAt: new Date().toISOString() }, mode === "edit" ? "İş emri güncellendi." : "İş emri oluşturuldu.");
+    setSaving(true);
+    try {
+      const body = {
+        orderItemId: form.orderItemId,
+        recipeId: form.recipeId || null,
+        plannedPairs,
+        priority: form.priority,
+        plannedStartDate: form.plannedStartDate ? new Date(form.plannedStartDate).toISOString() : null,
+        plannedEndDate: form.plannedEndDate ? new Date(form.plannedEndDate).toISOString() : null,
+        assignedMachineId: form.assignedMachineId || null,
+        shift: form.shift ? Number(form.shift) : null,
+        notes: form.notes || null,
+        isActive: true,
+      };
+
+      if (mode === "edit" && form.id) {
+        await apiPut<unknown>("/work-orders/" + form.id, body);
+        await onSaved("İş emri güncellendi.");
+      } else {
+        await apiPost<unknown>("/work-orders", body);
+        await onSaved("İş emri oluşturuldu.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "İş emri kaydedilemedi.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -478,11 +583,11 @@ function WorkOrderModal({
             <div>
               <p className="text-xs font-black tracking-[0.34em] text-emerald-300">WORK ORDER</p>
               <h2 className="mt-2 text-2xl font-black text-white">{readonly ? "İş Emri Detayı" : mode === "edit" ? "İş Emri Düzenle" : "Yeni İş Emri"}</h2>
-              <p className="mt-1 text-sm text-zinc-400">Product, Recipe, Material ve Stock bilgileri üzerinden üretimi başlatın.</p>
+              <p className="mt-1 text-sm text-zinc-400">Sipariş kalemi seçilir; ürün, reçete ve hammadde bilgileri master kartlardan gelir.</p>
             </div>
             <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-black text-white transition hover:bg-white/[0.12]">Kapat</button>
           </div>
-          <WorkOrderSummary form={form} product={product} details={details} totals={materialTotals} />
+          <WorkOrderSummary workOrder={workOrder} form={form} product={product} orderItem={selectedOrderItem} recipe={selectedRecipe} machine={selectedMachine} />
         </div>
 
         <div className="border-b border-white/10 px-5 pt-4">
@@ -505,22 +610,34 @@ function WorkOrderModal({
           {error && <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm font-bold text-red-100">{error}</div>}
           <ControlCards checks={checks} />
 
-          {activeTab === "general" && <GeneralTab form={form} product={product} details={details} products={products} readonly={readonly} selectProduct={selectProduct} updateForm={updateForm} />}
-          {activeTab === "product" && <ProductInfoTab product={product} details={details} />}
-          {activeTab === "plan" && <ProductionPlanTab form={form} readonly={readonly} updateForm={updateForm} />}
-          {activeTab === "materials" && <MaterialsTab form={form} materials={materials} stocks={stocks} readonly={readonly} updateMaterialLine={updateMaterialLine} totals={materialTotals} />}
-          {activeTab === "operations" && <OperationsTab form={form} readonly={readonly} updateOperation={updateOperation} />}
+          {activeTab === "general" && (
+            <GeneralTab
+              form={form}
+              workOrder={workOrder}
+              product={product}
+              details={details}
+              orderItems={orderItems}
+              productRecipes={productRecipes}
+              readonly={readonly || isLocked(workOrder)}
+              selectOrderItem={selectOrderItem}
+              updateForm={updateForm}
+            />
+          )}
+          {activeTab === "product" && <ProductInfoTab product={product} details={details} orderItem={selectedOrderItem} />}
+          {activeTab === "plan" && <ProductionPlanTab form={form} machines={machines} readonly={readonly || isLocked(workOrder)} updateForm={updateForm} />}
+          {activeTab === "materials" && <MaterialsTab requirements={requirements} materials={materials} stocks={stocks} totals={requirementTotals} />}
+          {activeTab === "operations" && <OperationsTab workOrder={workOrder} />}
           {activeTab === "quality" && <QualityTab details={details} product={product} />}
-          {activeTab === "notes" && <NotesTab form={form} readonly={readonly} updateForm={updateForm} />}
+          {activeTab === "notes" && <NotesTab form={form} readonly={readonly || isLocked(workOrder)} updateForm={updateForm} />}
         </div>
 
         <div className="flex flex-col gap-3 border-t border-white/10 bg-black/30 p-5 sm:flex-row sm:justify-end">
           <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white transition hover:bg-white/[0.12]">
             {readonly ? "Kapat" : "Vazgeç"}
           </button>
-          {!readonly && (
-            <button onClick={saveWorkOrder} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400">
-              Kaydet
+          {!readonly && !isLocked(workOrder) && (
+            <button onClick={() => void saveWorkOrder()} disabled={saving} className="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-black text-black transition hover:bg-emerald-400 disabled:opacity-50">
+              {saving ? "Kaydediliyor..." : "Kaydet"}
             </button>
           )}
         </div>
@@ -529,20 +646,32 @@ function WorkOrderModal({
   );
 }
 
-function WorkOrderSummary({ form, product, details, totals }: { form: WorkOrder; product: Product | undefined; details: ProductDetails; totals: MaterialTotals }) {
-  const planned = safeParsedNumber(form.plannedPairs);
-  const produced = safeParsedNumber(form.producedPairs);
+function WorkOrderSummary({
+  workOrder,
+  form,
+  product,
+  orderItem,
+  recipe,
+  machine,
+}: {
+  workOrder: WorkOrder | null;
+  form: WorkOrderForm;
+  product: Product | undefined;
+  orderItem: FlattenedOrderItem | undefined;
+  recipe: Recipe | undefined;
+  machine: Machine | undefined;
+}) {
   const items = [
-    ["İş Emri", form.workOrderNo || "-"],
-    ["Ürün", product?.name || "-"],
-    ["Müşteri", form.customerName || product?.customerName || "-"],
-    ["Numara", details.number || "-"],
-    ["Foam", product?.foamType || "-"],
-    ["Plan", formatNumber(planned)],
-    ["Kalan", formatNumber(Math.max(planned - produced, 0))],
-    ["Durum", form.status],
-    ["Öncelik", form.priority],
-    ["Hammadde", formatMoney(totals.totalCost, "TRY")],
+    ["İş Emri", workOrder?.workOrderNumber || "Otomatik"],
+    ["Ürün", product?.name || orderItem?.productName || "-"],
+    ["Müşteri", orderItem?.customerName || workOrder?.customerName || "-"],
+    ["Reçete", recipe ? [recipe.code, recipe.name].filter(Boolean).join(" - ") : "-"],
+    ["Plan", formatNumber(parseInteger(form.plannedPairs))],
+    ["Üretilen", formatNumber(workOrder?.producedPairs ?? 0)],
+    ["Durum", workOrder ? translateStatus(workOrder.status) : "Taslak"],
+    ["Öncelik", translatePriority(form.priority)],
+    ["Makine", machine ? [machine.code, machine.name].filter(Boolean).join(" - ") : "-"],
+    ["Vardiya", form.shift || "-"],
   ];
 
   return (
@@ -572,34 +701,51 @@ function ControlCards({ checks }: { checks: Array<{ label: string; status: strin
 
 function GeneralTab({
   form,
+  workOrder,
   product,
   details,
-  products,
+  orderItems,
+  productRecipes,
   readonly,
-  selectProduct,
+  selectOrderItem,
   updateForm,
 }: {
-  form: WorkOrder;
+  form: WorkOrderForm;
+  workOrder: WorkOrder | null;
   product: Product | undefined;
   details: ProductDetails;
-  products: Product[];
+  orderItems: FlattenedOrderItem[];
+  productRecipes: Recipe[];
   readonly: boolean;
-  selectProduct: (productId: string) => void;
-  updateForm: <K extends keyof WorkOrder>(key: K, value: WorkOrder[K]) => void;
+  selectOrderItem: (orderItemId: string) => void;
+  updateForm: <K extends keyof WorkOrderForm>(key: K, value: WorkOrderForm[K]) => void;
 }) {
   return (
-    <TabPanel title="Genel" note="Ürün seçildiğinde Product Master teknik bilgileri otomatik gelir.">
+    <TabPanel title="Genel" note="İş emri bir OrderItem üzerine açılır. Product ve müşteri bilgisi tekrar girilmez.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <TextInput label="İş Emri No" value={form.workOrderNo} readonly={readonly} onChange={(value) => updateForm("workOrderNo", value)} />
-        <Field label="Ürün Seç">
-          <select value={form.productId} disabled={readonly} onChange={(event) => selectProduct(event.target.value)} className={CONTROL_CLASS}>
-            <option value="">Product Master seç</option>
-            {products.map((item) => (
-              <option key={item.id} value={item.id}>{[item.code, item.name, item.foamType].filter(Boolean).join(" - ")}</option>
+        <ReadOnlyInfo label="İş Emri No" value={workOrder?.workOrderNumber || "Kaydedince oluşur"} />
+        <Field label="Sipariş Kalemi">
+          <select value={form.orderItemId} disabled={readonly || !!workOrder?.id} onChange={(event) => selectOrderItem(event.target.value)} className={CONTROL_CLASS}>
+            <option value="">Sipariş kalemi seç</option>
+            {orderItems.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.customerName} / {item.productName} / {formatNumber(item.remainingPairs)} çift kaldı
+              </option>
             ))}
           </select>
         </Field>
-        <ReadOnlyInfo label="Kod" value={product?.code || "-"} />
+        <Field label="Recipe / BOM">
+          <select value={form.recipeId} disabled={readonly || !product} onChange={(event) => updateForm("recipeId", event.target.value)} className={CONTROL_CLASS}>
+            <option value="">Reçete seçilmedi</option>
+            {productRecipes.map((recipe) => (
+              <option key={recipe.id} value={recipe.id}>
+                {[recipe.code, recipe.name, recipe.version].filter(Boolean).join(" - ")}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <TextInput label="Planlanan Üretim Miktarı (Çift)" value={form.plannedPairs} readonly={readonly} type="number" onChange={(value) => updateForm("plannedPairs", value)} />
+        <ReadOnlyInfo label="Ürün Kodu" value={product?.code || "-"} />
         <ReadOnlyInfo label="Ürün Adı" value={product?.name || "-"} />
         <ReadOnlyInfo label="Foam" value={product?.foamType || "-"} />
         <ReadOnlyInfo label="Numara" value={details.number || "-"} />
@@ -608,154 +754,128 @@ function GeneralTab({
         <ReadOnlyInfo label="Kumaş" value={details.fabricType || (product?.isFabric ? "Var" : "Yok")} />
         <ReadOnlyInfo label="DTF" value={product?.hasDTFLabel ? "Var" : "Yok"} />
         <ReadOnlyInfo label="Yapışkan" value={details.adhesiveType || (product?.isAdhesive ? "Var" : "Yok")} />
-        <ReadOnlyInfo label="Standart Kalıp" value={details.standardMold || form.mold || "-"} />
+        <ReadOnlyInfo label="Standart Kalıp" value={details.standardMold || "-"} />
         <ReadOnlyInfo label="Standart Pişme Süresi" value={product?.standardCycleTime ? String(product.standardCycleTime) : "-"} />
         <ReadOnlyInfo label="Standart Fire" value={details.standardWasteRate || "-"} />
         <ReadOnlyInfo label="Standart Günlük Kapasite" value={details.standardDailyCapacity || "-"} />
-        <TextInput label="Versiyon" value="Product Master" readonly onChange={() => undefined} />
-        <TextInput label="Revizyon" value="Recipe state" readonly onChange={() => undefined} />
-        <TextInput label="Müşteri" value={form.customerName} readonly={readonly} onChange={(value) => updateForm("customerName", value)} />
-        <TextInput label="Sipariş No" value={form.orderNo} readonly={readonly} onChange={(value) => updateForm("orderNo", value)} />
-        <TextInput label="Planlanan Üretim Miktarı (Çift)" value={form.plannedPairs} readonly={readonly} type="number" onChange={(value) => updateForm("plannedPairs", value)} />
-        <SelectInput label="Öncelik" value={form.priority} readonly={readonly} options={PRIORITIES} onChange={(value) => updateForm("priority", value)} />
-        <TextInput label="Başlangıç Tarihi" value={form.startDate} readonly={readonly} type="date" onChange={(value) => updateForm("startDate", value)} />
-        <TextInput label="Termin Tarihi" value={form.dueDate} readonly={readonly} type="date" onChange={(value) => updateForm("dueDate", value)} />
-        <SelectInput label="Durum" value={form.status} readonly={readonly} options={WORK_ORDER_STATUSES} onChange={(value) => updateForm("status", value)} />
+        <SelectInput label="Öncelik" value={form.priority} readonly={readonly} options={PRIORITY_OPTIONS} onChange={(value) => updateForm("priority", value)} />
+        <TextInput label="Başlangıç Tarihi" value={form.plannedStartDate} readonly={readonly} type="date" onChange={(value) => updateForm("plannedStartDate", value)} />
+        <TextInput label="Termin Tarihi" value={form.plannedEndDate} readonly={readonly} type="date" onChange={(value) => updateForm("plannedEndDate", value)} />
+        <ReadOnlyInfo label="Durum" value={workOrder ? translateStatus(workOrder.status) : "Taslak"} />
       </div>
     </TabPanel>
   );
 }
 
-function ProductInfoTab({ product, details }: { product: Product | undefined; details: ProductDetails }) {
+function ProductInfoTab({ product, details, orderItem }: { product: Product | undefined; details: ProductDetails; orderItem: FlattenedOrderItem | undefined }) {
   return (
-    <TabPanel title="Ürün Bilgileri" note="Readonly. Product Master'dan otomatik gelir.">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ImagePreview title="Ürün resmi" name={details.productImageName || ""} dataUrl={details.productImageDataUrl || ""} />
-        <ImagePreview title="Kalıp resmi" name={details.moldImageName || ""} dataUrl={details.moldImageDataUrl || ""} />
-      </div>
+    <TabPanel title="Ürün Bilgileri" note="Readonly. Product Master ve sipariş kaleminden otomatik gelir.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <ReadOnlyInfo label="Müşteri" value={orderItem?.customerName || product?.customerName || "-"} />
         <ReadOnlyInfo label="Model" value={details.model || product?.modelCode || "-"} />
         <ReadOnlyInfo label="Kategori" value={product?.category || "-"} />
         <ReadOnlyInfo label="Foam" value={product?.foamType || "-"} />
         <ReadOnlyInfo label="Numara" value={details.number || "-"} />
-        <ReadOnlyInfo label="Renk" value={details.color || "-"} />
-        <ReadOnlyInfo label="Üretim Tipi" value={details.productionType || "-"} />
+        <ReadOnlyInfo label="Renk" value={details.color || orderItem?.fabricColor || "-"} />
+        <ReadOnlyInfo label="Üretim Tipi" value={details.productionType || orderItem?.productionType || "-"} />
         <ReadOnlyInfo label="Gramaj" value={formatNumber(product?.averageWeight)} />
         <ReadOnlyInfo label="Yoğunluk" value={formatNumber(product?.targetDensity)} />
+        <ReadOnlyInfo label="Sipariş Miktarı" value={formatNumber(orderItem?.quantityPairs)} />
+        <ReadOnlyInfo label="Siparişte Üretilen" value={formatNumber(orderItem?.producedPairs)} />
+        <ReadOnlyInfo label="Sipariş Kalan" value={formatNumber(orderItem?.remainingPairs)} />
       </div>
     </TabPanel>
   );
 }
 
-function ProductionPlanTab({ form, readonly, updateForm }: WorkOrderTabProps) {
+function ProductionPlanTab({ form, machines, readonly, updateForm }: { form: WorkOrderForm; machines: Machine[]; readonly: boolean; updateForm: <K extends keyof WorkOrderForm>(key: K, value: WorkOrderForm[K]) => void }) {
   return (
-    <TabPanel title="Üretim Planı" note="Makine, kalıp, operatör, vardiya ve zaman planı.">
+    <TabPanel title="Üretim Planı" note="Makine ve vardiya planı. Operatör ve istasyon ataması Üretim Planlama ekranında yapılır.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <TextInput label="Makine" value={form.machine} readonly={readonly} onChange={(value) => updateForm("machine", value)} />
-        <TextInput label="Kalıp" value={form.mold} readonly={readonly} onChange={(value) => updateForm("mold", value)} />
-        <TextInput label="Operatör" value={form.operatorName} readonly={readonly} onChange={(value) => updateForm("operatorName", value)} />
-        <SelectInput label="Vardiya" value={form.shift} readonly={readonly} options={["1", "2", "3"]} onChange={(value) => updateForm("shift", value)} />
-        <TextInput label="Planlanan Başlangıç" value={form.plannedStart} readonly={readonly} type="datetime-local" onChange={(value) => updateForm("plannedStart", value)} />
-        <TextInput label="Planlanan Bitiş" value={form.plannedEnd} readonly={readonly} type="datetime-local" onChange={(value) => updateForm("plannedEnd", value)} />
-        <TextInput label="Tahmini Üretim Süresi" value={form.estimatedProductionTime} readonly={readonly} onChange={(value) => updateForm("estimatedProductionTime", value)} />
-        <TextInput label="Tahmini Günlük Kapasite" value={form.estimatedDailyCapacity} readonly={readonly} type="number" onChange={(value) => updateForm("estimatedDailyCapacity", value)} />
-        <TextInput label="Tahmini Fire" value={form.estimatedWasteRate} readonly={readonly} type="number" onChange={(value) => updateForm("estimatedWasteRate", value)} />
+        <Field label="Makine">
+          <select value={form.assignedMachineId} disabled={readonly} onChange={(event) => updateForm("assignedMachineId", event.target.value)} className={CONTROL_CLASS}>
+            <option value="">Makine seçilmedi</option>
+            {machines.map((machine) => (
+              <option key={machine.id} value={machine.id}>
+                {[machine.code, machine.name].filter(Boolean).join(" - ")}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <SelectInput label="Vardiya" value={form.shift} readonly={readonly} options={[{ value: "", label: "Seçilmedi" }, { value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }]} onChange={(value) => updateForm("shift", value)} />
+        <TextInput label="Planlanan Başlangıç" value={form.plannedStartDate} readonly={readonly} type="date" onChange={(value) => updateForm("plannedStartDate", value)} />
+        <TextInput label="Planlanan Bitiş" value={form.plannedEndDate} readonly={readonly} type="date" onChange={(value) => updateForm("plannedEndDate", value)} />
       </div>
-      <TextAreaInput label="Operasyon Notu" value={form.operationNote} readonly={readonly} onChange={(value) => updateForm("operationNote", value)} />
     </TabPanel>
   );
 }
 
-function MaterialsTab({
-  form,
-  materials,
-  stocks,
-  readonly,
-  updateMaterialLine,
-  totals,
-}: {
-  form: WorkOrder;
-  materials: Material[];
-  stocks: StockItem[];
-  readonly: boolean;
-  updateMaterialLine: (key: string, field: keyof WorkOrderMaterialLine, value: string) => void;
-  totals: MaterialTotals;
-}) {
-  const plannedPairs = safeParsedNumber(form.plannedPairs);
-
+function MaterialsTab({ requirements, materials, stocks, totals }: { requirements: RequirementPayload | null; materials: Material[]; stocks: StockItem[]; totals: Array<{ currency: string; total: number }> }) {
+  const lines = requirements?.items ?? [];
   return (
-    <TabPanel title="Kullanılacak Hammaddeler" note="Recipe/BOM mantığıyla Material Master'dan otomatik seçilir, stok yeterliliği kontrol edilir.">
-      <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
-        <table className="min-w-[1120px] w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-white/10 text-xs uppercase tracking-[0.16em] text-zinc-500">
-              <th className="p-3">Malzeme</th>
-              <th className="p-3">Kod</th>
-              <th className="p-3">Tip</th>
-              <th className="p-3">Birim</th>
-              <th className="p-3">Birim Fiyat</th>
-              <th className="p-3">1 Çift Kullanım</th>
-              <th className="p-3">Toplam Kullanım</th>
-              <th className="p-3">Stok Durumu</th>
-              <th className="p-3">Eksik</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/10">
-            {form.materialLines.map((line) => {
-              const material = materials.find((item) => item.id === line.materialId);
-              const stock = findStockForMaterial(material, stocks);
-              const totalUsage = safeParsedNumber(line.usagePerPair) * plannedPairs;
-              const missing = Math.max(totalUsage - safeNumber(stock?.currentQuantity), 0);
-              const status = getStockStatus(stock, totalUsage);
-
-              return (
-                <tr key={line.key}>
-                  <td className="p-3">
-                    <select value={line.materialId} disabled={readonly} onChange={(event) => updateMaterialLine(line.key, "materialId", event.target.value)} className={CONTROL_CLASS}>
-                      <option value="">{line.role} seç</option>
-                      {materials.map((item) => (
-                        <option key={item.id} value={item.id}>{formatMaterialOption(item)}</option>
-                      ))}
-                    </select>
-                    {line.role === "Crosskim" && <p className="mt-2 text-xs font-bold text-amber-200">Crosskim 180 kg Poliol kazanına ilave edilen katkıdır.</p>}
-                  </td>
-                  <td className="p-3 font-mono text-xs text-emerald-200">{material?.code || "-"}</td>
-                  <td className="p-3">{material?.materialType || "-"}</td>
-                  <td className="p-3">{material?.unit || "-"}</td>
-                  <td className="p-3">{formatMoney(safeNumber(material?.lastPurchasePrice), material?.currency || "TRY")}</td>
-                  <td className="p-3"><input value={line.usagePerPair} type="number" step="0.01" disabled={readonly} onChange={(event) => updateMaterialLine(line.key, "usagePerPair", event.target.value)} className={CONTROL_CLASS} /></td>
-                  <td className="p-3">{formatNumber(totalUsage)}</td>
-                  <td className="p-3"><StockStatusBadge status={status} /></td>
-                  <td className="p-3">{missing > 0 ? formatNumber(missing) : "-"}</td>
+    <TabPanel title="Kullanılacak Hammaddeler" note="Backend Recipe/BOM üzerinden hesaplanır; stok sadece okunur, tüketim yapılmaz.">
+      {!requirements && <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-5 text-sm font-bold text-amber-100">Bu iş emrine bağlı aktif reçete bulunmadığı için hammadde ihtiyacı hesaplanamıyor.</div>}
+      {requirements && (
+        <>
+          <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
+            <table className="min-w-[1120px] w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-xs uppercase tracking-[0.16em] text-zinc-500">
+                  <th className="p-3">Malzeme</th>
+                  <th className="p-3">Kod</th>
+                  <th className="p-3">Tip</th>
+                  <th className="p-3">Birim</th>
+                  <th className="p-3">Gerekli</th>
+                  <th className="p-3">Stok</th>
+                  <th className="p-3">Eksik</th>
+                  <th className="p-3">Tahmini Maliyet</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <MetricCard label="Toplam Hammadde Maliyeti" value={formatMoney(totals.totalCost, "TRY")} tone="emerald" />
-        <MetricCard label="Toplam Hammadde Gramajı" value={`${formatNumber(totals.totalGram)} gr`} />
-        <MetricCard label="Eksik / Kritik" value={`${totals.missingCount} eksik / ${totals.criticalCount} kritik`} tone={totals.missingCount > 0 ? "red" : "cyan"} />
-      </div>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {lines.map((line) => {
+                  const material = materials.find((item) => item.id === line.materialId);
+                  const stock = findStockForMaterial(material, stocks);
+                  const shortage = safeNumber(line.shortageQuantity);
+                  return (
+                    <tr key={line.materialId}>
+                      <td className="p-3 font-black text-white">{line.materialName || material?.name || "-"}</td>
+                      <td className="p-3 font-mono text-xs text-emerald-200">{line.materialCode || material?.code || "-"}</td>
+                      <td className="p-3">{material?.materialType || "-"}</td>
+                      <td className="p-3">{line.unit || material?.unit || "-"}</td>
+                      <td className="p-3">{formatNumber(line.requiredQuantity)}</td>
+                      <td className="p-3">{formatNumber(line.availableStock ?? stock?.currentQuantity)}</td>
+                      <td className="p-3"><StockStatusBadge status={shortage > 0 ? "Yetersiz" : "Yeterli"} /></td>
+                      <td className="p-3">{formatMoney(safeNumber(line.estimatedMaterialCost), line.currency || material?.currency || "TRY")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {totals.map((total) => (
+              <MetricCard key={total.currency} label={"Toplam Maliyet " + total.currency} value={formatMoney(total.total, total.currency)} tone="emerald" />
+            ))}
+            <MetricCard label="Eksik Malzeme" value={String(lines.filter((line) => safeNumber(line.shortageQuantity) > 0).length)} tone={lines.some((line) => safeNumber(line.shortageQuantity) > 0) ? "red" : "cyan"} />
+          </div>
+        </>
+      )}
     </TabPanel>
   );
 }
 
-function OperationsTab({ form, readonly, updateOperation }: { form: WorkOrder; readonly: boolean; updateOperation: (key: string, field: keyof OperationLine, value: string) => void }) {
+function OperationsTab({ workOrder }: { workOrder: WorkOrder | null }) {
+  const assignments = workOrder?.stationAssignments ?? [];
   return (
-    <TabPanel title="Operasyonlar" note="Şimdilik frontend state. İleride canlı üretim modülüne bağlanacak.">
-      <div className="space-y-3">
-        {form.operations.map((operation) => (
-          <div key={operation.key} className="grid gap-3 rounded-xl border border-white/10 bg-black/20 p-4 md:grid-cols-2 xl:grid-cols-[1.1fr_1fr_1fr_1fr_1fr_1.4fr]">
-            <ReadOnlyInfo label="Operasyon" value={operation.operation} />
-            <SelectInput label="Durum" value={operation.status} readonly={readonly} options={["Bekliyor", "Hazır", "Başladı", "Tamamlandı"]} onChange={(value) => updateOperation(operation.key, "status", value)} />
-            <TextInput label="Sorumlu" value={operation.responsible} readonly={readonly} onChange={(value) => updateOperation(operation.key, "responsible", value)} />
-            <TextInput label="Tahmini Süre" value={operation.estimatedTime} readonly={readonly} onChange={(value) => updateOperation(operation.key, "estimatedTime", value)} />
-            <TextInput label="Gerçek Süre" value={operation.actualTime} readonly={readonly} onChange={(value) => updateOperation(operation.key, "actualTime", value)} />
-            <TextInput label="Not" value={operation.note} readonly={readonly} onChange={(value) => updateOperation(operation.key, "note", value)} />
-          </div>
-        ))}
+    <TabPanel title="Operasyonlar" note="İstasyon atamaları Üretim Planlama üzerinden gelir. Tur Ekle akışı burada tekrar edilmez.">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <ReadOnlyInfo label="Atanan Çift" value={formatNumber(workOrder?.assignedPairs)} />
+        <ReadOnlyInfo label="Üretilen Çift" value={formatNumber(workOrder?.producedPairs)} />
+        <ReadOnlyInfo label="Sağlam" value={formatNumber(workOrder?.goodPairs)} />
+        <ReadOnlyInfo label="Fire" value={formatNumber(workOrder?.firePairs)} />
+      </div>
+      <div className="rounded-xl border border-white/10 bg-black/20 p-5 text-sm text-zinc-300">
+        {assignments.length > 0 ? `${assignments.length} istasyon ataması bağlı.` : "Henüz bu iş emrine bağlı istasyon ataması yok."}
       </div>
     </TabPanel>
   );
@@ -776,24 +896,13 @@ function QualityTab({ details, product }: { details: ProductDetails; product: Pr
   );
 }
 
-function NotesTab({ form, readonly, updateForm }: WorkOrderTabProps) {
+function NotesTab({ form, readonly, updateForm }: { form: WorkOrderForm; readonly: boolean; updateForm: <K extends keyof WorkOrderForm>(key: K, value: WorkOrderForm[K]) => void }) {
   return (
-    <TabPanel title="Notlar" note="İş emrine özel üretim, müşteri, kalite ve genel notlar.">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <TextAreaInput label="Üretim Notu" value={form.productionNote} readonly={readonly} onChange={(value) => updateForm("productionNote", value)} />
-        <TextAreaInput label="Müşteri Notu" value={form.customerNote} readonly={readonly} onChange={(value) => updateForm("customerNote", value)} />
-        <TextAreaInput label="Kalite Notu" value={form.qualityNote} readonly={readonly} onChange={(value) => updateForm("qualityNote", value)} />
-        <TextAreaInput label="Genel Not" value={form.generalNote} readonly={readonly} onChange={(value) => updateForm("generalNote", value)} />
-      </div>
+    <TabPanel title="Notlar" note="İş emrine özel genel not. Üretim sayaçları burada tutulmaz.">
+      <TextAreaInput label="Genel Not" value={form.notes} readonly={readonly} onChange={(value) => updateForm("notes", value)} />
     </TabPanel>
   );
 }
-
-type WorkOrderTabProps = {
-  form: WorkOrder;
-  readonly: boolean;
-  updateForm: <K extends keyof WorkOrder>(key: K, value: WorkOrder[K]) => void;
-};
 
 function TabPanel({ title, note, children }: { title: string; note: string; children: ReactNode }) {
   return (
@@ -819,7 +928,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function TextInput({ label, value, readonly, onChange, type = "text" }: { label: string; value: string; readonly: boolean; onChange: (value: string) => void; type?: string }) {
   return (
     <Field label={label}>
-      <input value={value} type={type} step={type === "number" ? "0.01" : undefined} disabled={readonly} readOnly={readonly} onChange={(event) => onChange(event.target.value)} className={CONTROL_CLASS} />
+      <input value={value} type={type} step={type === "number" ? "1" : undefined} disabled={readonly} readOnly={readonly} onChange={(event) => onChange(event.target.value)} className={CONTROL_CLASS} />
     </Field>
   );
 }
@@ -827,16 +936,19 @@ function TextInput({ label, value, readonly, onChange, type = "text" }: { label:
 function TextAreaInput({ label, value, readonly, onChange }: { label: string; value: string; readonly: boolean; onChange: (value: string) => void }) {
   return (
     <Field label={label}>
-      <textarea value={value} disabled={readonly} readOnly={readonly} rows={4} onChange={(event) => onChange(event.target.value)} className={`${CONTROL_CLASS} min-h-28 resize-y`} />
+      <textarea value={value} disabled={readonly} readOnly={readonly} rows={5} onChange={(event) => onChange(event.target.value)} className={`${CONTROL_CLASS} min-h-28 resize-y`} />
     </Field>
   );
 }
 
-function SelectInput({ label, value, readonly, options, onChange }: { label: string; value: string; readonly: boolean; options: string[]; onChange: (value: string) => void }) {
+function SelectInput({ label, value, readonly, options, onChange }: { label: string; value: string; readonly: boolean; options: Array<string | { value: string; label: string }>; onChange: (value: string) => void }) {
   return (
     <Field label={label}>
       <select value={value} disabled={readonly} onChange={(event) => onChange(event.target.value)} className={CONTROL_CLASS}>
-        {options.map((option) => <option key={option}>{option}</option>)}
+        {options.map((option) => {
+          const item = typeof option === "string" ? { value: option, label: option } : option;
+          return <option key={item.value} value={item.value}>{item.label}</option>;
+        })}
       </select>
     </Field>
   );
@@ -847,17 +959,6 @@ function ReadOnlyInfo({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-white/10 bg-black/20 p-4">
       <p className="text-xs font-black uppercase tracking-[0.16em] text-zinc-500">{label}</p>
       <p className="mt-2 break-words text-sm font-black text-white">{value}</p>
-    </div>
-  );
-}
-
-function ImagePreview({ title, name, dataUrl }: { title: string; name: string; dataUrl: string }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
-      <div className="relative flex aspect-[4/3] items-center justify-center bg-white/[0.04]">
-        {dataUrl ? <Image src={dataUrl} alt={title} fill sizes="(max-width: 1024px) 100vw, 50vw" unoptimized className="object-cover" /> : <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">{title}</p>}
-      </div>
-      <div className="border-t border-white/10 px-3 py-2 text-xs font-bold text-zinc-300">{name || "Önizleme yok"}</div>
     </div>
   );
 }
@@ -892,17 +993,18 @@ function MetricCard({ label, value, tone = "zinc" }: { label: string; value: str
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const label = translateStatus(status);
   const className =
-    status === "Tamamlandı" ? "bg-emerald-500/15 text-emerald-200" :
-    status === "Üretimde" ? "bg-amber-500/15 text-amber-200" :
-    status === "İptal" ? "bg-red-500/15 text-red-200" :
-    status === "Hazır" ? "bg-cyan-500/15 text-cyan-200" :
+    status === "Completed" ? "bg-emerald-500/15 text-emerald-200" :
+    status === "InProduction" || status === "Paused" ? "bg-amber-500/15 text-amber-200" :
+    status === "Cancelled" ? "bg-red-500/15 text-red-200" :
+    status === "Ready" || status === "Planned" ? "bg-cyan-500/15 text-cyan-200" :
     "bg-zinc-500/15 text-zinc-200";
-  return <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{status}</span>;
+  return <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{label}</span>;
 }
 
 function StockStatusBadge({ status }: { status: string }) {
-  const className = status === "Yeterli" ? "bg-emerald-500/15 text-emerald-200" : status === "Kritik" ? "bg-amber-500/15 text-amber-200" : "bg-red-500/15 text-red-200";
+  const className = status === "Yeterli" ? "bg-emerald-500/15 text-emerald-200" : "bg-red-500/15 text-red-200";
   return <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{status}</span>;
 }
 
@@ -910,124 +1012,178 @@ function LoadingState() {
   return <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-8 text-center text-sm font-bold text-zinc-400">Yükleniyor...</div>;
 }
 
-function createEmptyWorkOrder(): WorkOrder {
-  return {
-    id: `wo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    workOrderNo: `WO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`,
-    productId: "",
-    version: "V1",
-    revisionNo: "R0",
-    customerName: "",
-    orderNo: "",
-    plannedPairs: "",
-    producedPairs: "0",
-    priority: "Normal",
-    startDate: formatDateInput(new Date()),
-    dueDate: "",
-    status: "Taslak",
-    machine: "",
-    mold: "",
-    operatorName: "",
-    shift: "1",
-    plannedStart: "",
-    plannedEnd: "",
-    estimatedProductionTime: "",
-    estimatedDailyCapacity: "",
-    estimatedWasteRate: "",
-    operationNote: "",
-    materialLines: [],
-    operations: OPERATION_NAMES.map((operation, index) => ({
-      key: `op-${index + 1}`,
-      operation,
-      status: "Bekliyor",
-      responsible: "",
-      estimatedTime: "",
-      actualTime: "",
-      note: "",
-    })),
-    productionNote: "",
-    customerNote: "",
-    qualityNote: "",
-    generalNote: "",
-    updatedAt: new Date().toISOString(),
-  };
-}
+type FlattenedOrderItem = OrderItemLookup & {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  productName: string;
+  quantityPairs: number;
+  producedPairs: number;
+  remainingPairs: number;
+};
 
-function cloneWorkOrder(order: WorkOrder): WorkOrder {
-  return {
-    ...order,
-    materialLines: order.materialLines.map((line) => ({ ...line })),
-    operations: order.operations.map((line) => ({ ...line })),
-  };
-}
-
-function createMaterialLinesFromMasters(materials: Material[], product: Product | undefined): WorkOrderMaterialLine[] {
-  return RECIPE_ROLES.map((role, index) => {
-    const matched = findMaterialForRole(role, materials, product);
-    return {
-      key: `${role}-${index}`,
-      role,
-      materialId: matched?.id || "",
-      usagePerPair: "",
-      wasteRate: "0",
-      note: "",
-    };
-  });
-}
-
-function findMaterialForRole(role: string, materials: Material[], product: Product | undefined) {
-  const normalizedRole = normalizeText(role);
-  return materials.find((material) => {
-    const type = normalizeText(material.materialType);
-    const text = normalizeText(`${material.code || ""} ${material.name || ""}`);
-    if (normalizedRole === "kumaş") return type === "fabric";
-    if (normalizedRole === "yapışkan") return type === "adhesive";
-    if (normalizedRole === "dtf") return product?.hasDTFLabel ? type === "dtf" : false;
-    if (normalizedRole === "işçilik") return false;
-    return text.includes(normalizedRole);
-  });
-}
-
-function calculateMaterialTotals(order: WorkOrder, materials: Material[], stocks: StockItem[]): MaterialTotals {
-  const plannedPairs = safeParsedNumber(order.plannedPairs);
-  return order.materialLines.reduce(
-    (totals, line) => {
-      const material = materials.find((item) => item.id === line.materialId);
-      const stock = findStockForMaterial(material, stocks);
-      const totalUsage = safeParsedNumber(line.usagePerPair) * plannedPairs;
-      const lineCost = totalUsage * safeNumber(material?.lastPurchasePrice);
-      const status = getStockStatus(stock, totalUsage);
-      const isGram = normalizeText(material?.unit) === "gr";
-      return {
-        totalCost: totals.totalCost + lineCost,
-        totalGram: totals.totalGram + (isGram ? totalUsage : 0),
-        missingCount: totals.missingCount + (status === "Yetersiz" ? 1 : 0),
-        criticalCount: totals.criticalCount + (status === "Kritik" ? 1 : 0),
-      };
-    },
-    { totalCost: 0, totalGram: 0, missingCount: 0, criticalCount: 0 }
+function flattenOrderItems(orders: OrderLookup[]): FlattenedOrderItem[] {
+  return orders.flatMap((order) =>
+    (order.items ?? []).map((item) => ({
+      ...item,
+      orderId: order.id,
+      orderNumber: "ORD-" + order.id.substring(0, 8).toUpperCase(),
+      customerName: order.customerName ?? "-",
+      productName: item.productName ?? order.productName ?? "-",
+      quantityPairs: safeNumber(item.quantityPairs),
+      producedPairs: safeNumber(item.producedPairs),
+      remainingPairs: safeNumber(item.remainingPairs),
+    }))
   );
 }
 
-function buildChecks(order: WorkOrder, product: Product | undefined, materials: Material[], stocks: StockItem[]) {
-  const hasRecipe = order.materialLines.some((line) => line.materialId);
-  const hasMaterials = order.materialLines.every((line) => !line.usagePerPair || line.materialId);
-  const totals = calculateMaterialTotals(order, materials, stocks);
-  const hasCost = totals.totalCost > 0;
+function createForm(workOrder: WorkOrder | null): WorkOrderForm {
+  return {
+    id: workOrder?.id ?? "",
+    orderItemId: workOrder?.orderItemId ?? "",
+    recipeId: workOrder?.recipeId ?? "",
+    plannedPairs: workOrder ? String(workOrder.plannedPairs) : "",
+    priority: workOrder?.priority ?? "Normal",
+    plannedStartDate: dateOnly(workOrder?.plannedStartDate) || formatDateInput(new Date()),
+    plannedEndDate: dateOnly(workOrder?.plannedEndDate) || "",
+    assignedMachineId: workOrder?.assignedMachineId ?? "",
+    shift: workOrder?.shift ? String(workOrder.shift) : "",
+    notes: workOrder?.notes ?? "",
+  };
+}
 
+function buildChecks(form: WorkOrderForm, orderItem: FlattenedOrderItem | undefined, product: Product | undefined, recipe: Recipe | undefined, requirements: RequirementPayload | null) {
+  const hasShortage = (requirements?.items ?? []).some((item) => safeNumber(item.shortageQuantity) > 0);
   return [
-    { label: "Recipe var mı?", status: hasRecipe ? "Reçete satırı hazır" : "Reçete bekleniyor", tone: hasRecipe ? "emerald" as const : "amber" as const },
-    { label: "Product seçimi", status: product ? "Product Master bağlı" : "Ürün seçilmedi", tone: product ? "emerald" as const : "red" as const },
-    { label: "Material var mı?", status: hasMaterials ? "Material seçimleri uygun" : "Eksik Material var", tone: hasMaterials ? "emerald" as const : "red" as const },
-    { label: "Stok yeterli mi?", status: totals.missingCount > 0 ? "Yetersiz stok var" : totals.criticalCount > 0 ? "Kritik stok var" : "Stok yeterli", tone: totals.missingCount > 0 ? "red" as const : totals.criticalCount > 0 ? "amber" as const : "emerald" as const },
-    { label: "Maliyet", status: hasCost ? "Tahmini maliyet var" : "Maliyet hesaplanamıyor", tone: hasCost ? "emerald" as const : "amber" as const },
+    { label: "Sipariş Kalemi", status: orderItem ? "OrderItem bağlı" : "Sipariş kalemi bekleniyor", tone: orderItem ? "emerald" as const : "red" as const },
+    { label: "Product Master", status: product ? "Ürün bilgisi otomatik" : "Product bulunamadı", tone: product ? "emerald" as const : "red" as const },
+    { label: "Recipe / BOM", status: recipe ? "Reçete bağlı" : "Reçete seçilmedi", tone: recipe ? "emerald" as const : "amber" as const },
+    { label: "Stok Kontrolü", status: !requirements ? "Reçete bekleniyor" : hasShortage ? "Eksik malzeme var" : "Stok yeterli", tone: !requirements ? "amber" as const : hasShortage ? "red" as const : "emerald" as const },
+    { label: "Plan", status: parseInteger(form.plannedPairs) > 0 ? "Plan miktarı hazır" : "Plan miktarı girilmeli", tone: parseInteger(form.plannedPairs) > 0 ? "emerald" as const : "red" as const },
   ];
 }
 
-function getStockStatus(stock: StockItem | undefined, requiredQuantity: number) {
-  if (!stock || requiredQuantity > safeNumber(stock.currentQuantity)) return "Yetersiz";
-  if (safeNumber(stock.currentQuantity) <= safeNumber(stock.criticalQuantity)) return "Kritik";
-  return "Yeterli";
+function buildRequirementTotals(requirements: RequirementPayload | null, recipe: Recipe | undefined) {
+  if (requirements?.totalsByCurrency) {
+    return Object.entries(requirements.totalsByCurrency).map(([currency, total]) => ({ currency, total: safeNumber(total) }));
+  }
+
+  if (recipe?.totalCost) {
+    return [{ currency: "TRY", total: recipe.totalCost }];
+  }
+
+  return [{ currency: "TRY", total: 0 }];
+}
+
+async function apiGet<T>(path: string): Promise<T> {
+  return apiRequest<T>(path, { method: "GET" });
+}
+
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return apiRequest<T>(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}
+
+async function apiPut<T>(path: string, body: unknown): Promise<T> {
+  return apiRequest<T>(path, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+}
+
+async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(API + path, init);
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined;
+
+  if (!response.ok) {
+    const apiPayload = isRecord(payload) ? payload as ApiResponse<T> : undefined;
+    throw new Error(apiPayload?.message || apiPayload?.errorMessage || "İstek başarısız oldu.");
+  }
+
+  if (isRecord(payload) && "data" in payload) return (payload as ApiResponse<T>).data as T;
+  return payload as T;
+}
+
+function extractArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (isRecord(value) && Array.isArray(value.data)) return value.data;
+  return [];
+}
+
+function mapDetailWorkOrder(value: unknown): WorkOrder | null {
+  const data = isRecord(value) && "workOrder" in value ? value : value;
+  if (!isRecord(data)) return null;
+  const workOrder = mapWorkOrder(data.workOrder ?? data);
+  if (!workOrder) return null;
+  return {
+    ...workOrder,
+    notes: typeof data.notes === "string" ? data.notes : workOrder.notes,
+    cancellationReason: typeof data.cancellationReason === "string" ? data.cancellationReason : workOrder.cancellationReason,
+    requirements: isRecord(data.requirements) ? data.requirements as RequirementPayload : workOrder.requirements,
+    stationAssignments: Array.isArray(data.stationAssignments) ? data.stationAssignments : [],
+  };
+}
+
+function mapWorkOrder(value: unknown): WorkOrder | null {
+  if (!isRecord(value) || typeof value.id !== "string") return null;
+  return {
+    id: value.id,
+    workOrderNumber: stringValue(value.workOrderNumber),
+    orderNumber: stringValue(value.orderNumber),
+    orderItemId: stringValue(value.orderItemId),
+    customerId: nullableString(value.customerId),
+    customerName: nullableString(value.customerName),
+    productId: stringValue(value.productId),
+    productCode: nullableString(value.productCode),
+    productName: nullableString(value.productName),
+    recipeId: nullableString(value.recipeId),
+    recipeCode: nullableString(value.recipeCode),
+    recipeName: nullableString(value.recipeName),
+    plannedPairs: safeNumber(value.plannedPairs),
+    assignedPairs: safeNumber(value.assignedPairs),
+    producedPairs: safeNumber(value.producedPairs),
+    goodPairs: safeNumber(value.goodPairs),
+    firePairs: safeNumber(value.firePairs),
+    remainingPairs: safeNumber(value.remainingPairs),
+    progressPercent: safeNumber(value.progressPercent),
+    priority: stringValue(value.priority) || "Normal",
+    status: stringValue(value.status) || "Draft",
+    plannedStartDate: nullableString(value.plannedStartDate),
+    plannedEndDate: nullableString(value.plannedEndDate),
+    actualStartDate: nullableString(value.actualStartDate),
+    actualEndDate: nullableString(value.actualEndDate),
+    assignedMachineId: nullableString(value.assignedMachineId),
+    assignedMachineCode: nullableString(value.assignedMachineCode),
+    shift: nullableNumber(value.shift),
+    isActive: typeof value.isActive === "boolean" ? value.isActive : true,
+    isCancelled: typeof value.isCancelled === "boolean" ? value.isCancelled : false,
+    updatedAt: nullableString(value.updatedAt),
+  };
+}
+
+function isProduct(value: unknown): value is Product {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isRecipe(value: unknown): value is Recipe {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isMaterial(value: unknown): value is Material {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isStockItem(value: unknown): value is StockItem {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isMachine(value: unknown): value is Machine {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isOrderLookup(value: unknown): value is OrderLookup {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function findStockForMaterial(material: Material | undefined, stocks: StockItem[]) {
@@ -1046,56 +1202,75 @@ function parseProductDetails(description?: string | null): ProductDetails {
   }
 }
 
-function extractProducts(result: unknown): Product[] {
-  if (Array.isArray(result)) return result.filter(isProduct);
-  if (isRecord(result) && Array.isArray((result as ApiResponse<unknown[]>).data)) return (result as ApiResponse<unknown[]>).data!.filter(isProduct);
-  return [];
+function getNextTransitionPath(status: string) {
+  if (status === "Draft") return "/plan";
+  if (status === "Planned") return "/mark-ready";
+  if (status === "Ready") return "/start";
+  if (status === "Paused") return "/resume";
+  return null;
 }
 
-function extractMaterials(result: unknown): Material[] {
-  if (Array.isArray(result)) return result.filter(isMaterial);
-  if (isRecord(result) && Array.isArray((result as ApiResponse<unknown[]>).data)) return (result as ApiResponse<unknown[]>).data!.filter(isMaterial);
-  return [];
+function getTransitionLabel(status: string) {
+  if (status === "Draft") return "Planla";
+  if (status === "Planned") return "Hazır Yap";
+  if (status === "Ready") return "Üretimi Başlat";
+  if (status === "Paused") return "Devam Et";
+  return "Başlat";
 }
 
-function extractStocks(result: unknown): StockItem[] {
-  if (Array.isArray(result)) return result.filter(isStockItem);
-  if (isRecord(result) && Array.isArray((result as ApiResponse<unknown[]>).data)) return (result as ApiResponse<unknown[]>).data!.filter(isStockItem);
-  return [];
-}
-
-function isProduct(value: unknown): value is Product {
-  return isRecord(value) && typeof value.id === "string";
-}
-
-function isMaterial(value: unknown): value is Material {
-  return isRecord(value) && typeof value.id === "string";
-}
-
-function isStockItem(value: unknown): value is StockItem {
-  return isRecord(value) && typeof value.id === "string";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function isLocked(workOrder: WorkOrder | null | undefined) {
+  return !!workOrder && (workOrder.status === "Completed" || workOrder.status === "Cancelled" || workOrder.status === "InProduction");
 }
 
 function countByStatus(orders: WorkOrder[], status: string) {
   return orders.filter((order) => order.status === status).length.toLocaleString("tr-TR");
 }
 
-function formatMaterialOption(material: Material) {
-  return `${[material.code, material.name].filter(Boolean).join(" - ") || material.id} | ${material.materialType || "-"} | ${material.unit || "-"}`;
+function countByStatuses(orders: WorkOrder[], statuses: string[]) {
+  return orders.filter((order) => statuses.includes(order.status)).length.toLocaleString("tr-TR");
 }
 
-function safeNumber(value: number | null | undefined) {
+function translateStatus(status: string) {
+  const map: Record<string, string> = {
+    Draft: "Taslak",
+    Planned: "Planlandı",
+    Ready: "Hazır",
+    InProduction: "Üretimde",
+    Paused: "Duraklatıldı",
+    Completed: "Tamamlandı",
+    Cancelled: "İptal",
+  };
+  return map[status] ?? status;
+}
+
+function translatePriority(priority: string) {
+  const map: Record<string, string> = {
+    Normal: "Normal",
+    High: "Yüksek",
+    Urgent: "Acil",
+  };
+  return map[priority] ?? priority;
+}
+
+function safeNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function safeParsedNumber(value: string) {
-  if (!value.trim()) return 0;
-  const parsed = Number(value.replace(",", "."));
+function nullableNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function parseInteger(value: string) {
+  const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function nullableString(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -1118,7 +1293,14 @@ function formatDateInput(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatDate(value: string) {
+function dateOnly(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return formatDateInput(date);
+}
+
+function formatDate(value?: string | null) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";

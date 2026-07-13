@@ -183,8 +183,37 @@ public class StationAssignmentsController : ControllerBase
         if (alreadyActive)
             return BadRequest(ApiResponse<object>.Fail("Bu istasyonda zaten aktif iş var.", "STATION_ALREADY_ACTIVE"));
 
+        WorkOrder? workOrder = null;
+        var orderItemId = request.OrderItemId;
+
+        if (request.WorkOrderId.HasValue)
+        {
+            workOrder = await _db.WorkOrders
+                .FirstOrDefaultAsync(x => x.Id == request.WorkOrderId.Value, cancellationToken);
+
+            if (workOrder is null)
+                return NotFound(ApiResponse<object>.Fail("İş emri bulunamadı.", "WORK_ORDER_NOT_FOUND"));
+
+            if (workOrder.Status is not ("Planned" or "Ready"))
+                return BadRequest(ApiResponse<object>.Fail("Yalnızca Planlandı veya Hazır durumundaki iş emirleri planlamaya alınabilir.", "WORK_ORDER_NOT_AVAILABLE"));
+
+            if (workOrder.IsCancelled || !workOrder.IsActive)
+                return BadRequest(ApiResponse<object>.Fail("Pasif veya iptal edilmiş iş emri planlamaya alınamaz.", "WORK_ORDER_INACTIVE"));
+
+            var assignedPairs = await _db.StationAssignments
+                .Where(x => x.WorkOrderId == workOrder.Id)
+                .SumAsync(x => x.PlannedPairs, cancellationToken);
+            var remainingToAssign = workOrder.PlannedPairs - assignedPairs;
+            var requestedPairs = request.PlannedPairs ?? remainingToAssign;
+
+            if (requestedPairs <= 0 || requestedPairs > remainingToAssign)
+                return BadRequest(ApiResponse<object>.Fail("Atama miktarı iş emrinin kalan atanabilir miktarını aşıyor.", "WORK_ORDER_ASSIGNMENT_LIMIT"));
+
+            orderItemId = workOrder.OrderItemId;
+        }
+
         var orderItem = await _db.OrderItems
-            .FirstOrDefaultAsync(x => x.Id == request.OrderItemId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == orderItemId, cancellationToken);
 
         if (orderItem is null)
             return NotFound(ApiResponse<object>.Fail("Sipariş kalemi bulunamadı.", "ORDER_ITEM_NOT_FOUND"));
@@ -201,11 +230,13 @@ public class StationAssignmentsController : ControllerBase
         var assignment = new StationAssignment
         {
             InjectionStationId = station.Id,
-            OrderItemId = request.OrderItemId,
+            OrderItemId = orderItemId,
+            WorkOrderId = workOrder?.Id,
             MoldId = request.MoldId,
             StationNumberSnapshot = request.StationNumber,
             OperatorName = request.OperatorName,
             StartedAt = utcNow,
+            PlannedPairs = request.PlannedPairs ?? workOrder?.PlannedPairs ?? orderItem.QuantityPairs,
             Status = "Üretimde",
             ProducedPairs = 0,
             FirePairs = 0,
@@ -660,6 +691,7 @@ public class StationAssignmentsController : ControllerBase
             .Include(x => x.OrderItem).ThenInclude(x => x.Order).ThenInclude(x => x.Customer)
             .Include(x => x.OrderItem).ThenInclude(x => x.Order).ThenInclude(x => x.Product)
             .Include(x => x.OrderItem).ThenInclude(x => x.Product)
+            .Include(x => x.WorkOrder)
             .Include(x => x.Mold)
             .Include(x => x.InjectionStation);
     }
@@ -789,6 +821,9 @@ public class StationAssignmentsController : ControllerBase
             CustomerName = assignment.OrderItem.Order.Customer.CompanyName ?? assignment.OrderItem.Order.Customer.Name,
             ProductName = product?.Name,
             ProductCode = product?.Code,
+            assignment.WorkOrderId,
+            WorkOrderNumber = assignment.WorkOrder?.WorkOrderNumber,
+            assignment.PlannedPairs,
             MoldName = assignment.Mold?.Name,
             MoldCode = assignment.Mold?.Code,
             assignment.StartedAt,
@@ -810,6 +845,9 @@ public class StationAssignmentsController : ControllerBase
             FirePairs = firePairs,
             GoodPairs = Math.Max(assignment.ProducedPairs - firePairs, 0),
             QuantityPairs = assignment.OrderItem.QuantityPairs,
+            assignment.WorkOrderId,
+            WorkOrderNumber = assignment.WorkOrder?.WorkOrderNumber,
+            AssignmentPlannedPairs = assignment.PlannedPairs,
             OrderItemProducedPairs = assignment.OrderItem.ProducedPairs,
             RemainingPairs = assignment.OrderItem.QuantityPairs - assignment.OrderItem.ProducedPairs,
             ProductionType = assignment.OrderItem.ProductionType,
@@ -860,7 +898,8 @@ public class StationAssignmentsController : ControllerBase
             OrderRemainingPairs: 0,
             StartedAt: null,
             PausedAt: null,
-            FinishedAt: null);
+            FinishedAt: null,
+            WorkOrderNumber: null);
     }
 
     private static LiveStationResponse ToLiveStationResponse(StationAssignment assignment, int firePairs, StationAssignmentDowntime? downtime)
@@ -896,7 +935,8 @@ public class StationAssignmentsController : ControllerBase
             OrderRemainingPairs: Math.Max(0, plannedPairs - orderProducedPairs),
             StartedAt: assignment.StartedAt,
             PausedAt: assignment.Status == "Duraklatıldı" ? assignment.LastModified : null,
-            FinishedAt: assignment.FinishedAt);
+            FinishedAt: assignment.FinishedAt,
+            WorkOrderNumber: assignment.WorkOrder?.WorkOrderNumber);
     }
 
     private static object ToFireResponse(StationAssignmentFire fire)
@@ -992,6 +1032,8 @@ public record AssignStationRequest(
     int StationNumber,
     Guid OrderItemId,
     Guid? MoldId,
+    Guid? WorkOrderId,
+    int? PlannedPairs,
     string? OperatorName,
     string? Note
 );
@@ -1058,5 +1100,6 @@ public record LiveStationResponse(
     int OrderRemainingPairs,
     DateTime? StartedAt,
     DateTime? PausedAt,
-    DateTime? FinishedAt
+    DateTime? FinishedAt,
+    string? WorkOrderNumber
 );

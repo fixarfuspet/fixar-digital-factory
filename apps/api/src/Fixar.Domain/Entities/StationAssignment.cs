@@ -10,6 +10,9 @@ public class StationAssignment : BaseAuditableEntity
     public Guid OrderItemId { get; set; }
     public OrderItem OrderItem { get; set; } = default!;
 
+    public Guid? WorkOrderId { get; set; }
+    public WorkOrder? WorkOrder { get; set; }
+
     public Guid? MoldId { get; set; }
     public Mold? Mold { get; set; }
 
@@ -20,6 +23,8 @@ public class StationAssignment : BaseAuditableEntity
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? FinishedAt { get; set; }
+
+    public int PlannedPairs { get; set; }
 
     public int ProducedPairs { get; set; }
 

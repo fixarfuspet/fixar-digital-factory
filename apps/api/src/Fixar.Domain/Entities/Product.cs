@@ -47,4 +47,6 @@ public class Product : BaseAuditableEntity
     public ICollection<Mold> Molds { get; set; } = new List<Mold>();
 
     public ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
+
+    public ICollection<WorkOrder> WorkOrders { get; set; } = new List<WorkOrder>();
 }

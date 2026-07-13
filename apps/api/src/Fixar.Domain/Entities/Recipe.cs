@@ -35,4 +35,6 @@ public class Recipe : BaseAuditableEntity
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<RecipeItem> Items { get; set; } = new List<RecipeItem>();
+
+    public ICollection<WorkOrder> WorkOrders { get; set; } = new List<WorkOrder>();
 }
