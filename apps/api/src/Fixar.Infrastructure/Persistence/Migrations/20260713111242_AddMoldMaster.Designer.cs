@@ -3,6 +3,7 @@ using System;
 using Fixar.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Fixar.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260713111242_AddMoldMaster")]
+    partial class AddMoldMaster
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -238,132 +241,6 @@ namespace Fixar.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("InjectionStations");
-                });
-
-            modelBuilder.Entity("Fixar.Domain.Entities.Machine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("AvailabilityPercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CurrentOperatorName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("CurrentStatus")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("CurrentWorkOrderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("DefaultCycleTimeSeconds")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("EnergyConsumption")
-                        .HasColumnType("numeric");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastCalibrationDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastCleaningDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastMaintenanceDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastModified")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("LastModifiedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Location")
-                        .HasColumnType("text");
-
-                    b.Property<string>("MachineType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Manufacturer")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("MaximumDailyCapacity")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Model")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("NextCalibrationDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("NextCleaningDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("NextMaintenanceDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("OEE")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("PerformancePercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("QualityPercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("SerialNumber")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("StationCount")
-                        .HasColumnType("integer");
-
-                    b.Property<long>("TotalProducedPairs")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("TotalRunningHours")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("WorkingHoursPerDay")
-                        .HasColumnType("numeric");
-
-                    b.Property<int?>("Year")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Machines");
                 });
 
             modelBuilder.Entity("Fixar.Domain.Entities.Material", b =>

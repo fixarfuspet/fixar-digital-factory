@@ -37,6 +37,8 @@ public DbSet<ProductionRecord> ProductionRecords => Set<ProductionRecord>();
 
 public DbSet<CuttingMachine> CuttingMachines => Set<CuttingMachine>();
 
+public DbSet<Machine> Machines => Set<Machine>();
+
 public DbSet<CuttingRecord> CuttingRecords => Set<CuttingRecord>();
 
 public DbSet<ProductionBox> ProductionBoxes => Set<ProductionBox>();
@@ -75,6 +77,12 @@ public DbSet<Material> Materials => Set<Material>();
             .HasMany(x => x.StockItems)
             .WithOne(x => x.Material)
             .HasForeignKey(x => x.MaterialId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Product>()
+            .HasMany(x => x.Molds)
+            .WithOne(x => x.Product)
+            .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

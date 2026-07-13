@@ -43,4 +43,6 @@ public class Product : BaseAuditableEntity
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<Order> Orders { get; set; } = new List<Order>();
+
+    public ICollection<Mold> Molds { get; set; } = new List<Mold>();
 }
