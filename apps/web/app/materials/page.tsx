@@ -511,6 +511,8 @@ export default function MaterialsPage() {
                         </td>
                         <td className="py-4">
                           <div className="flex justify-end gap-2">
+                            <a href={`/material-lots?materialId=${material.id}`} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-100">Lotlar</a>
+                            <a href={`/material-containers?materialId=${material.id}`} className="rounded-lg border border-violet-400/30 bg-violet-400/10 px-3 py-2 text-xs font-black text-violet-100">Containerlar</a>
                             <button
                               onClick={() => openDialog("detail", material)}
                               className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-xs font-black text-cyan-100 transition hover:bg-cyan-400/20"

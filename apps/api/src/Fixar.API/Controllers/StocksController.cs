@@ -57,7 +57,12 @@ public class StocksController : ControllerBase
                 x.SafetyInfo,
                 x.Note,
                 x.IsActive,
-                IsCritical = x.CurrentQuantity <= x.CriticalQuantity
+                IsCritical = x.CurrentQuantity <= x.CriticalQuantity,
+                LotCount = _db.MaterialLots.Count(l => l.StockItemId == x.Id),
+                ActiveLotCount = _db.MaterialLots.Count(l => l.StockItemId == x.Id && l.IsActive),
+                ContainerCount = _db.MaterialContainers.Count(c => c.StockItemId == x.Id),
+                OpenContainerCount = _db.MaterialContainers.Count(c => c.StockItemId == x.Id && c.IsActive && (c.Status == "Open" || c.Status == "PartiallyUsed")),
+                NearestExpiryDate = _db.MaterialLots.Where(l => l.StockItemId == x.Id && l.IsActive && l.ExpiryDate != null).Min(l => l.ExpiryDate)
             })
             .ToListAsync(cancellationToken);
 

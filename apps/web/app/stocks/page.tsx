@@ -44,6 +44,11 @@ type StockItem = {
   isCritical: boolean;
   movements?: StockMovement[];
   movementHistory?: StockMovement[];
+  lotCount?: number;
+  activeLotCount?: number;
+  containerCount?: number;
+  openContainerCount?: number;
+  nearestExpiryDate?: string | null;
 };
 
 type StockFormState = {
@@ -461,6 +466,10 @@ function StockCard({
         <button onClick={onExit} className="rounded-xl bg-red-500 px-4 py-3 text-sm font-black text-white transition hover:bg-red-400">
           Stok Çıkışı
         </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-zinc-400 sm:grid-cols-5">
+        <span>Lot: <b className="text-white">{item.lotCount ?? 0}</b></span><span>Aktif lot: <b className="text-white">{item.activeLotCount ?? 0}</b></span><span>Container: <b className="text-white">{item.containerCount ?? 0}</b></span><span>Açık: <b className="text-white">{item.openContainerCount ?? 0}</b></span><span>Yakın SKT: <b className="text-white">{item.nearestExpiryDate ? new Date(item.nearestExpiryDate).toLocaleDateString("tr-TR") : "-"}</b></span>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
