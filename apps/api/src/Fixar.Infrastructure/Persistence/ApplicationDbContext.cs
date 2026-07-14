@@ -65,6 +65,8 @@ public DbSet<ProductionSession> ProductionSessions => Set<ProductionSession>();
 public DbSet<ProductionStation> ProductionStations => Set<ProductionStation>();
 public DbSet<ProductionEvent> ProductionEvents => Set<ProductionEvent>();
 public DbSet<ProductionDowntime> ProductionDowntimes => Set<ProductionDowntime>();
+public DbSet<QualityInspection> QualityInspections => Set<QualityInspection>();
+public DbSet<QualityDefect> QualityDefects => Set<QualityDefect>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -321,5 +323,96 @@ public DbSet<ProductionDowntime> ProductionDowntimes => Set<ProductionDowntime>(
 
         builder.Entity<StationAssignmentEvent>()
             .HasIndex(x => x.EventType);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.InspectionNumber)
+            .IsUnique();
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.StationAssignmentId);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.WorkOrderId);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.OrderItemId);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.ProductId);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.Result);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.InspectionType);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.InspectionDate);
+
+        builder.Entity<QualityInspection>()
+            .HasIndex(x => x.IsActive);
+
+        builder.Entity<QualityInspection>()
+            .HasOne(x => x.StationAssignment)
+            .WithMany()
+            .HasForeignKey(x => x.StationAssignmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityInspection>()
+            .HasOne(x => x.WorkOrder)
+            .WithMany()
+            .HasForeignKey(x => x.WorkOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityInspection>()
+            .HasOne(x => x.OrderItem)
+            .WithMany()
+            .HasForeignKey(x => x.OrderItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityInspection>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityInspection>()
+            .HasOne(x => x.Mold)
+            .WithMany()
+            .HasForeignKey(x => x.MoldId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityInspection>()
+            .HasOne(x => x.Machine)
+            .WithMany()
+            .HasForeignKey(x => x.MachineId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityInspection>()
+            .HasOne(x => x.Operator)
+            .WithMany()
+            .HasForeignKey(x => x.OperatorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityInspection>()
+            .HasMany(x => x.Defects)
+            .WithOne(x => x.QualityInspection)
+            .HasForeignKey(x => x.QualityInspectionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<QualityDefect>()
+            .HasIndex(x => x.QualityInspectionId);
+
+        builder.Entity<QualityDefect>()
+            .HasIndex(x => x.StationAssignmentFireId);
+
+        builder.Entity<QualityDefect>()
+            .HasIndex(x => x.DefectType);
+
+        builder.Entity<QualityDefect>()
+            .HasOne(x => x.StationAssignmentFire)
+            .WithMany()
+            .HasForeignKey(x => x.StationAssignmentFireId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

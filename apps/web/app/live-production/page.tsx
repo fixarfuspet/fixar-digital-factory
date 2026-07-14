@@ -279,6 +279,7 @@ export default function LiveProductionPage() {
                 stations={stations}
                 onAssign={() => router.push("/production-planning")}
                 onOpenPanel={setPanelStation}
+                onQuality={(station) => router.push(`/quality-control?stationAssignmentId=${station.assignmentId}`)}
               />
             )}
           </section>
@@ -424,10 +425,12 @@ function StationGrid({
   stations,
   onAssign,
   onOpenPanel,
+  onQuality,
 }: {
   stations: LiveStation[];
   onAssign: () => void;
   onOpenPanel: (station: LiveStation) => void;
+  onQuality: (station: LiveStation) => void;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -437,6 +440,7 @@ function StationGrid({
           station={station}
           onAssign={onAssign}
           onOpenPanel={() => onOpenPanel(station)}
+          onQuality={() => onQuality(station)}
         />
       ))}
     </div>
@@ -447,10 +451,12 @@ function StationCard({
   station,
   onAssign,
   onOpenPanel,
+  onQuality,
 }: {
   station: LiveStation;
   onAssign: () => void;
   onOpenPanel: () => void;
+  onQuality: () => void;
 }) {
   const status = translateStatus(station.status);
   const isEmpty = status === "Boş";
@@ -518,12 +524,20 @@ function StationCard({
             </p>
           )}
 
-          <button
-            onClick={onOpenPanel}
-            className="mt-5 w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-black text-black transition hover:bg-emerald-400"
-          >
-            İşlem Paneli
-          </button>
+          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              onClick={onOpenPanel}
+              className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-black text-black transition hover:bg-emerald-400"
+            >
+              İşlem Paneli
+            </button>
+            <button
+              onClick={onQuality}
+              className="rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm font-black text-white transition hover:border-emerald-400/50"
+            >
+              Kalite Kontrolü Aç
+            </button>
+          </div>
         </>
       )}
     </article>

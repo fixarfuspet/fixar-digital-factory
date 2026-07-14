@@ -148,6 +148,17 @@ type RequirementPayload = {
   warnings?: string[];
 };
 
+type WorkOrderQualitySummary = {
+  inspectionCount?: number | null;
+  passed?: number | null;
+  failed?: number | null;
+  totalChecked?: number | null;
+  totalRejected?: number | null;
+  defectRate?: number | null;
+  latestResult?: string | null;
+  canCloseQuality?: boolean | null;
+};
+
 type WorkOrder = {
   id: string;
   workOrderNumber: string;
@@ -547,6 +558,7 @@ function WorkOrderModal({
   const [activeTab, setActiveTab] = useState<WorkOrderTab>("general");
   const [form, setForm] = useState<WorkOrderForm>(() => createForm(workOrder));
   const [requirements, setRequirements] = useState<RequirementPayload | null>(workOrder?.requirements ?? null);
+  const [qualitySummary, setQualitySummary] = useState<WorkOrderQualitySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const readonly = mode === "detail";
@@ -570,6 +582,17 @@ function WorkOrderModal({
       .then(setRequirements)
       .catch(() => setRequirements(null));
   }, [workOrder]);
+
+  useEffect(() => {
+    if (!workOrder?.id) {
+      setQualitySummary(null);
+      return;
+    }
+
+    void apiGet<WorkOrderQualitySummary>("/quality-inspections/work-order/" + workOrder.id + "/summary")
+      .then(setQualitySummary)
+      .catch(() => setQualitySummary(null));
+  }, [workOrder?.id]);
 
   function updateForm<K extends keyof WorkOrderForm>(key: K, value: WorkOrderForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -684,7 +707,7 @@ function WorkOrderModal({
           {activeTab === "plan" && <ProductionPlanTab form={form} machines={machines} readonly={readonly || isLocked(workOrder)} updateForm={updateForm} />}
           {activeTab === "materials" && <MaterialsTab requirements={requirements} materials={materials} stocks={stocks} totals={requirementTotals} />}
           {activeTab === "operations" && <OperationsTab workOrder={workOrder} />}
-          {activeTab === "quality" && <QualityTab details={details} product={product} />}
+          {activeTab === "quality" && <QualityTab details={details} product={product} summary={qualitySummary} />}
           {activeTab === "notes" && <NotesTab form={form} readonly={readonly || isLocked(workOrder)} updateForm={updateForm} />}
         </div>
 
@@ -959,9 +982,17 @@ function OperationsTab({ workOrder }: { workOrder: WorkOrder | null }) {
   );
 }
 
-function QualityTab({ details, product }: { details: ProductDetails; product: Product | undefined }) {
+function QualityTab({ details, product, summary }: { details: ProductDetails; product: Product | undefined; summary: WorkOrderQualitySummary | null }) {
   return (
     <TabPanel title="Kalite" note="Readonly. Product Master kalite toleranslarından otomatik gelir.">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <ReadOnlyInfo label="Kontrol Sayısı" value={formatNumber(summary?.inspectionCount)} />
+        <ReadOnlyInfo label="Son Sonuç" value={summary?.latestResult || "-"} />
+        <ReadOnlyInfo label="Kontrol Edilen" value={formatNumber(summary?.totalChecked)} />
+        <ReadOnlyInfo label="Uygunsuz" value={formatNumber(summary?.totalRejected)} />
+        <ReadOnlyInfo label="Hata Oranı" value={`%${formatNumber(summary?.defectRate)}`} />
+        <ReadOnlyInfo label="Açık Bekletme" value={summary?.canCloseQuality === false ? "Kontrol bekliyor" : "Yok"} />
+      </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <ReadOnlyInfo label="Minimum Gramaj" value={details.minWeight || "-"} />
         <ReadOnlyInfo label="Maksimum Gramaj" value={details.maxWeight || "-"} />
