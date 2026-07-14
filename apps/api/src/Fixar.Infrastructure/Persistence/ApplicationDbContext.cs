@@ -414,5 +414,128 @@ public DbSet<QualityDefect> QualityDefects => Set<QualityDefect>();
             .WithMany()
             .HasForeignKey(x => x.StationAssignmentFireId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.RecordNumber)
+            .IsUnique();
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.StationAssignmentId);
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.WorkOrderId);
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.OrderItemId);
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.ProductId);
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.CuttingMachineId);
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.RecordDate);
+
+        builder.Entity<CuttingRecord>()
+            .HasIndex(x => x.Status);
+
+        builder.Entity<CuttingRecord>()
+            .HasOne(x => x.StationAssignment)
+            .WithMany()
+            .HasForeignKey(x => x.StationAssignmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CuttingRecord>()
+            .HasOne(x => x.WorkOrder)
+            .WithMany()
+            .HasForeignKey(x => x.WorkOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CuttingRecord>()
+            .HasOne(x => x.OrderItem)
+            .WithMany()
+            .HasForeignKey(x => x.OrderItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CuttingRecord>()
+            .HasOne(x => x.Product)
+            .WithMany()
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CuttingRecord>()
+            .HasOne(x => x.Operator)
+            .WithMany()
+            .HasForeignKey(x => x.OperatorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.BoxNumber)
+            .IsUnique();
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.Barcode);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.TraceabilityCode)
+            .IsUnique();
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.CuttingRecordId);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.StationAssignmentId);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.WorkOrderId);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.OrderItemId);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.ProductId);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.CustomerId);
+
+        builder.Entity<ProductionBox>()
+            .HasIndex(x => x.Status);
+
+        builder.Entity<ProductionBox>()
+            .HasOne(x => x.StationAssignment)
+            .WithMany()
+            .HasForeignKey(x => x.StationAssignmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionBox>()
+            .HasOne(x => x.CuttingRecord)
+            .WithMany()
+            .HasForeignKey(x => x.CuttingRecordId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionBox>()
+            .HasOne(x => x.WorkOrder)
+            .WithMany()
+            .HasForeignKey(x => x.WorkOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionBox>()
+            .HasOne(x => x.OrderItem)
+            .WithMany()
+            .HasForeignKey(x => x.OrderItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionBox>()
+            .HasOne(x => x.Customer)
+            .WithMany()
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionBox>()
+            .HasOne(x => x.PackedByOperator)
+            .WithMany()
+            .HasForeignKey(x => x.PackedByOperatorId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

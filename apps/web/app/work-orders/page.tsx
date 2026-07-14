@@ -159,6 +159,14 @@ type WorkOrderQualitySummary = {
   canCloseQuality?: boolean | null;
 };
 
+type WorkOrderOperationSummary = {
+  cutPairs: number;
+  boxedPairs: number;
+  warehousePairs: number;
+  readyPairs: number;
+  shippedPairs: number;
+};
+
 type WorkOrder = {
   id: string;
   workOrderNumber: string;
@@ -559,6 +567,7 @@ function WorkOrderModal({
   const [form, setForm] = useState<WorkOrderForm>(() => createForm(workOrder));
   const [requirements, setRequirements] = useState<RequirementPayload | null>(workOrder?.requirements ?? null);
   const [qualitySummary, setQualitySummary] = useState<WorkOrderQualitySummary | null>(null);
+  const [operationSummary, setOperationSummary] = useState<WorkOrderOperationSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const readonly = mode === "detail";
@@ -586,12 +595,20 @@ function WorkOrderModal({
   useEffect(() => {
     if (!workOrder?.id) {
       setQualitySummary(null);
+      setOperationSummary(null);
       return;
     }
 
     void apiGet<WorkOrderQualitySummary>("/quality-inspections/work-order/" + workOrder.id + "/summary")
       .then(setQualitySummary)
       .catch(() => setQualitySummary(null));
+
+    void Promise.all([
+      apiGet<unknown>("/cutting-records?workOrderId=" + workOrder.id),
+      apiGet<unknown>("/production-boxes?workOrderId=" + workOrder.id),
+    ])
+      .then(([cuttingData, boxData]) => setOperationSummary(buildOperationSummary(cuttingData, boxData)))
+      .catch(() => setOperationSummary(null));
   }, [workOrder?.id]);
 
   function updateForm<K extends keyof WorkOrderForm>(key: K, value: WorkOrderForm[K]) {
@@ -706,7 +723,7 @@ function WorkOrderModal({
           {activeTab === "product" && <ProductInfoTab product={product} details={details} orderItem={selectedOrderItem} />}
           {activeTab === "plan" && <ProductionPlanTab form={form} machines={machines} readonly={readonly || isLocked(workOrder)} updateForm={updateForm} />}
           {activeTab === "materials" && <MaterialsTab requirements={requirements} materials={materials} stocks={stocks} totals={requirementTotals} />}
-          {activeTab === "operations" && <OperationsTab workOrder={workOrder} />}
+          {activeTab === "operations" && <OperationsTab workOrder={workOrder} operationSummary={operationSummary} />}
           {activeTab === "quality" && <QualityTab details={details} product={product} summary={qualitySummary} />}
           {activeTab === "notes" && <NotesTab form={form} readonly={readonly || isLocked(workOrder)} updateForm={updateForm} />}
         </div>
@@ -965,7 +982,7 @@ function MaterialsTab({ requirements, materials, stocks, totals }: { requirement
   );
 }
 
-function OperationsTab({ workOrder }: { workOrder: WorkOrder | null }) {
+function OperationsTab({ workOrder, operationSummary }: { workOrder: WorkOrder | null; operationSummary: WorkOrderOperationSummary | null }) {
   const assignments = workOrder?.stationAssignments ?? [];
   return (
     <TabPanel title="Operasyonlar" note="İstasyon atamaları Üretim Planlama üzerinden gelir. Tur Ekle akışı burada tekrar edilmez.">
@@ -974,6 +991,13 @@ function OperationsTab({ workOrder }: { workOrder: WorkOrder | null }) {
         <ReadOnlyInfo label="Üretilen Çift" value={formatNumber(workOrder?.producedPairs)} />
         <ReadOnlyInfo label="Sağlam" value={formatNumber(workOrder?.goodPairs)} />
         <ReadOnlyInfo label="Fire" value={formatNumber(workOrder?.firePairs)} />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <ReadOnlyInfo label="Kesilen Çift" value={formatNumber(operationSummary?.cutPairs)} />
+        <ReadOnlyInfo label="Kolilenen Çift" value={formatNumber(operationSummary?.boxedPairs)} />
+        <ReadOnlyInfo label="Depodaki Çift" value={formatNumber(operationSummary?.warehousePairs)} />
+        <ReadOnlyInfo label="Sevkiyata Hazır" value={formatNumber(operationSummary?.readyPairs)} />
+        <ReadOnlyInfo label="Sevk Edilen" value={formatNumber(operationSummary?.shippedPairs)} />
       </div>
       <div className="rounded-xl border border-white/10 bg-black/20 p-5 text-sm text-zinc-300">
         {assignments.length > 0 ? `${assignments.length} istasyon ataması bağlı.` : "Henüz bu iş emrine bağlı istasyon ataması yok."}
@@ -1220,6 +1244,18 @@ function getRequirementStatus(line: WorkOrderRequirementLine) {
   if (safeNumber(line.shortageQuantity) > 0) return "Eksik";
   if (line.materialUnitPrice == null || line.estimatedMaterialCost == null) return "Fiyat Bulunamadı";
   return "Yeterli";
+}
+
+function buildOperationSummary(cuttingData: unknown, boxData: unknown): WorkOrderOperationSummary {
+  const cuts = extractArray(cuttingData).filter(isRecord);
+  const boxes = extractArray(boxData).filter(isRecord);
+  return {
+    cutPairs: cuts.reduce((sum, item) => sum + safeNumber(item.goodPairs), 0),
+    boxedPairs: boxes.reduce((sum, item) => sum + safeNumber(item.pairCount), 0),
+    warehousePairs: boxes.filter((item) => item.status === "InWarehouse").reduce((sum, item) => sum + safeNumber(item.pairCount), 0),
+    readyPairs: boxes.filter((item) => item.status === "ReadyForShipment").reduce((sum, item) => sum + safeNumber(item.pairCount), 0),
+    shippedPairs: boxes.filter((item) => item.status === "Shipped").reduce((sum, item) => sum + safeNumber(item.pairCount), 0),
+  };
 }
 
 async function apiGet<T>(path: string): Promise<T> {

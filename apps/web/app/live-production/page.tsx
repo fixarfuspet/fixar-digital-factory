@@ -280,6 +280,7 @@ export default function LiveProductionPage() {
                 onAssign={() => router.push("/production-planning")}
                 onOpenPanel={setPanelStation}
                 onQuality={(station) => router.push(`/quality-control?stationAssignmentId=${station.assignmentId}`)}
+                onCutting={(station) => router.push(`/cutting?stationAssignmentId=${station.assignmentId}`)}
               />
             )}
           </section>
@@ -426,11 +427,13 @@ function StationGrid({
   onAssign,
   onOpenPanel,
   onQuality,
+  onCutting,
 }: {
   stations: LiveStation[];
   onAssign: () => void;
   onOpenPanel: (station: LiveStation) => void;
   onQuality: (station: LiveStation) => void;
+  onCutting: (station: LiveStation) => void;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -441,6 +444,7 @@ function StationGrid({
           onAssign={onAssign}
           onOpenPanel={() => onOpenPanel(station)}
           onQuality={() => onQuality(station)}
+          onCutting={() => onCutting(station)}
         />
       ))}
     </div>
@@ -452,11 +456,13 @@ function StationCard({
   onAssign,
   onOpenPanel,
   onQuality,
+  onCutting,
 }: {
   station: LiveStation;
   onAssign: () => void;
   onOpenPanel: () => void;
   onQuality: () => void;
+  onCutting: () => void;
 }) {
   const status = translateStatus(station.status);
   const isEmpty = status === "Boş";
@@ -524,7 +530,7 @@ function StationCard({
             </p>
           )}
 
-          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
               onClick={onOpenPanel}
               className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-black text-black transition hover:bg-emerald-400"
@@ -536,6 +542,12 @@ function StationCard({
               className="rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm font-black text-white transition hover:border-emerald-400/50"
             >
               Kalite Kontrolü Aç
+            </button>
+            <button
+              onClick={onCutting}
+              className="rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm font-black text-white transition hover:border-cyan-400/50"
+            >
+              Kesime Gönder
             </button>
           </div>
         </>
