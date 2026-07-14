@@ -43,7 +43,8 @@ public class ProductionPlanningLookupsController : ControllerBase
             .Include(x => x.Customer)
             .Include(x => x.Product)
             .Include(x => x.Items)
-            .Where(x => x.Status == "Aktif")
+            .Where(x => x.IsActive && !x.IsCancelled &&
+                (x.Status == "Aktif" || x.Status == "Confirmed" || x.Status == "InProduction" || x.Status == "PartiallyCompleted"))
             .AsQueryable();
 
         if (customerId.HasValue)
@@ -56,6 +57,8 @@ public class ProductionPlanningLookupsController : ControllerBase
             .Select(x => new
             {
                 x.Id,
+                x.OrderNumber,
+                x.DueDate,
                 CustomerName = !string.IsNullOrWhiteSpace(x.Customer.CompanyName) ? x.Customer.CompanyName : x.Customer.Name,
                 ProductName = x.Product.Name,
                 x.SizeRange,

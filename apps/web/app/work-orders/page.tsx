@@ -82,6 +82,8 @@ type OrderItemLookup = {
 
 type OrderLookup = {
   id: string;
+  orderNumber?: string | null;
+  dueDate?: string | null;
   customerName?: string | null;
   productName?: string | null;
   quantity?: number | null;
@@ -826,7 +828,7 @@ function GeneralTab({
             <option value="">Sipariş kalemi seç</option>
             {orderItems.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.customerName} / {item.productName} / {formatNumber(item.remainingPairs)} çift kaldı
+                {item.orderNumber} / {item.customerName} / {item.productName} / {formatNumber(item.remainingPairs)} çift kaldı{item.dueDate ? ` / ${formatDate(item.dueDate)}` : ""}
               </option>
             ))}
           </select>
@@ -1178,6 +1180,7 @@ type FlattenedOrderItem = OrderItemLookup & {
   quantityPairs: number;
   producedPairs: number;
   remainingPairs: number;
+  dueDate?: string | null;
 };
 
 function flattenOrderItems(orders: OrderLookup[]): FlattenedOrderItem[] {
@@ -1185,7 +1188,8 @@ function flattenOrderItems(orders: OrderLookup[]): FlattenedOrderItem[] {
     (order.items ?? []).map((item) => ({
       ...item,
       orderId: order.id,
-      orderNumber: "ORD-" + order.id.substring(0, 8).toUpperCase(),
+      orderNumber: order.orderNumber || "ORD-" + order.id.substring(0, 8).toUpperCase(),
+      dueDate: order.dueDate,
       customerName: order.customerName ?? "-",
       productName: item.productName ?? order.productName ?? "-",
       quantityPairs: safeNumber(item.quantityPairs),

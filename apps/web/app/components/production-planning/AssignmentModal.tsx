@@ -24,6 +24,8 @@ type OrderItem = {
 
 type Order = {
   id: string;
+  orderNumber?: string;
+  dueDate?: string | null;
   customerName: string;
   productName: string;
   quantity?: number;
@@ -127,14 +129,15 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
       customerName: order.customerName,
       orderTotalQuantity: order.quantity ?? item.quantityPairs,
       orderRemainingQuantity: order.remainingQuantity ?? item.remainingPairs,
-      orderCode: "ORD-" + order.id.substring(0, 8).toUpperCase(),
+      orderCode: order.orderNumber || "ORD-" + order.id.substring(0, 8).toUpperCase(),
+      dueDate: order.dueDate,
       label:
         order.customerName +
         " / " +
         item.productName +
         " / " +
         item.remainingPairs.toLocaleString("tr-TR") +
-        " çift kaldı",
+        " çift kaldı" + (order.dueDate ? " / " + new Date(order.dueDate).toLocaleDateString("tr-TR") : ""),
     }))
   );
 
@@ -359,6 +362,7 @@ if (!response.ok) {
           <Panel title="📦 Sipariş Bilgisi">
             <Info label="Sipariş No" value={selectedItem?.orderCode ?? "-"} />
             <Info label="Müşteri" value={selectedItem?.customerName ?? "-"} />
+            <Info label="Teslim Tarihi" value={selectedItem?.dueDate ? new Date(selectedItem.dueDate).toLocaleDateString("tr-TR") : "-"} />
             <Info label="Ürün" value={selectedItem?.productName ?? "-"} />
             <Info label="Üretim Tipi" value={selectedItem?.productionType ?? "-"} />
             <Info label="Kumaş Rengi" value={selectedItem?.fabricColor ?? "-"} />

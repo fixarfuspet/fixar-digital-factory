@@ -175,6 +175,14 @@ public DbSet<QualityDefect> QualityDefects => Set<QualityDefect>();
             .HasForeignKey(x => x.OrderItemId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Entity<Customer>().HasIndex(x => x.CustomerCode).IsUnique();
+        builder.Entity<Customer>().HasIndex(x => x.IsActive);
+        builder.Entity<Order>().HasIndex(x => x.OrderNumber).IsUnique();
+        builder.Entity<Order>().HasIndex(x => new { x.CustomerId, x.Status });
+        builder.Entity<Order>().HasIndex(x => x.OrderDate);
+        builder.Entity<OrderItem>().HasIndex(x => new { x.OrderId, x.LineNumber }).IsUnique();
+        builder.Entity<OrderItem>().HasIndex(x => x.IsActive);
+
         builder.Entity<WorkOrder>()
             .HasOne(x => x.Product)
             .WithMany(x => x.WorkOrders)

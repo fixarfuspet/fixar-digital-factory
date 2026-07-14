@@ -1,5 +1,6 @@
 import { requireSession } from "../lib/auth/session";
 import { LogoutButton } from "../components/auth/LogoutButton";
+import Link from "next/link";
 
 const injectionStations = Array.from({ length: 24 }, (_, i) => {
   const data = [
@@ -120,6 +121,10 @@ export default async function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-4">
+              <nav className="flex gap-2">
+                <Link href="/customers" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Müşteriler</Link>
+                <Link href="/orders" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Satış Siparişleri</Link>
+              </nav>
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-right">
                 <p className="text-sm font-semibold">{user.email}</p>
                 <p className="text-xs text-zinc-400">Yetkili kullanıcı</p>
