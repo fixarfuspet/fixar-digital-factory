@@ -124,6 +124,7 @@ export default async function DashboardPage() {
               <nav className="flex gap-2">
                 <Link href="/customers" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Müşteriler</Link>
                 <Link href="/orders" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Satış Siparişleri</Link>
+                <Link href="/traceability" className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-sm font-bold text-violet-200">QR İzlenebilirlik</Link>
               </nav>
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-right">
                 <p className="text-sm font-semibold">{user.email}</p>

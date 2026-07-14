@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 type ApiResponse<T> = { data?: T; message?: string; errorMessage?: string };
 type Box = { id: string; boxNumber: string; customerName?: string | null; productName?: string | null; productCode?: string | null; workOrderNumber?: string | null; pairCount: number; status: string; warehouseLocation?: string | null; rackCode?: string | null; receivedToWarehouseAt?: string | null };
@@ -50,6 +51,7 @@ export default function WarehousePage() {
   return (
     <main className="min-h-screen bg-[#05070A] text-white">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <Link href="/traceability" className="inline-block rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-2 text-sm font-black text-violet-200">Koli Ara · QR · İzlenebilirlik</Link>
         <header className="border-b border-white/10 pb-6"><p className="text-sm font-bold tracking-[0.36em] text-emerald-400">FIXAR OS</p><h1 className="mt-2 text-3xl font-black sm:text-4xl">Bitmiş Ürün Deposu</h1><p className="mt-2 text-sm text-zinc-400">Hammadde stoklarından bağımsız, ProductionBox statüleriyle mamül depo yönetimi.</p></header>
         {(error || success) && <div className={"rounded-2xl border p-4 text-sm font-bold " + (error ? "border-red-400/30 bg-red-500/10 text-red-200" : "border-emerald-400/30 bg-emerald-500/10 text-emerald-200")}>{error ?? success}</div>}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-4"><Card label="Depodaki Koli" value={summary?.warehouseBoxes ?? 0} /><Card label="Depodaki Çift" value={summary?.warehousePairs ?? 0} /><Card label="Sevkiyata Hazır Koli" value={summary?.readyBoxes ?? 0} tone="emerald" /><Card label="Sevkiyata Hazır Çift" value={summary?.readyPairs ?? 0} tone="emerald" /></section>
