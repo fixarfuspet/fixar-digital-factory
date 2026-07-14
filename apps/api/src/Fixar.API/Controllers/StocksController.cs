@@ -63,6 +63,9 @@ public class StocksController : ControllerBase
                 ContainerCount = _db.MaterialContainers.Count(c => c.StockItemId == x.Id),
                 OpenContainerCount = _db.MaterialContainers.Count(c => c.StockItemId == x.Id && c.IsActive && (c.Status == "Open" || c.Status == "PartiallyUsed")),
                 NearestExpiryDate = _db.MaterialLots.Where(l => l.StockItemId == x.Id && l.IsActive && l.ExpiryDate != null).Min(l => l.ExpiryDate)
+                ,ActiveReservedQuantity = _db.StockReservationLines.Where(l => l.StockItemId == x.Id && l.StockReservation.Status == "Active").Sum(l => l.ReservedQuantity - l.ReleasedQuantity)
+                ,FreeStockQuantity = x.CurrentQuantity - _db.StockReservationLines.Where(l => l.StockItemId == x.Id && l.StockReservation.Status == "Active").Sum(l => l.ReservedQuantity - l.ReleasedQuantity)
+                ,ActiveReservationCount = _db.StockReservationLines.Where(l => l.StockItemId == x.Id && l.StockReservation.Status == "Active").Select(l => l.StockReservationId).Distinct().Count()
             })
             .ToListAsync(cancellationToken);
 

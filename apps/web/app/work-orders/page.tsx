@@ -137,6 +137,13 @@ type WorkOrderRequirementLine = {
   estimatedMaterialCost?: number | null;
   warning?: string | null;
   isUnitMismatch?: boolean | null;
+  reservedForThisWorkOrder?: number | null;
+  reservedForOtherWorkOrders?: number | null;
+  freeStockAfterReservations?: number | null;
+  remainingToReserve?: number | null;
+  reservationStatus?: string | null;
+  availableLotQuantity?: number | null;
+  availableContainerQuantity?: number | null;
 };
 
 type RequirementPayload = {
@@ -148,6 +155,8 @@ type RequirementPayload = {
   items?: WorkOrderRequirementLine[];
   totalsByCurrency?: Record<string, number>;
   warnings?: string[];
+  isFullyReserved?: boolean;
+  reservationCount?: number;
 };
 
 type WorkOrderQualitySummary = {
@@ -359,6 +368,12 @@ export default function WorkOrdersPage() {
           }
 
           body = { allowMaterialShortage: true, shortageReason: reason.trim() };
+        }
+        if (!requirements.isFullyReserved) {
+          const missing = (requirements.items ?? []).filter(x => safeNumber(x.remainingToReserve) > 0).map(x => `${x.materialCode}: ${formatNumber(x.remainingToReserve)} ${x.stockUnit || ""}`).join("\n");
+          const reason = window.prompt("Zorunlu hammaddeler tam rezerve edilmemiştir.\n\n" + missing + "\n\nRezervasyonsuz başlatma gerekçesi:");
+          if (!reason?.trim()) { alert("Rezervasyonsuz başlatma override gerekçesi zorunludur."); return; }
+          body = { ...body, allowStartWithoutReservation: true, reservationOverrideReason: reason.trim() };
         }
       }
 
@@ -939,6 +954,7 @@ function MaterialsTab({ requirements, materials, stocks, totals }: { requirement
                   <th className="p-3">Fire %</th>
                   <th className="p-3">Toplam İhtiyaç</th>
                   <th className="p-3">Mevcut Stok</th>
+                  <th className="p-3">Diğer Rezerve</th><th className="p-3">Bu İş Emri</th><th className="p-3">Serbest</th><th className="p-3">Kalan Rezervasyon</th><th className="p-3">Lot/Container</th>
                   <th className="p-3">Eksik</th>
                   <th className="p-3">Karşılama</th>
                   <th className="p-3">Birim Fiyat</th>
@@ -960,6 +976,7 @@ function MaterialsTab({ requirements, materials, stocks, totals }: { requirement
                       <td className="p-3">{formatNumber(line.wastePercent)}</td>
                       <td className="p-3">{formatNumber(line.totalRequiredQuantity)} {line.stockUnit || material?.unit || ""}</td>
                       <td className="p-3">{formatNumber(line.availableStock ?? stock?.currentQuantity)} {line.stockUnit || stock?.unit || ""}</td>
+                      <td className="p-3">{formatNumber(line.reservedForOtherWorkOrders)}</td><td className="p-3">{formatNumber(line.reservedForThisWorkOrder)}</td><td className="p-3">{formatNumber(line.freeStockAfterReservations)}</td><td className="p-3">{formatNumber(line.remainingToReserve)} · {line.reservationStatus}</td><td className="p-3">{formatNumber(line.availableLotQuantity)} / {formatNumber(line.availableContainerQuantity)}</td>
                       <td className="p-3">{formatNumber(line.shortageQuantity)} {line.stockUnit || ""}</td>
                       <td className="p-3">{formatNumber(line.coveragePercent)}%</td>
                       <td className="p-3">{line.materialUnitPrice == null ? "-" : formatNumber(line.materialUnitPrice)}</td>

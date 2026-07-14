@@ -69,6 +69,8 @@ public DbSet<QualityInspection> QualityInspections => Set<QualityInspection>();
 public DbSet<QualityDefect> QualityDefects => Set<QualityDefect>();
 public DbSet<MaterialLot> MaterialLots => Set<MaterialLot>();
 public DbSet<MaterialContainer> MaterialContainers => Set<MaterialContainer>();
+public DbSet<StockReservation> StockReservations => Set<StockReservation>();
+public DbSet<StockReservationLine> StockReservationLines => Set<StockReservationLine>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -99,6 +101,13 @@ public DbSet<MaterialContainer> MaterialContainers => Set<MaterialContainer>();
         builder.Entity<MaterialLot>().HasOne(x=>x.Material).WithMany().HasForeignKey(x=>x.MaterialId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialLot>().HasOne(x=>x.StockItem).WithMany().HasForeignKey(x=>x.StockItemId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialLot>().HasOne(x=>x.Supplier).WithMany().HasForeignKey(x=>x.SupplierId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialLot>().HasOne(x=>x.PurchaseOrder).WithMany().HasForeignKey(x=>x.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialLot>().HasOne(x=>x.PurchaseOrderLine).WithMany().HasForeignKey(x=>x.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
         builder.Entity<MaterialContainer>().HasIndex(x=>x.ContainerCode).IsUnique(); builder.Entity<MaterialContainer>().HasIndex(x=>x.MaterialLotId); builder.Entity<MaterialContainer>().HasIndex(x=>x.MaterialId); builder.Entity<MaterialContainer>().HasIndex(x=>x.StockItemId); builder.Entity<MaterialContainer>().HasIndex(x=>x.Status); builder.Entity<MaterialContainer>().HasIndex(x=>x.OpenedAt); builder.Entity<MaterialContainer>().HasIndex(x=>x.IsDamaged); builder.Entity<MaterialContainer>().HasIndex(x=>x.IsBlocked); builder.Entity<MaterialContainer>().HasIndex(x=>x.IsActive);
         builder.Entity<MaterialContainer>().HasOne(x=>x.MaterialLot).WithMany(x=>x.Containers).HasForeignKey(x=>x.MaterialLotId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialContainer>().HasOne(x=>x.Material).WithMany().HasForeignKey(x=>x.MaterialId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialContainer>().HasOne(x=>x.StockItem).WithMany().HasForeignKey(x=>x.StockItemId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<StockReservation>().HasIndex(x => x.ReservationNumber).IsUnique();
+        builder.Entity<StockReservation>().HasIndex(x => x.WorkOrderId); builder.Entity<StockReservation>().HasIndex(x => x.Status); builder.Entity<StockReservation>().HasIndex(x => x.ReservationDate); builder.Entity<StockReservation>().HasIndex(x => x.IsActive);
+        builder.Entity<StockReservation>().HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<StockReservationLine>().HasIndex(x => x.StockReservationId); builder.Entity<StockReservationLine>().HasIndex(x => x.MaterialId); builder.Entity<StockReservationLine>().HasIndex(x => x.StockItemId); builder.Entity<StockReservationLine>().HasIndex(x => x.MaterialLotId); builder.Entity<StockReservationLine>().HasIndex(x => x.MaterialContainerId);
+        builder.Entity<StockReservationLine>().HasIndex(x => new { x.StockReservationId, x.MaterialContainerId }).IsUnique().HasFilter("\"MaterialContainerId\" IS NOT NULL");
+        builder.Entity<StockReservationLine>().HasOne(x => x.StockReservation).WithMany(x => x.Lines).HasForeignKey(x => x.StockReservationId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<StockReservationLine>().HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict); builder.Entity<StockReservationLine>().HasOne(x => x.StockItem).WithMany().HasForeignKey(x => x.StockItemId).OnDelete(DeleteBehavior.Restrict); builder.Entity<StockReservationLine>().HasOne(x => x.MaterialLot).WithMany().HasForeignKey(x => x.MaterialLotId).OnDelete(DeleteBehavior.Restrict); builder.Entity<StockReservationLine>().HasOne(x => x.MaterialContainer).WithMany().HasForeignKey(x => x.MaterialContainerId).OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Product>()
             .HasMany(x => x.Molds)

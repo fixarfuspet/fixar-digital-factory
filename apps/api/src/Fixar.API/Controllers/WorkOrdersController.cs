@@ -274,6 +274,19 @@ public class WorkOrdersController : ControllerBase
             }, cancellationToken);
         }
 
+        if (!requirements.IsFullyReserved)
+        {
+            if (request?.AllowStartWithoutReservation != true)
+            {
+                await AddAuditLog("WorkOrder Start Blocked By Reservation", workOrder.Id, new { workOrder.WorkOrderNumber, requirements.UnreservedMaterialCount, requirements.PartiallyReservedMaterialCount }, cancellationToken);
+                await _db.SaveChangesAsync(cancellationToken);
+                return BadRequest(ApiResponse<object>.Fail("İş emrinin zorunlu hammaddeleri tam olarak rezerve edilmemiştir.", "MATERIAL_RESERVATION_REQUIRED"));
+            }
+            if (string.IsNullOrWhiteSpace(request.ReservationOverrideReason))
+                return BadRequest(ApiResponse<object>.Fail("Rezervasyonsuz başlatma override gerekçesi zorunludur.", "RESERVATION_OVERRIDE_REASON_REQUIRED"));
+            await AddAuditLog("WorkOrder Started Without Reservation Override", workOrder.Id, new { workOrder.WorkOrderNumber, Reason = request.ReservationOverrideReason.Trim() }, cancellationToken);
+        }
+
         var utcNow = DateTime.UtcNow;
         workOrder.Status = "InProduction";
         workOrder.UpdatedAt = utcNow;
@@ -654,6 +667,14 @@ public class WorkOrdersController : ControllerBase
             .OrderByDescending(x => x.PurchaseOrder.OrderDate)
             .ToListAsync(cancellationToken);
 
+        var activeReservations = await _db.StockReservationLines.AsNoTracking()
+            .Where(x => x.StockReservation.Status == "Active" && materialIds.Contains(x.MaterialId))
+            .GroupBy(x => new { x.StockReservation.WorkOrderId, x.MaterialId })
+            .Select(x => new { x.Key.WorkOrderId, x.Key.MaterialId, Quantity = x.Sum(y => y.ReservedQuantity - y.ReleasedQuantity) })
+            .ToListAsync(cancellationToken);
+        var availableLots = await _db.MaterialLots.AsNoTracking().Where(x => materialIds.Contains(x.MaterialId) && x.IsActive && !x.IsBlocked && x.QualityStatus != "Rejected" && (x.ExpiryDate == null || x.ExpiryDate >= DateTime.UtcNow)).GroupBy(x => x.MaterialId).Select(x => new { MaterialId = x.Key, Quantity = x.Sum(y => y.CurrentQuantity - y.ReservedQuantity) }).ToDictionaryAsync(x => x.MaterialId, x => x.Quantity, cancellationToken);
+        var availableContainers = await _db.MaterialContainers.AsNoTracking().Where(x => materialIds.Contains(x.MaterialId) && x.IsActive && !x.IsBlocked && !x.IsDamaged && x.Status != "Empty" && x.Status != "Cancelled").GroupBy(x => x.MaterialId).Select(x => new { MaterialId = x.Key, Quantity = x.Sum(y => y.CurrentQuantity - y.ReservedQuantity) }).ToDictionaryAsync(x => x.MaterialId, x => x.Quantity, cancellationToken);
+
         var warnings = new List<string>();
         var items = recipe.Items
             .OrderBy(x => x.Sequence)
@@ -684,7 +705,9 @@ public class WorkOrdersController : ControllerBase
                 var totalRequiredRecipeUnit = netRequired + wasteQuantity;
                 var totalRequiredStockUnit = conversion.IsSupported ? totalRequiredRecipeUnit * conversion.Factor : totalRequiredRecipeUnit;
                 var availableStock = stock?.CurrentQuantity ?? 0;
-                var reservedQuantity = 0m;
+                var reservedForThisWorkOrder = activeReservations.Where(x => x.WorkOrderId == workOrder.Id && x.MaterialId == item.MaterialId).Sum(x => x.Quantity);
+                var reservedForOtherWorkOrders = activeReservations.Where(x => x.WorkOrderId != workOrder.Id && x.MaterialId == item.MaterialId).Sum(x => x.Quantity);
+                var reservedQuantity = reservedForThisWorkOrder + reservedForOtherWorkOrders;
                 var freeStock = Math.Max(availableStock - reservedQuantity, 0);
                 var shortageQuantity = conversion.IsSupported ? Math.Max(totalRequiredStockUnit - freeStock, 0) : totalRequiredStockUnit;
                 var coveragePercent = totalRequiredStockUnit > 0 && conversion.IsSupported
@@ -720,7 +743,17 @@ public class WorkOrdersController : ControllerBase
                     price.Currency,
                     price.UnitPrice.HasValue ? Round(totalRequiredStockUnit * price.UnitPrice.Value) : null,
                     rowWarnings.Count > 0 ? string.Join(" ", rowWarnings) : null,
-                    !conversion.IsSupported);
+                    !conversion.IsSupported,
+                    Round(reservedForThisWorkOrder),
+                    Round(reservedForOtherWorkOrders),
+                    Round(reservedQuantity),
+                    Round(freeStock),
+                    Round(availableLots.GetValueOrDefault(item.MaterialId)),
+                    Round(availableContainers.GetValueOrDefault(item.MaterialId)),
+                    reservedForThisWorkOrder <= 0 ? "Unreserved" : reservedForThisWorkOrder < totalRequiredStockUnit ? "Partial" : "FullyReserved",
+                    reservedForThisWorkOrder >= totalRequiredStockUnit,
+                    Round(Math.Max(totalRequiredStockUnit - reservedForThisWorkOrder, 0)),
+                    conversion.IsSupported && stock is not null && reservedForThisWorkOrder < totalRequiredStockUnit);
             })
             .ToList();
 
@@ -742,6 +775,8 @@ public class WorkOrdersController : ControllerBase
             CanStartProduction: canStart,
             MaterialWarnings: warnings);
 
+        var reservationCount = await _db.StockReservations.CountAsync(x => x.WorkOrderId == workOrder.Id && x.Status == "Active", cancellationToken);
+        var fullyReservedCount = items.Count(x => x.IsFullyReserved); var partiallyReservedCount = items.Count(x => x.ReservedForThisWorkOrder > 0 && !x.IsFullyReserved); var unreservedCount = items.Count - fullyReservedCount - partiallyReservedCount;
         return new WorkOrderRequirementsResponse(
             workOrder.Id,
             workOrder.WorkOrderNumber,
@@ -776,7 +811,14 @@ public class WorkOrdersController : ControllerBase
                     x.MaterialUnitPrice,
                     x.Currency))
                 .ToList(),
-            summary);
+            summary,
+            reservationCount > 0,
+            reservationCount,
+            fullyReservedCount,
+            partiallyReservedCount,
+            unreservedCount,
+            items.Count > 0 && fullyReservedCount == items.Count,
+            canStart && items.Count > 0 && fullyReservedCount == items.Count);
     }
 
     private static UnitConversionResult ResolveUnitConversion(string recipeUnit, string stockUnit)
@@ -981,7 +1023,7 @@ public record SaveWorkOrderRequest(
     bool IsActive = true
 );
 
-public record StartWorkOrderRequest(bool AllowMaterialShortage = false, string? ShortageReason = null);
+public record StartWorkOrderRequest(bool AllowMaterialShortage = false, string? ShortageReason = null, bool AllowStartWithoutReservation = false, string? ReservationOverrideReason = null);
 
 public record CompleteWorkOrderRequest(bool AllowShortCompletion, string? Reason);
 
@@ -1012,7 +1054,17 @@ public record WorkOrderRequirementItemResponse(
     string Currency,
     decimal? EstimatedMaterialCost,
     string? Warning,
-    bool IsUnitMismatch
+    bool IsUnitMismatch,
+    decimal ReservedForThisWorkOrder,
+    decimal ReservedForOtherWorkOrders,
+    decimal TotalReserved,
+    decimal FreeStockAfterReservations,
+    decimal AvailableLotQuantity,
+    decimal AvailableContainerQuantity,
+    string ReservationStatus,
+    bool IsFullyReserved,
+    decimal RemainingToReserve,
+    bool CanReserve
 );
 
 public record PurchaseSuggestionResponse(
@@ -1049,7 +1101,14 @@ public record WorkOrderRequirementsResponse(
     List<string> Warnings,
     List<WorkOrderRequirementItemResponse> Items,
     List<PurchaseSuggestionResponse> PurchaseSuggestions,
-    MaterialPlanningSummary Summary
+    MaterialPlanningSummary Summary,
+    bool HasActiveReservation,
+    int ReservationCount,
+    int FullyReservedMaterialCount,
+    int PartiallyReservedMaterialCount,
+    int UnreservedMaterialCount,
+    bool IsFullyReserved,
+    bool CanStartWithReservation
 );
 
 public record MaterialPlanningSummary(
