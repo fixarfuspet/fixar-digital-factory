@@ -1,6 +1,7 @@
 import { requireSession } from "../lib/auth/session";
 import { LogoutButton } from "../components/auth/LogoutButton";
 import Link from "next/link";
+import { can } from "../lib/auth/permissions";
 
 const injectionStations = Array.from({ length: 24 }, (_, i) => {
   const data = [
@@ -125,6 +126,9 @@ export default async function DashboardPage() {
                 <Link href="/customers" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Müşteriler</Link>
                 <Link href="/orders" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Satış Siparişleri</Link>
                 <Link href="/traceability" className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-sm font-bold text-violet-200">QR İzlenebilirlik</Link>
+                {can(user.roles, "costs") && <Link href="/work-order-costs" className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm font-bold text-amber-200">İş Emri Maliyetleri</Link>}
+                {can(user.roles, "costs") && <Link href="/cost-settings" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Maliyet Ayarları</Link>}
+                {can(user.roles, "costs") && <Link href="/exchange-rates" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold">Döviz Kurları</Link>}
               </nav>
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-right">
                 <p className="text-sm font-semibold">{user.email}</p>

@@ -1,6 +1,6 @@
 export const rolePermissions: Record<string, readonly string[]> = {
   CEO: ["*"],
-  "Production Manager": ["production", "work-orders", "reservations", "consumption", "quality", "cutting", "boxes", "warehouse", "shipments"],
+  "Production Manager": ["production", "work-orders", "reservations", "consumption", "quality", "cutting", "boxes", "warehouse", "shipments", "costs"],
   InjectionOperator: ["production", "consumption"],
   CuttingOperator: ["cutting", "boxes", "traceability"],
   "Warehouse Operator": ["stocks", "lots", "containers", "warehouse", "shipments"],

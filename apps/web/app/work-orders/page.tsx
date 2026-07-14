@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -430,6 +431,7 @@ export default function WorkOrdersPage() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
+              <Link href="/work-order-costs" className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-5 py-3 text-sm font-black text-amber-200">Maliyet Ön İzleme / Geçmiş</Link>
               <button
                 onClick={() => void loadData()}
                 disabled={loading}

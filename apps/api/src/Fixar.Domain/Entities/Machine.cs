@@ -30,6 +30,12 @@ public class Machine : BaseAuditableEntity
 
     public decimal? EnergyConsumption { get; set; }
 
+    public decimal? PowerKw { get; set; }
+
+    public decimal? HourlyOperatingCost { get; set; }
+
+    public decimal? DefaultEnergyCostPerKwh { get; set; }
+
     public string? Location { get; set; }
 
     public string CurrentStatus { get; set; } = "Idle";

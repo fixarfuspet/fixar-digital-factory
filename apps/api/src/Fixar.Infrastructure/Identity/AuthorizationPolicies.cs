@@ -23,4 +23,8 @@ public static class AuthorizationPolicies
     public const string CanViewCosts = nameof(CanViewCosts);
     public const string CanViewTraceability = nameof(CanViewTraceability);
     public const string CanOverrideProductionRules = nameof(CanOverrideProductionRules);
+    public const string CanCalculateCosts = nameof(CanCalculateCosts);
+    public const string CanManageCostSettings = nameof(CanManageCostSettings);
+    public const string CanManageExchangeRates = nameof(CanManageExchangeRates);
+    public const string CanFinalizeCosts = nameof(CanFinalizeCosts);
 }

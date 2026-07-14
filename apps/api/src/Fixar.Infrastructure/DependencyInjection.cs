@@ -100,12 +100,17 @@ public static class DependencyInjection
             options.AddPolicy(AuthorizationPolicies.CanViewCosts, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
             options.AddPolicy(AuthorizationPolicies.CanViewTraceability, p => p.RequireAuthenticatedUser());
             options.AddPolicy(AuthorizationPolicies.CanOverrideProductionRules, p => Roles(p, ceo, RoleNames.ProductionManager));
+            options.AddPolicy(AuthorizationPolicies.CanCalculateCosts, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance, RoleNames.ProductionManager));
+            options.AddPolicy(AuthorizationPolicies.CanManageCostSettings, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanManageExchangeRates, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanFinalizeCosts, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance, RoleNames.ProductionManager));
         });
         services.AddHttpContextAccessor();
 
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IDateTimeService, DateTimeService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IWorkOrderCostService, WorkOrderCostService>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ApplicationDbContextInitialiser>();

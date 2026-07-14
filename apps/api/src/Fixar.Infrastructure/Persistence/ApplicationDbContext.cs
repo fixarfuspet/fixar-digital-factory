@@ -73,6 +73,10 @@ public DbSet<StockReservation> StockReservations => Set<StockReservation>();
 public DbSet<StockReservationLine> StockReservationLines => Set<StockReservationLine>();
 public DbSet<MaterialConsumption> MaterialConsumptions => Set<MaterialConsumption>();
 public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+public DbSet<CostSettings> CostSettings => Set<CostSettings>();
+public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+public DbSet<WorkOrderCostSnapshot> WorkOrderCostSnapshots => Set<WorkOrderCostSnapshot>();
+public DbSet<WorkOrderCostLine> WorkOrderCostLines => Set<WorkOrderCostLine>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -114,6 +118,15 @@ public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
         builder.Entity<MaterialConsumption>().HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialConsumption>().HasOne(x => x.StationAssignment).WithMany().HasForeignKey(x => x.StationAssignmentId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialConsumption>().HasOne(x => x.StockReservation).WithMany().HasForeignKey(x => x.StockReservationId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialConsumption>().HasOne(x => x.StockReservationLine).WithMany().HasForeignKey(x => x.StockReservationLineId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialConsumption>().HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialConsumption>().HasOne(x => x.StockItem).WithMany().HasForeignKey(x => x.StockItemId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialConsumption>().HasOne(x => x.MaterialLot).WithMany().HasForeignKey(x => x.MaterialLotId).OnDelete(DeleteBehavior.Restrict); builder.Entity<MaterialConsumption>().HasOne(x => x.MaterialContainer).WithMany().HasForeignKey(x => x.MaterialContainerId).OnDelete(DeleteBehavior.Restrict);
         builder.Entity<IdempotencyRecord>().HasIndex(x => new { x.IdempotencyKey, x.UserId, x.Endpoint }).IsUnique().AreNullsDistinct(false);
         builder.Entity<IdempotencyRecord>().HasIndex(x => x.ExpiresAt);
+        builder.Entity<CostSettings>().HasIndex(x => new { x.IsActive, x.EffectiveFrom, x.EffectiveTo });
+        builder.Entity<ExchangeRate>().HasIndex(x => new { x.RateDate, x.BaseCurrency, x.QuoteCurrency }).IsUnique().HasFilter("\"IsActive\" = TRUE");
+        builder.Entity<ExchangeRate>().HasIndex(x => x.IsActive);
+        builder.Entity<WorkOrderCostSnapshot>().HasIndex(x => x.SnapshotNumber).IsUnique();
+        builder.Entity<WorkOrderCostSnapshot>().HasIndex(x => new { x.WorkOrderId, x.SnapshotDate });
+        builder.Entity<WorkOrderCostSnapshot>().HasIndex(x => new { x.IsFinal, x.CalculationType, x.ReportingCurrency });
+        builder.Entity<WorkOrderCostSnapshot>().HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<WorkOrderCostLine>().HasIndex(x => new { x.WorkOrderCostSnapshotId, x.CostCategory });
+        builder.Entity<WorkOrderCostLine>().HasOne(x => x.WorkOrderCostSnapshot).WithMany(x => x.Lines).HasForeignKey(x => x.WorkOrderCostSnapshotId).OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<Product>()
             .HasMany(x => x.Molds)
