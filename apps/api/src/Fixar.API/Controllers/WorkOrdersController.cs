@@ -668,10 +668,11 @@ public class WorkOrdersController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var activeReservations = await _db.StockReservationLines.AsNoTracking()
-            .Where(x => x.StockReservation.Status == "Active" && materialIds.Contains(x.MaterialId))
+            .Where(x => (x.StockReservation.Status == "Active" || x.StockReservation.Status == "PartiallyConsumed" || x.StockReservation.Status == "Consumed") && materialIds.Contains(x.MaterialId))
             .GroupBy(x => new { x.StockReservation.WorkOrderId, x.MaterialId })
-            .Select(x => new { x.Key.WorkOrderId, x.Key.MaterialId, Quantity = x.Sum(y => y.ReservedQuantity - y.ReleasedQuantity) })
+            .Select(x => new { x.Key.WorkOrderId, x.Key.MaterialId, Quantity = x.Sum(y => y.ReservedQuantity - y.ReleasedQuantity - y.ConsumedQuantity) })
             .ToListAsync(cancellationToken);
+        var consumptions = await _db.StockReservationLines.AsNoTracking().Where(x => x.StockReservation.WorkOrderId == workOrder.Id && materialIds.Contains(x.MaterialId)).GroupBy(x => x.MaterialId).Select(x => new { MaterialId = x.Key, Quantity = x.Sum(y => y.ConsumedQuantity), LastAt = x.Max(y => y.LastConsumedAt) }).ToDictionaryAsync(x => x.MaterialId, cancellationToken);
         var availableLots = await _db.MaterialLots.AsNoTracking().Where(x => materialIds.Contains(x.MaterialId) && x.IsActive && !x.IsBlocked && x.QualityStatus != "Rejected" && (x.ExpiryDate == null || x.ExpiryDate >= DateTime.UtcNow)).GroupBy(x => x.MaterialId).Select(x => new { MaterialId = x.Key, Quantity = x.Sum(y => y.CurrentQuantity - y.ReservedQuantity) }).ToDictionaryAsync(x => x.MaterialId, x => x.Quantity, cancellationToken);
         var availableContainers = await _db.MaterialContainers.AsNoTracking().Where(x => materialIds.Contains(x.MaterialId) && x.IsActive && !x.IsBlocked && !x.IsDamaged && x.Status != "Empty" && x.Status != "Cancelled").GroupBy(x => x.MaterialId).Select(x => new { MaterialId = x.Key, Quantity = x.Sum(y => y.CurrentQuantity - y.ReservedQuantity) }).ToDictionaryAsync(x => x.MaterialId, x => x.Quantity, cancellationToken);
 
@@ -753,7 +754,12 @@ public class WorkOrdersController : ControllerBase
                     reservedForThisWorkOrder <= 0 ? "Unreserved" : reservedForThisWorkOrder < totalRequiredStockUnit ? "Partial" : "FullyReserved",
                     reservedForThisWorkOrder >= totalRequiredStockUnit,
                     Round(Math.Max(totalRequiredStockUnit - reservedForThisWorkOrder, 0)),
-                    conversion.IsSupported && stock is not null && reservedForThisWorkOrder < totalRequiredStockUnit);
+                    conversion.IsSupported && stock is not null && reservedForThisWorkOrder < totalRequiredStockUnit,
+                    Round(consumptions.GetValueOrDefault(item.MaterialId)?.Quantity ?? 0),
+                    Round(reservedForThisWorkOrder),
+                    Round(Math.Max(totalRequiredStockUnit - (consumptions.GetValueOrDefault(item.MaterialId)?.Quantity ?? 0), 0)),
+                    totalRequiredStockUnit > 0 ? Round(Math.Min(100, (consumptions.GetValueOrDefault(item.MaterialId)?.Quantity ?? 0) / totalRequiredStockUnit * 100)) : 0,
+                    consumptions.GetValueOrDefault(item.MaterialId)?.LastAt);
             })
             .ToList();
 
@@ -1064,7 +1070,12 @@ public record WorkOrderRequirementItemResponse(
     string ReservationStatus,
     bool IsFullyReserved,
     decimal RemainingToReserve,
-    bool CanReserve
+    bool CanReserve,
+    decimal ConsumedQuantity,
+    decimal RemainingReservedQuantity,
+    decimal RemainingRequirementQuantity,
+    decimal ConsumptionProgressPercent,
+    DateTime? LastConsumptionAt
 );
 
 public record PurchaseSuggestionResponse(

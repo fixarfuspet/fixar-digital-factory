@@ -17,6 +17,9 @@ public class StockReservationLine : BaseEntity
     public decimal RequiredQuantity { get; set; }
     public decimal ReservedQuantity { get; set; }
     public decimal ReleasedQuantity { get; set; }
+    public decimal ConsumedQuantity { get; set; }
+    public DateTime? LastConsumedAt { get; set; }
+    public string? LastConsumedByName { get; set; }
     public string Unit { get; set; } = string.Empty;
     public int Sequence { get; set; }
     public bool IsFifoSuggested { get; set; }

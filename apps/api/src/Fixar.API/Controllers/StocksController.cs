@@ -66,6 +66,8 @@ public class StocksController : ControllerBase
                 ,ActiveReservedQuantity = _db.StockReservationLines.Where(l => l.StockItemId == x.Id && l.StockReservation.Status == "Active").Sum(l => l.ReservedQuantity - l.ReleasedQuantity)
                 ,FreeStockQuantity = x.CurrentQuantity - _db.StockReservationLines.Where(l => l.StockItemId == x.Id && l.StockReservation.Status == "Active").Sum(l => l.ReservedQuantity - l.ReleasedQuantity)
                 ,ActiveReservationCount = _db.StockReservationLines.Where(l => l.StockItemId == x.Id && l.StockReservation.Status == "Active").Select(l => l.StockReservationId).Distinct().Count()
+                ,TotalConsumedQuantity = _db.MaterialConsumptions.Where(c => c.StockItemId == x.Id && !c.IsReversed).Sum(c => c.Quantity)
+                ,LastConsumptionAt = _db.MaterialConsumptions.Where(c => c.StockItemId == x.Id && !c.IsReversed).Max(c => (DateTime?)c.ConsumptionDate)
             })
             .ToListAsync(cancellationToken);
 

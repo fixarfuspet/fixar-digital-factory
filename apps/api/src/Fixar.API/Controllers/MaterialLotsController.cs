@@ -43,6 +43,7 @@ public sealed class MaterialLotsController(ApplicationDbContext db) : Controller
             AvailableQuantity = x.CurrentQuantity - x.ReservedQuantity, x.Unit, x.UnitPrice, x.Currency, x.Warehouse, x.Location, x.RackCode,
             x.Status, x.QualityStatus, x.IsBlocked, x.IsActive, IsExpired = x.ExpiryDate.HasValue && x.ExpiryDate < DateTime.UtcNow,
             ContainerCount = x.Containers.Count(c => c.IsActive && c.Status != "Cancelled"), OpenContainerCount = x.Containers.Count(c => c.IsActive && (c.Status == "Open" || c.Status == "PartiallyUsed")),
+            TotalConsumedQuantity = db.MaterialConsumptions.Where(c => c.MaterialLotId == x.Id && !c.IsReversed).Sum(c => c.Quantity), LastConsumptionAt = db.MaterialConsumptions.Where(c => c.MaterialLotId == x.Id && !c.IsReversed).Max(c => (DateTime?)c.ConsumptionDate),
             x.CreatedAt, x.UpdatedAt
         }).ToListAsync(ct);
         return Ok(ApiResponse<object>.SuccessResponse(rows));

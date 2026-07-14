@@ -52,6 +52,8 @@ type StockItem = {
   activeReservedQuantity?: number;
   freeStockQuantity?: number;
   activeReservationCount?: number;
+  totalConsumedQuantity?: number;
+  lastConsumptionAt?: string | null;
 };
 
 type StockFormState = {
@@ -475,6 +477,7 @@ function StockCard({
         <span>Lot: <b className="text-white">{item.lotCount ?? 0}</b></span><span>Aktif lot: <b className="text-white">{item.activeLotCount ?? 0}</b></span><span>Container: <b className="text-white">{item.containerCount ?? 0}</b></span><span>Açık: <b className="text-white">{item.openContainerCount ?? 0}</b></span><span>Yakın SKT: <b className="text-white">{item.nearestExpiryDate ? new Date(item.nearestExpiryDate).toLocaleDateString("tr-TR") : "-"}</b></span>
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-zinc-400"><span>Fiziksel: <b className="text-white">{item.currentQuantity}</b></span><span>Aktif rezerve: <b className="text-amber-300">{item.activeReservedQuantity ?? 0}</b></span><span>Serbest: <b className="text-emerald-300">{item.freeStockQuantity ?? item.currentQuantity}</b> · {item.activeReservationCount ?? 0} rezervasyon</span></div>
+      <div className="mt-2 text-xs text-zinc-400">Toplam tüketim: <b className="text-red-200">{item.totalConsumedQuantity ?? 0} {item.unit}</b> · Son tüketim: <b className="text-white">{item.lastConsumptionAt ? new Date(item.lastConsumptionAt).toLocaleString("tr-TR") : "-"}</b></div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <button onClick={onDetail} className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-white/[0.1]">
