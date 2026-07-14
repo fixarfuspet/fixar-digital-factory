@@ -28,6 +28,8 @@ public class CurrentUserService : ICurrentUserService
 
     public string? Email => User?.FindFirstValue(ClaimTypes.Email);
 
+    public string? UserName => User?.FindFirstValue(ClaimTypes.Name) ?? Email;
+
     public string? IpAddress => _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 
     public IReadOnlyList<string> Roles =>

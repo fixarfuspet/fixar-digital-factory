@@ -5,6 +5,8 @@ using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +15,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/production-boxes")]
 public class ProductionBoxesController : ControllerBase
 {
@@ -70,6 +72,7 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanManageBoxes), Idempotent]
     public async Task<IActionResult> Create([FromBody] CreateProductionBoxRequest request, CancellationToken cancellationToken)
     {
         if (!request.CuttingRecordId.HasValue)
@@ -157,6 +160,7 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/receive-to-warehouse")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWarehouse), Idempotent]
     public Task<IActionResult> ReceiveToWarehouse(Guid id, [FromBody] WarehouseTransitionRequest request, CancellationToken cancellationToken)
         => Transition(id, "Packed", "InWarehouse", request.WarehouseLocation, request.RackCode, "ReceivedToWarehouse", request.Note, null, null, cancellationToken);
 
@@ -165,6 +169,7 @@ public class ProductionBoxesController : ControllerBase
         => Transition(id, "InWarehouse", "ReadyForShipment", request.WarehouseLocation, request.RackCode, "MarkedReadyForShipment", request.Note, null, null, cancellationToken);
 
     [HttpPost("{id:guid}/ship")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageShipments), Idempotent]
     public Task<IActionResult> Ship(Guid id, [FromBody] ShipBoxRequest request, CancellationToken cancellationToken)
         => Transition(id, "ReadyForShipment", "Shipped", null, null, "Shipped", request.Notes, request.ShipmentReference, request.ShipmentDate, cancellationToken);
 
@@ -205,6 +210,7 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPost("bulk-ship")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageShipments), Idempotent]
     public async Task<IActionResult> BulkShip([FromBody] BulkShipRequest request, CancellationToken cancellationToken)
     {
         if (request.BoxIds.Count == 0)

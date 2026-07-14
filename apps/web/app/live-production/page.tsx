@@ -87,7 +87,7 @@ type Downtime = {
 
 const API =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:5000/api/v1";
+  "/api/backend/api/v1";
 
 const FIRE_REASONS = [
   "Eksik Döküm",
@@ -186,7 +186,7 @@ export default function LiveProductionPage() {
     try {
       const response = await fetch(`${API}/station-assignments/add-turn`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({
           turnCount: 1,
           note: "Canlı üretim ekranından 1 tur eklendi",

@@ -11,6 +11,8 @@ public interface ICurrentUserService
 
     string? Email { get; }
 
+    string? UserName { get; }
+
     string? IpAddress { get; }
 
     bool IsAuthenticated { get; }

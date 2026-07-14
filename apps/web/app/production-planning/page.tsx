@@ -21,7 +21,7 @@ type LastTurn = {
   totalAddedPairs: number;
 };
 
-const API = "http://localhost:5000/api/v1";
+const API = "/api/backend/api/v1";
 
 const emptyStations: Station[] = Array.from({ length: 24 }, (_, i) => ({
   station: i + 1,

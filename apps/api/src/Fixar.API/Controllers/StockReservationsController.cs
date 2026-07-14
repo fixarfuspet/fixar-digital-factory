@@ -5,13 +5,15 @@ using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fixar.API.Controllers;
 
-[ApiController, ApiVersion("1.0"), AllowAnonymous]
+[ApiController, ApiVersion("1.0"), Authorize]
 [Route("api/v{version:apiVersion}/stock-reservations")]
 public sealed class StockReservationsController(ApplicationDbContext db) : ControllerBase
 {
@@ -44,6 +46,7 @@ public sealed class StockReservationsController(ApplicationDbContext db) : Contr
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanManageReservations)]
     public async Task<IActionResult> Create([FromBody] ReservationRequest request, CancellationToken ct)
     {
         var built = await BuildDraft(request, null, ct); if (built.Error is not null) return built.Error;
@@ -55,6 +58,7 @@ public sealed class StockReservationsController(ApplicationDbContext db) : Contr
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageReservations)]
     public async Task<IActionResult> Update(Guid id, [FromBody] ReservationRequest request, CancellationToken ct)
     {
         var reservation = await db.StockReservations.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id, ct); if (reservation is null) return NotFound(Fail("Rezervasyon bulunamadı.", "RESERVATION_NOT_FOUND")); if (reservation.Status != "Draft") return BadRequest(Fail("Yalnızca taslak rezervasyon düzenlenebilir.", "RESERVATION_NOT_DRAFT")); if (request.WorkOrderId != reservation.WorkOrderId) return BadRequest(Fail("Rezervasyonun iş emri değiştirilemez.", "WORK_ORDER_CHANGE_NOT_ALLOWED"));
@@ -63,6 +67,7 @@ public sealed class StockReservationsController(ApplicationDbContext db) : Contr
     }
 
     [HttpPost("{id:guid}/activate")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageReservations), Idempotent]
     public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
@@ -77,12 +82,14 @@ public sealed class StockReservationsController(ApplicationDbContext db) : Contr
     }
 
     [HttpPost("{id:guid}/release")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageReservations), Idempotent]
     public async Task<IActionResult> Release(Guid id, [FromBody] ReservationActionRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Reason)) return BadRequest(Fail("Serbest bırakma gerekçesi zorunludur.", "REASON_REQUIRED")); await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct); var r = await db.StockReservations.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id, ct); if (r is null) return NotFound(Fail("Rezervasyon bulunamadı.", "RESERVATION_NOT_FOUND")); if (r.Status != "Active") return BadRequest(Fail("Yalnızca aktif rezervasyon serbest bırakılabilir.", "RESERVATION_NOT_ACTIVE")); await ReleaseLines(r, ct); r.Status = "Released"; r.ReleasedAt = DateTime.UtcNow; r.ReleasedByName = Actor(); r.IsActive = false; r.UpdatedAt = DateTime.UtcNow; Audit("Stock Reservation Released", id, new { Reason = request.Reason.Trim() }); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(await Detail(id).FirstAsync(ct), "Rezervasyon serbest bırakıldı."));
     }
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageReservations), Idempotent]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] ReservationActionRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Reason)) return BadRequest(Fail("İptal gerekçesi zorunludur.", "REASON_REQUIRED")); await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct); var r = await db.StockReservations.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id, ct); if (r is null) return NotFound(Fail("Rezervasyon bulunamadı.", "RESERVATION_NOT_FOUND")); if (r.Status is "Cancelled" or "Released") return BadRequest(Fail("Bu rezervasyon yeniden iptal edilemez.", "RESERVATION_TERMINAL")); if (r.Status == "Active") await ReleaseLines(r, ct); r.Status = "Cancelled"; r.IsCancelled = true; r.IsActive = false; r.CancellationReason = request.Reason.Trim(); r.CancelledAt = DateTime.UtcNow; r.CancelledByName = Actor(); r.UpdatedAt = DateTime.UtcNow; Audit("Stock Reservation Cancelled", id, new { r.CancellationReason }); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(await Detail(id).FirstAsync(ct), "Rezervasyon iptal edildi."));

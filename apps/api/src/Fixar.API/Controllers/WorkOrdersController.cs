@@ -4,6 +4,8 @@ using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +14,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/work-orders")]
 public class WorkOrdersController : ControllerBase
 {
@@ -131,6 +133,7 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders)]
     public async Task<IActionResult> Create([FromBody] SaveWorkOrderRequest request, CancellationToken cancellationToken)
     {
         var validation = await ValidateRequest(request, null, null, cancellationToken);
@@ -162,6 +165,7 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders)]
     public async Task<IActionResult> Update(Guid id, [FromBody] SaveWorkOrderRequest request, CancellationToken cancellationToken)
     {
         var workOrder = await QueryWorkOrders().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -205,6 +209,7 @@ public class WorkOrdersController : ControllerBase
     public Task<IActionResult> MarkReady(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "Ready", cancellationToken);
 
     [HttpPost("{id:guid}/start")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public async Task<IActionResult> Start(Guid id, [FromBody] StartWorkOrderRequest? request, CancellationToken cancellationToken)
     {
         var workOrder = await QueryWorkOrders().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -305,6 +310,7 @@ public class WorkOrdersController : ControllerBase
     public Task<IActionResult> Resume(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "InProduction", cancellationToken);
 
     [HttpPost("{id:guid}/complete")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders)]
     public async Task<IActionResult> Complete(Guid id, [FromBody] CompleteWorkOrderRequest request, CancellationToken cancellationToken)
     {
         var workOrder = await QueryWorkOrders().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -336,6 +342,7 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders)]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelWorkOrderRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.CancellationReason))

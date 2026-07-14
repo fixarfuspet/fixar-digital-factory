@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Fixar.API.Middleware;
+using Fixar.API.Security;
 
 namespace Fixar.API.Extensions;
 
@@ -10,6 +11,7 @@ public static class ApiServiceExtensions
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddControllers();
+        services.AddScoped<IdempotencyFilter>();
 
         services
             .AddApiVersioning(options =>

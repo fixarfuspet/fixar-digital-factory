@@ -55,6 +55,8 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
 
         public string? Email => "design-time@fixar.local";
 
+        public string? UserName => Email;
+
         public string? IpAddress => null;
 
         public bool IsAuthenticated => false;

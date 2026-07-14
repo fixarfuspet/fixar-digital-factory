@@ -9,7 +9,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/production-planning/lookups")]
 public class ProductionPlanningLookupsController : ControllerBase
 {

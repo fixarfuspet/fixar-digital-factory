@@ -2,13 +2,15 @@ using Asp.Versioning;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fixar.API.Controllers;
 
-[ApiController, ApiVersion("1.0"), AllowAnonymous]
+[ApiController, ApiVersion("1.0"), Authorize]
 [Route("api/v{version:apiVersion}/orders")]
 public class OrdersController(ApplicationDbContext db) : ControllerBase
 {
@@ -39,6 +41,7 @@ public class OrdersController(ApplicationDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanManageSalesOrders)]
     public async Task<IActionResult> Create(OrderRequest request, CancellationToken ct)
     {
         var validation = await Validate(request, null, ct); if (validation is not null) return BadRequest(ApiResponse<object>.Fail(validation, "VALIDATION_ERROR"));
@@ -50,6 +53,7 @@ public class OrdersController(ApplicationDbContext db) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageSalesOrders)]
     public async Task<IActionResult> Update(Guid id, OrderRequest request, CancellationToken ct)
     {
         var order = await db.Orders.Include(x => x.Items).ThenInclude(x => x.WorkOrders).FirstOrDefaultAsync(x => x.Id == id, ct); if (order is null) return NotFound(ApiResponse<object>.Fail("Sipariş bulunamadı.", "ORDER_NOT_FOUND"));
@@ -62,11 +66,14 @@ public class OrdersController(ApplicationDbContext db) : ControllerBase
     }
 
     [HttpPost("{id:guid}/confirm")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageSalesOrders), Idempotent]
     public async Task<IActionResult> Confirm(Guid id, CancellationToken ct) { var x = await db.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id, ct); if (x is null) return NotFound(ApiResponse<object>.Fail("Sipariş bulunamadı.", "ORDER_NOT_FOUND")); if (x.Status != "Draft" && x.Status != "Aktif") return Conflict(ApiResponse<object>.Fail("Yalnız taslak sipariş onaylanabilir.", "INVALID_STATUS")); if (!x.Items.Any(i => i.IsActive && !i.IsCancelled)) return BadRequest(ApiResponse<object>.Fail("Siparişte aktif kalem bulunmalıdır.", "NO_ACTIVE_ITEMS")); x.Status = "Confirmed"; await db.SaveChangesAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { x.Id, x.Status }, "Sipariş onaylandı.")); }
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageSalesOrders), Idempotent]
     public async Task<IActionResult> Cancel(Guid id, CancelOrderRequest request, CancellationToken ct) { var x = await db.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id, ct); if (x is null) return NotFound(ApiResponse<object>.Fail("Sipariş bulunamadı.", "ORDER_NOT_FOUND")); if (x.Items.Any(i => i.ProducedPairs > 0)) return Conflict(ApiResponse<object>.Fail("Üretime başlamış sipariş doğrudan iptal edilemez.", "PRODUCTION_STARTED")); if (string.IsNullOrWhiteSpace(request.Reason)) return BadRequest(ApiResponse<object>.Fail("İptal nedeni zorunludur.", "VALIDATION_ERROR")); x.Status = "Cancelled"; x.IsCancelled = true; x.IsActive = false; x.CancellationReason = request.Reason; x.CancelledAt = DateTime.UtcNow; foreach (var i in x.Items) { i.IsCancelled = true; i.IsActive = false; i.CancellationReason = request.Reason; } await db.SaveChangesAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { x.Id, x.Status }, "Sipariş iptal edildi.")); }
 
     [HttpPost("{id:guid}/duplicate")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageSalesOrders)]
     public async Task<IActionResult> Duplicate(Guid id, CancellationToken ct) { var source = await db.Orders.AsNoTracking().Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id, ct); if (source is null) return NotFound(ApiResponse<object>.Fail("Sipariş bulunamadı.", "ORDER_NOT_FOUND")); await using var tx = await db.Database.BeginTransactionAsync(ct); await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81002)", ct); var copy = new Order { OrderNumber = await NextNumber(DateTime.UtcNow, ct), OrderDate = DateTime.UtcNow, CustomerId = source.CustomerId, ProductId = source.ProductId, SizeRange = source.SizeRange, Color = source.Color, Quantity = source.Quantity, DueDate = source.DueDate, Currency = source.Currency, ExpectedPaymentMethod = source.ExpectedPaymentMethod, PaymentTermDays = source.PaymentTermDays, DiscountPercent = source.DiscountPercent, TaxPercent = source.TaxPercent, Notes = source.Notes, Status = "Draft", IsActive = true }; foreach (var i in source.Items.Where(i => i.IsActive && !i.IsCancelled)) copy.Items.Add(new OrderItem { LineNumber = i.LineNumber, ProductId = i.ProductId, MoldId = i.MoldId, ProductionType = i.ProductionType, FabricColor = i.FabricColor, SizeRange = i.SizeRange, Color = i.Color, QuantityPairs = i.QuantityPairs, UnitPrice = i.UnitPrice, DiscountPercent = i.DiscountPercent, TaxPercent = i.TaxPercent, RequestedDeliveryDate = i.RequestedDeliveryDate, Note = i.Note, Status = "Bekliyor", IsActive = true }); Calculate(copy); db.Orders.Add(copy); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { copy.Id, copy.OrderNumber }, "Sipariş çoğaltıldı.")); }
     [HttpPost("{id:guid}/recalculate")]
     public async Task<IActionResult> Recalculate(Guid id, CancellationToken ct) { var x = await db.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id, ct); if (x is null) return NotFound(ApiResponse<object>.Fail("Sipariş bulunamadı.", "ORDER_NOT_FOUND")); Calculate(x); await db.SaveChangesAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { x.Subtotal, x.DiscountAmount, x.TaxAmount, x.GrandTotal }, "Toplamlar yeniden hesaplandı.")); }

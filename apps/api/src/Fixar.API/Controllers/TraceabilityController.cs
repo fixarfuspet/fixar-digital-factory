@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Fixar.API.Controllers;
 
-[ApiController, ApiVersion("1.0"), AllowAnonymous]
+[ApiController, ApiVersion("1.0"), Authorize]
 [Route("api/v{version:apiVersion}/traceability")]
 public class TraceabilityController(ApplicationDbContext db) : ControllerBase
 {

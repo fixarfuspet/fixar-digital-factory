@@ -5,13 +5,14 @@ using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fixar.API.Controllers;
 
-[ApiController, ApiVersion("1.0"), AllowAnonymous]
+[ApiController, ApiVersion("1.0"), Authorize(Policy = AuthorizationPolicies.CanManageContainers)]
 [Route("api/v{version:apiVersion}/material-containers")]
 public sealed class MaterialContainersController(ApplicationDbContext db) : ControllerBase
 {

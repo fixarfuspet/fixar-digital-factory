@@ -5,6 +5,8 @@ using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +15,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/cutting-records")]
 public class CuttingRecordsController : ControllerBase
 {
@@ -112,6 +114,7 @@ public class CuttingRecordsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordCutting), Idempotent]
     public async Task<IActionResult> Create([FromBody] UpsertCuttingRecordRequest request, CancellationToken cancellationToken)
     {
         var validation = await ValidateRequest(request, null, cancellationToken);
@@ -205,6 +208,7 @@ public class CuttingRecordsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/complete")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordCutting), Idempotent]
     public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken)
     {
         var record = await _db.CuttingRecords.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);

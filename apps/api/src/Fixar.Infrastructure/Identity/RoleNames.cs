@@ -22,12 +22,19 @@ public static class RoleNames
     public const string QualityInspector = "Quality Inspector";
     public const string MaintenanceTechnician = "Maintenance Technician";
     public const string Guest = "Guest";
+    public const string InjectionOperator = "InjectionOperator";
+    public const string CuttingOperator = "CuttingOperator";
+    public const string QualityOperator = "QualityOperator";
+    public const string Purchasing = "Purchasing";
+    public const string Finance = "Finance";
+    public const string Viewer = "Viewer";
 
     public static readonly IReadOnlyList<string> All = new[]
     {
         CEO, FactoryManager, ProductionManager, WarehouseManager, PurchasingManager,
         FinanceManager, QualityManager, MaintenanceManager, HRManager, SalesManager,
         ProductionSupervisor, WarehouseOperator, ProductionOperator, QualityInspector,
-        MaintenanceTechnician, Guest
+        MaintenanceTechnician, Guest, InjectionOperator, CuttingOperator,
+        QualityOperator, Purchasing, Finance, Viewer
     };
 }

@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Fixar.API.Controllers;
 
-[ApiController, ApiVersion("1.0"), AllowAnonymous]
+[ApiController, ApiVersion("1.0"), Authorize(Policy = AuthorizationPolicies.CanManageCustomers)]
 [Route("api/v{version:apiVersion}/customers")]
 public class CustomersController(ApplicationDbContext db) : ControllerBase
 {

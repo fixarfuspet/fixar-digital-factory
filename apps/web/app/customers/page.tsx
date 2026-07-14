@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const API = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api/v1").replace(/\/$/, "");
+const API = (process.env.NEXT_PUBLIC_API_URL ?? "/api/backend/api/v1").replace(/\/$/, "");
 type Customer = { id:string; customerCode:string; name:string; contactName?:string; phone?:string; email?:string; city?:string; country?:string; defaultCurrency:string; paymentTermDays:number; creditLimit:number; isActive:boolean; activeOrderCount:number; createdAt:string };
 type Form = { id?:string; name:string; legalName:string; contactName:string; phone:string; email:string; taxOffice:string; taxNumber:string; addressLine1:string; addressLine2:string; district:string; city:string; postalCode:string; country:string; defaultCurrency:string; paymentTermDays:string; creditLimit:string; notes:string };
 const empty:Form={name:"",legalName:"",contactName:"",phone:"",email:"",taxOffice:"",taxNumber:"",addressLine1:"",addressLine2:"",district:"",city:"",postalCode:"",country:"Türkiye",defaultCurrency:"TRY",paymentTermDays:"0",creditLimit:"0",notes:""};

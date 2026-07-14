@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize(Policy = AuthorizationPolicies.CanManagePurchases)]
 [Route("api/v{version:apiVersion}/purchases")]
 public class PurchasesController : ControllerBase
 {

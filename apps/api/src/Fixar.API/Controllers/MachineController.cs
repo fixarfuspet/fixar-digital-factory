@@ -10,7 +10,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/machines")]
 public class MachineController : ControllerBase
 {

@@ -3,6 +3,8 @@ using Asp.Versioning;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +13,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/station-assignments")]
 public class StationAssignmentsController : ControllerBase
 {
@@ -167,6 +169,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("assign")]
+    [Authorize(Policy = AuthorizationPolicies.CanPlanProduction)]
     public async Task<IActionResult> Assign([FromBody] AssignStationRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -287,6 +290,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("add-turn")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> AddTurn([FromBody] AddTurnRequest request, CancellationToken cancellationToken)
     {
         if (request.TurnCount <= 0)

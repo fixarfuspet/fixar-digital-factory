@@ -104,7 +104,7 @@ type ApiResponse<T> = {
 
 const API =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "http://localhost:5000/api/v1";
+  "/api/backend/api/v1";
 const PRODUCT_MARKER = "\n\n---FIXAR_PRODUCT_MASTER_JSON---\n";
 const RECIPE_MARKER = "\n\n---FIXAR_RECIPE_UI_JSON---\n";
 const CONTROL_CLASS =

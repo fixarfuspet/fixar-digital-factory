@@ -69,7 +69,7 @@ type ProductionRecipe = {
   isoSetting: string;
 };
 
-const API = "http://localhost:5000/api/v1";
+const API = "/api/backend/api/v1";
 const PAIRS_PER_MOLD_HOUR = 9;
 
 export default function AssignmentModal({ open, station, onClose }: Props) {

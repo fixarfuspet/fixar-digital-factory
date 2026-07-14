@@ -26,7 +26,7 @@ type AssignmentDetail = {
   note?: string;
 };
 
-const API = "http://localhost:5000/api/v1";
+const API = "/api/backend/api/v1";
 
 export default function ManageAssignmentModal({ open, station, onClose }: Props) {
   const [item, setItem] = useState<AssignmentDetail | null>(null);

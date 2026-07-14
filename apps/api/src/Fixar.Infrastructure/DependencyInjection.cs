@@ -75,7 +75,32 @@ public static class DependencyInjection
                 };
             });
 
-        services.AddAuthorization();
+        services.AddAuthorization(options =>
+        {
+            static void Roles(Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder p, params string[] roles) => p.RequireRole(roles);
+            var ceo = RoleNames.CEO;
+            options.AddPolicy(AuthorizationPolicies.CanManageUsers, p => Roles(p, ceo));
+            options.AddPolicy(AuthorizationPolicies.CanManageCustomers, p => Roles(p, ceo, RoleNames.SalesManager));
+            options.AddPolicy(AuthorizationPolicies.CanManageSalesOrders, p => Roles(p, ceo, RoleNames.SalesManager, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanManagePurchases, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing));
+            options.AddPolicy(AuthorizationPolicies.CanManageMaterials, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing));
+            options.AddPolicy(AuthorizationPolicies.CanManageLots, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing, RoleNames.QualityManager, RoleNames.QualityInspector, RoleNames.QualityOperator));
+            options.AddPolicy(AuthorizationPolicies.CanManageContainers, p => Roles(p, ceo, RoleNames.WarehouseManager, RoleNames.WarehouseOperator));
+            options.AddPolicy(AuthorizationPolicies.CanManageWorkOrders, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.FactoryManager));
+            options.AddPolicy(AuthorizationPolicies.CanPlanProduction, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.ProductionSupervisor));
+            options.AddPolicy(AuthorizationPolicies.CanRecordProduction, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.ProductionSupervisor, RoleNames.ProductionOperator, RoleNames.InjectionOperator));
+            options.AddPolicy(AuthorizationPolicies.CanRecordQuality, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.QualityManager, RoleNames.QualityInspector, RoleNames.QualityOperator));
+            options.AddPolicy(AuthorizationPolicies.CanRecordCutting, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.CuttingOperator));
+            options.AddPolicy(AuthorizationPolicies.CanManageBoxes, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.CuttingOperator, RoleNames.WarehouseManager, RoleNames.WarehouseOperator));
+            options.AddPolicy(AuthorizationPolicies.CanManageWarehouse, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.WarehouseManager, RoleNames.WarehouseOperator));
+            options.AddPolicy(AuthorizationPolicies.CanManageShipments, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.WarehouseManager, RoleNames.WarehouseOperator));
+            options.AddPolicy(AuthorizationPolicies.CanManageReservations, p => Roles(p, ceo, RoleNames.ProductionManager));
+            options.AddPolicy(AuthorizationPolicies.CanRecordConsumption, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.ProductionOperator, RoleNames.InjectionOperator, RoleNames.QualityOperator));
+            options.AddPolicy(AuthorizationPolicies.CanReverseConsumption, p => Roles(p, ceo, RoleNames.ProductionManager));
+            options.AddPolicy(AuthorizationPolicies.CanViewCosts, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewTraceability, p => p.RequireAuthenticatedUser());
+            options.AddPolicy(AuthorizationPolicies.CanOverrideProductionRules, p => Roles(p, ceo, RoleNames.ProductionManager));
+        });
         services.AddHttpContextAccessor();
 
         services.AddScoped<ICurrentUserService, CurrentUserService>();

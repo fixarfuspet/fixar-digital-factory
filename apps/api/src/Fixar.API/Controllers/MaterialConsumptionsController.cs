@@ -5,13 +5,15 @@ using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fixar.API.Controllers;
 
-[ApiController, ApiVersion("1.0"), AllowAnonymous]
+[ApiController, ApiVersion("1.0"), Authorize]
 [Route("api/v{version:apiVersion}/material-consumptions")]
 public sealed class MaterialConsumptionsController(ApplicationDbContext db) : ControllerBase
 {
@@ -34,6 +36,7 @@ public sealed class MaterialConsumptionsController(ApplicationDbContext db) : Co
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordConsumption), Idempotent]
     public async Task<IActionResult> Create([FromBody] ConsumptionRequest request, CancellationToken ct)
     {
         if (request.Quantity <= 0) return BadRequest(Fail("Tüketim miktarı sıfırdan büyük olmalıdır.", "INVALID_QUANTITY")); if (!Types.Contains(request.ConsumptionType)) return BadRequest(Fail("Tüketim tipi geçersiz.", "INVALID_TYPE")); if (string.IsNullOrWhiteSpace(request.Unit)) return BadRequest(Fail("Tüketim birimi zorunludur.", "UNIT_REQUIRED"));
@@ -53,6 +56,7 @@ public sealed class MaterialConsumptionsController(ApplicationDbContext db) : Co
     }
 
     [HttpPost("{id:guid}/reverse")]
+    [Authorize(Policy = AuthorizationPolicies.CanReverseConsumption), Idempotent]
     public async Task<IActionResult> Reverse(Guid id, [FromBody] ReverseRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Reason)) return BadRequest(Fail("Geri alma gerekçesi zorunludur.", "REASON_REQUIRED")); await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct); var c = await db.MaterialConsumptions.Include(x => x.StockReservation).Include(x => x.StockReservationLine).Include(x => x.StockItem).Include(x => x.MaterialLot).Include(x => x.MaterialContainer).FirstOrDefaultAsync(x => x.Id == id, ct); if (c is null) return NotFound(Fail("Hammadde tüketimi bulunamadı.", "CONSUMPTION_NOT_FOUND")); if (c.IsReversed) return BadRequest(Fail("Bu tüketim daha önce geri alınmış.", "ALREADY_REVERSED")); if (c.StockReservationLine.ConsumedQuantity < c.Quantity) return Conflict(Fail("Rezervasyon tüketim miktarı tutarsız.", "CONSUMPTION_CONFLICT")); if (c.MaterialLot.CurrentQuantity + c.Quantity > c.MaterialLot.InitialQuantity || (c.MaterialContainer != null && c.MaterialContainer.CurrentQuantity + c.Quantity > c.MaterialContainer.InitialQuantity)) return BadRequest(Fail("Geri alma sonrası miktar başlangıç miktarını aşamaz.", "INITIAL_QUANTITY_EXCEEDED"));

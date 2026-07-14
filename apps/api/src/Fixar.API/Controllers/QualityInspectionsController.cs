@@ -5,6 +5,7 @@ using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/quality-inspections")]
 public class QualityInspectionsController : ControllerBase
 {
@@ -117,6 +118,7 @@ public class QualityInspectionsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality)]
     public async Task<IActionResult> Create([FromBody] UpsertQualityInspectionRequest request, CancellationToken cancellationToken)
     {
         var validation = ValidateRequest(request, requireCompleteFields: false);
@@ -155,6 +157,7 @@ public class QualityInspectionsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpsertQualityInspectionRequest request, CancellationToken cancellationToken)
     {
         var validation = ValidateRequest(request, requireCompleteFields: false);

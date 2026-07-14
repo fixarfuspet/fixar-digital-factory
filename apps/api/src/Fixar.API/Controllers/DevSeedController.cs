@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
 using Fixar.Infrastructure.Persistence;
+using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,20 +11,23 @@ namespace Fixar.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize(Policy = AuthorizationPolicies.CanManageUsers)]
 [Route("api/v{version:apiVersion}/dev-seed")]
 public class DevSeedController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IWebHostEnvironment _environment;
 
-    public DevSeedController(ApplicationDbContext db)
+    public DevSeedController(ApplicationDbContext db, IWebHostEnvironment environment)
     {
         _db = db;
+        _environment = environment;
     }
 
     [HttpPost]
     public async Task<IActionResult> Seed(CancellationToken cancellationToken)
     {
+        if (!_environment.IsDevelopment()) return NotFound();
         for (var i = 1; i <= 24; i++)
         {
             var exists = await _db.InjectionStations

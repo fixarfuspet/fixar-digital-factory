@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-const API = "http://localhost:5000/api/v1";
+const API = "/api/backend/api/v1";
 type Lot = { id:string; lotNumber:string; supplierLotNumber?:string; materialId:string; materialCode?:string; materialName:string; stockItemId:string; stockCode?:string; supplierName?:string; receivedDate:string; expiryDate?:string; initialQuantity:number; currentQuantity:number; reservedQuantity:number; availableQuantity:number; unit:string; warehouse?:string; rackCode?:string; status:string; qualityStatus:string; isBlocked:boolean; isActive:boolean; containerCount:number };
 type Choice = { id:string; name:string; code?:string; materialId?:string; unit?:string };
 type Summary = { total:number; available:number; qualityPending:number; blocked:number; expired:number; expiringSoon:number; depleted:number };

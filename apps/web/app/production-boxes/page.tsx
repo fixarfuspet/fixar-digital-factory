@@ -8,7 +8,7 @@ type Box = { id: string; boxNumber: string; cuttingRecordId?: string | null; cut
 type CuttingRecord = { id: string; recordNumber: string; customerName?: string | null; productName?: string | null; goodPairs: number; boxedPairs: number; remainingForPacking: number; status: string };
 type Summary = { totalBoxes?: number; totalPairs?: number; packedBoxes?: number; packedPairs?: number; warehouseBoxes?: number; readyBoxes?: number; shippedBoxes?: number };
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:5000/api/v1";
+const API = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/api/backend/api/v1";
 const CONTROL = "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none focus:border-emerald-400/60";
 
 export default function ProductionBoxesPage() {

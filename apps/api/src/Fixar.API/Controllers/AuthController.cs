@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Fixar.Application.Common.Interfaces;
 using Fixar.Application.Common.Models;
 using Fixar.Application.Features.Auth;
+using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,7 +23,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    [AllowAnonymous]
+    [Authorize(Policy = AuthorizationPolicies.CanManageUsers)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var result = await _authService.RegisterAsync(request, cancellationToken);
@@ -82,6 +83,7 @@ public class AuthController : ControllerBase
         var response = new
         {
             _currentUserService.UserId,
+            _currentUserService.UserName,
             _currentUserService.Email,
             _currentUserService.Roles
         };

@@ -13,7 +13,7 @@ namespace Fixar.API.Controllers;
 // The active production source is StationAssignment + InjectionStation + OrderItem.
 [ApiController]
 [ApiVersion("1.0")]
-[AllowAnonymous]
+[Authorize]
 [Route("api/v{version:apiVersion}/live-production")]
 public class LiveProductionController : ControllerBase
 {

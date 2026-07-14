@@ -37,7 +37,7 @@ type SupplierFormState = {
   isActive: boolean;
 };
 
-const API = "http://localhost:5000/api/v1";
+const API = "/api/backend/api/v1";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60";
 
