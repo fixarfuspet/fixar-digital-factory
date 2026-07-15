@@ -27,4 +27,7 @@ public static class AuthorizationPolicies
     public const string CanManageCostSettings = nameof(CanManageCostSettings);
     public const string CanManageExchangeRates = nameof(CanManageExchangeRates);
     public const string CanFinalizeCosts = nameof(CanFinalizeCosts);
+    public const string CanViewExecutiveDashboard = nameof(CanViewExecutiveDashboard);
+    public const string CanViewProfitability = nameof(CanViewProfitability);
+    public const string CanManageProfitabilitySettings = nameof(CanManageProfitabilitySettings);
 }

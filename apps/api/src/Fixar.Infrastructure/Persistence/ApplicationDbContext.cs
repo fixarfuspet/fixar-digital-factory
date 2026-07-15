@@ -77,6 +77,7 @@ public DbSet<CostSettings> CostSettings => Set<CostSettings>();
 public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
 public DbSet<WorkOrderCostSnapshot> WorkOrderCostSnapshots => Set<WorkOrderCostSnapshot>();
 public DbSet<WorkOrderCostLine> WorkOrderCostLines => Set<WorkOrderCostLine>();
+public DbSet<ProfitabilitySettings> ProfitabilitySettings => Set<ProfitabilitySettings>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -127,6 +128,7 @@ public DbSet<WorkOrderCostLine> WorkOrderCostLines => Set<WorkOrderCostLine>();
         builder.Entity<WorkOrderCostSnapshot>().HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
         builder.Entity<WorkOrderCostLine>().HasIndex(x => new { x.WorkOrderCostSnapshotId, x.CostCategory });
         builder.Entity<WorkOrderCostLine>().HasOne(x => x.WorkOrderCostSnapshot).WithMany(x => x.Lines).HasForeignKey(x => x.WorkOrderCostSnapshotId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<ProfitabilitySettings>().HasIndex(x => new { x.IsActive, x.EffectiveFrom, x.EffectiveTo });
 
         builder.Entity<Product>()
             .HasMany(x => x.Molds)

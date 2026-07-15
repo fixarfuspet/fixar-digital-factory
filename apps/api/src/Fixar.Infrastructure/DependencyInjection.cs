@@ -104,6 +104,9 @@ public static class DependencyInjection
             options.AddPolicy(AuthorizationPolicies.CanManageCostSettings, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
             options.AddPolicy(AuthorizationPolicies.CanManageExchangeRates, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
             options.AddPolicy(AuthorizationPolicies.CanFinalizeCosts, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance, RoleNames.ProductionManager));
+            options.AddPolicy(AuthorizationPolicies.CanViewExecutiveDashboard, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewProfitability, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance, RoleNames.ProductionManager));
+            options.AddPolicy(AuthorizationPolicies.CanManageProfitabilitySettings, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
         });
         services.AddHttpContextAccessor();
 
@@ -111,6 +114,7 @@ public static class DependencyInjection
         services.AddScoped<IDateTimeService, DateTimeService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IWorkOrderCostService, WorkOrderCostService>();
+        services.AddScoped<IProfitabilityReportService, ProfitabilityReportService>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ApplicationDbContextInitialiser>();
