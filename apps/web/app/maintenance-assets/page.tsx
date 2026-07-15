@@ -1,1 +1,1 @@
-import{MaintenanceView}from"../components/maintenance/MaintenanceView";export default function Page(){return <MaintenanceView title="Bakım Varlıkları" endpoint="maintenance-assets"/>}
+import{MaintenanceOperations}from"../components/maintenance/MaintenanceOperations";export default function Page(){return <MaintenanceOperations kind="assets"/>}
