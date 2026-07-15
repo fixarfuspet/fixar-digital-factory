@@ -78,6 +78,10 @@ public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
 public DbSet<WorkOrderCostSnapshot> WorkOrderCostSnapshots => Set<WorkOrderCostSnapshot>();
 public DbSet<WorkOrderCostLine> WorkOrderCostLines => Set<WorkOrderCostLine>();
 public DbSet<ProfitabilitySettings> ProfitabilitySettings => Set<ProfitabilitySettings>();
+public DbSet<CustomerReceivable> CustomerReceivables => Set<CustomerReceivable>();
+public DbSet<CustomerCollection> CustomerCollections => Set<CustomerCollection>();
+public DbSet<CollectionAllocation> CollectionAllocations => Set<CollectionAllocation>();
+public DbSet<CustomerLedgerEntry> CustomerLedgerEntries => Set<CustomerLedgerEntry>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -129,6 +133,21 @@ public DbSet<ProfitabilitySettings> ProfitabilitySettings => Set<ProfitabilitySe
         builder.Entity<WorkOrderCostLine>().HasIndex(x => new { x.WorkOrderCostSnapshotId, x.CostCategory });
         builder.Entity<WorkOrderCostLine>().HasOne(x => x.WorkOrderCostSnapshot).WithMany(x => x.Lines).HasForeignKey(x => x.WorkOrderCostSnapshotId).OnDelete(DeleteBehavior.Cascade);
         builder.Entity<ProfitabilitySettings>().HasIndex(x => new { x.IsActive, x.EffectiveFrom, x.EffectiveTo });
+        builder.Entity<CustomerReceivable>().HasIndex(x => x.ReceivableNumber).IsUnique();
+        builder.Entity<CustomerReceivable>().HasIndex(x => x.OrderId).IsUnique().HasFilter("\"OrderId\" IS NOT NULL AND \"IsCancelled\" = FALSE");
+        builder.Entity<CustomerReceivable>().HasIndex(x => new { x.CustomerId, x.Currency, x.Status, x.DueDate });
+        builder.Entity<CustomerReceivable>().HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<CustomerReceivable>().HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<CustomerCollection>().HasIndex(x => x.CollectionNumber).IsUnique();
+        builder.Entity<CustomerCollection>().HasIndex(x => new { x.CustomerId, x.Currency, x.Status, x.CollectionDate });
+        builder.Entity<CustomerCollection>().HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<CollectionAllocation>().HasIndex(x => new { x.CustomerCollectionId, x.CustomerReceivableId });
+        builder.Entity<CollectionAllocation>().HasOne(x => x.CustomerCollection).WithMany(x => x.Allocations).HasForeignKey(x => x.CustomerCollectionId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<CollectionAllocation>().HasOne(x => x.CustomerReceivable).WithMany(x => x.Allocations).HasForeignKey(x => x.CustomerReceivableId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<CustomerLedgerEntry>().HasIndex(x => x.EntryNumber).IsUnique();
+        builder.Entity<CustomerLedgerEntry>().HasIndex(x => new { x.SourceType, x.SourceId, x.EntryType }).IsUnique();
+        builder.Entity<CustomerLedgerEntry>().HasIndex(x => new { x.CustomerId, x.Currency, x.TransactionDate });
+        builder.Entity<CustomerLedgerEntry>().HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Product>()
             .HasMany(x => x.Molds)

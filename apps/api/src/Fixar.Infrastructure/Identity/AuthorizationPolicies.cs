@@ -30,4 +30,11 @@ public static class AuthorizationPolicies
     public const string CanViewExecutiveDashboard = nameof(CanViewExecutiveDashboard);
     public const string CanViewProfitability = nameof(CanViewProfitability);
     public const string CanManageProfitabilitySettings = nameof(CanManageProfitabilitySettings);
+    public const string CanViewCustomerFinance = nameof(CanViewCustomerFinance);
+    public const string CanManageReceivables = nameof(CanManageReceivables);
+    public const string CanRecordCollections = nameof(CanRecordCollections);
+    public const string CanAllocateCollections = nameof(CanAllocateCollections);
+    public const string CanReverseCollections = nameof(CanReverseCollections);
+    public const string CanViewCustomerLedger = nameof(CanViewCustomerLedger);
+    public const string CanExportCustomerStatement = nameof(CanExportCustomerStatement);
 }

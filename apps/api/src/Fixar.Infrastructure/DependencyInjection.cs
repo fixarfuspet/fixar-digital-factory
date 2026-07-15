@@ -107,6 +107,13 @@ public static class DependencyInjection
             options.AddPolicy(AuthorizationPolicies.CanViewExecutiveDashboard, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
             options.AddPolicy(AuthorizationPolicies.CanViewProfitability, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance, RoleNames.ProductionManager));
             options.AddPolicy(AuthorizationPolicies.CanManageProfitabilitySettings, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewCustomerFinance, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanManageReceivables, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanRecordCollections, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanAllocateCollections, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanReverseCollections, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewCustomerLedger, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanExportCustomerStatement, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
         });
         services.AddHttpContextAccessor();
 
