@@ -6,6 +6,7 @@ using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Fixar.API.Security;
 
 namespace Fixar.API.Controllers;
 
@@ -333,6 +334,9 @@ public class PurchasesController : ControllerBase
 
         return Ok(ApiResponse<object>.SuccessResponse(ToPurchaseResponse(purchase), "Satın alma iptal edildi."));
     }
+
+    [HttpPost("{id:guid}/complete"),Idempotent]
+    public async Task<IActionResult>Complete(Guid id,CancellationToken ct){await using var tx=await _db.Database.BeginTransactionAsync(ct);var p=await _db.PurchaseOrders.FirstOrDefaultAsync(x=>x.Id==id,ct);if(p is null)return NotFound(ApiResponse<object>.Fail("Satın alma siparişi bulunamadı.","NOT_FOUND"));if(await _db.SupplierPayables.AnyAsync(x=>x.PurchaseOrderId==id&&!x.IsCancelled,ct))return Conflict(ApiResponse<object>.Fail("Bu satın alma siparişi için borç kaydı zaten oluşturulmuş.","DUPLICATE"));var s=await _db.Suppliers.FirstOrDefaultAsync(x=>(p.SupplierCode!=null&&x.Code==p.SupplierCode)||x.Name==p.SupplierName,ct);if(s is null)return Conflict(ApiResponse<object>.Fail("Tedarikçi kartı bulunamadı; kod veya ad eşleştirmesi gereklidir.","SUPPLIER_NOT_FOUND"));p.Status="Completed";var due=p.DueDate??p.OrderDate.AddDays(s.PaymentTermDays??0);var payable=new SupplierPayable{Id=Guid.NewGuid(),PayableNumber=await SupplierFinanceSupport.Next(_db,"PAY",p.OrderDate,ct),SupplierId=s.Id,PurchaseOrderId=p.Id,PurchaseOrderNumberSnapshot=p.InvoiceNo??p.DocumentNo,TransactionDate=p.OrderDate,DueDate=due,Currency=p.Currency,OriginalAmount=p.GrandTotal,OutstandingAmount=p.GrandTotal,Status=due.Date<DateTime.UtcNow.Date?"Overdue":"Open",SourceType="PurchaseOrder",Description="Satın alma GrandTotal (KDV dahil)"};_db.SupplierPayables.Add(payable);_db.SupplierLedgerEntries.Add(new SupplierLedgerEntry{Id=Guid.NewGuid(),EntryNumber=await SupplierFinanceSupport.Next(_db,"SLE",p.OrderDate,ct),SupplierId=s.Id,TransactionDate=p.OrderDate,DueDate=due,EntryType="Credit",SourceType="Payable",SourceId=payable.Id,ReferenceNumber=payable.PayableNumber,Currency=p.Currency,CreditAmount=p.GrandTotal,Description=payable.Description,Created=DateTime.UtcNow});await _db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return Ok(ApiResponse<object>.SuccessResponse(new{PurchaseOrderId=p.Id,p.Status,PayableId=payable.Id,payable.PayableNumber}));}
 
     private async Task<IActionResult?> ValidatePurchaseRequest(CreatePurchaseOrderRequest request, CancellationToken cancellationToken)
     {

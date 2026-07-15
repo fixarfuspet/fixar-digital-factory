@@ -6,7 +6,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
   "Warehouse Operator": ["stocks", "lots", "containers", "warehouse", "shipments"],
   QualityOperator: ["quality", "lots"],
   Purchasing: ["suppliers", "purchases", "materials", "lots"],
-  Finance: ["orders", "purchases", "costs", "customer-finance", "financial-accounts", "cheques", "cash-flow"],
+  Finance: ["orders", "purchases", "costs", "customer-finance", "financial-accounts", "cheques", "cash-flow", "supplier-finance"],
   Viewer: ["read"],
 };
 

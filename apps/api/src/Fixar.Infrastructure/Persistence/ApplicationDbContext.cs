@@ -86,6 +86,7 @@ public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
 public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
 public DbSet<CustomerCheque> CustomerCheques => Set<CustomerCheque>();
 public DbSet<ChequeEvent> ChequeEvents => Set<ChequeEvent>();
+public DbSet<SupplierPayable> SupplierPayables=>Set<SupplierPayable>();public DbSet<SupplierPayment>SupplierPayments=>Set<SupplierPayment>();public DbSet<SupplierPaymentAllocation>SupplierPaymentAllocations=>Set<SupplierPaymentAllocation>();public DbSet<SupplierLedgerEntry>SupplierLedgerEntries=>Set<SupplierLedgerEntry>();public DbSet<ChequeEndorsement>ChequeEndorsements=>Set<ChequeEndorsement>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -165,6 +166,11 @@ public DbSet<ChequeEvent> ChequeEvents => Set<ChequeEvent>();
         builder.Entity<CustomerCheque>().HasOne(x=>x.Customer).WithMany().HasForeignKey(x=>x.CustomerId).OnDelete(DeleteBehavior.Restrict);
         builder.Entity<ChequeEvent>().HasIndex(x=>new{x.CustomerChequeId,x.EventDate});
         builder.Entity<ChequeEvent>().HasOne(x=>x.CustomerCheque).WithMany(x=>x.Events).HasForeignKey(x=>x.CustomerChequeId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<SupplierPayable>().HasIndex(x=>x.PayableNumber).IsUnique();builder.Entity<SupplierPayable>().HasIndex(x=>x.PurchaseOrderId).IsUnique().HasFilter("\"PurchaseOrderId\" IS NOT NULL AND \"IsCancelled\"=FALSE");builder.Entity<SupplierPayable>().HasIndex(x=>new{x.SupplierId,x.Currency,x.Status,x.DueDate});builder.Entity<SupplierPayable>().HasOne(x=>x.Supplier).WithMany().HasForeignKey(x=>x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<SupplierPayment>().HasIndex(x=>x.PaymentNumber).IsUnique();builder.Entity<SupplierPayment>().HasIndex(x=>new{x.SupplierId,x.Currency,x.Status,x.PaymentDate});builder.Entity<SupplierPayment>().HasOne(x=>x.Supplier).WithMany().HasForeignKey(x=>x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<SupplierPaymentAllocation>().HasIndex(x=>new{x.SupplierPaymentId,x.SupplierPayableId});builder.Entity<SupplierPaymentAllocation>().HasOne(x=>x.SupplierPayment).WithMany(x=>x.Allocations).HasForeignKey(x=>x.SupplierPaymentId).OnDelete(DeleteBehavior.Restrict);builder.Entity<SupplierPaymentAllocation>().HasOne(x=>x.SupplierPayable).WithMany(x=>x.Allocations).HasForeignKey(x=>x.SupplierPayableId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<SupplierLedgerEntry>().HasIndex(x=>x.EntryNumber).IsUnique();builder.Entity<SupplierLedgerEntry>().HasIndex(x=>new{x.SourceType,x.SourceId,x.EntryType}).IsUnique();builder.Entity<SupplierLedgerEntry>().HasIndex(x=>new{x.SupplierId,x.Currency,x.TransactionDate});builder.Entity<SupplierLedgerEntry>().HasOne(x=>x.Supplier).WithMany().HasForeignKey(x=>x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<ChequeEndorsement>().HasIndex(x=>x.EndorsementNumber).IsUnique();builder.Entity<ChequeEndorsement>().HasIndex(x=>x.CustomerChequeId).IsUnique().HasFilter("\"Status\"='Active'");builder.Entity<ChequeEndorsement>().HasOne(x=>x.CustomerCheque).WithMany().HasForeignKey(x=>x.CustomerChequeId).OnDelete(DeleteBehavior.Restrict);builder.Entity<ChequeEndorsement>().HasOne(x=>x.Supplier).WithMany().HasForeignKey(x=>x.SupplierId).OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Product>()
             .HasMany(x => x.Molds)

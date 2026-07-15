@@ -46,4 +46,5 @@ public static class AuthorizationPolicies
     public const string CanManageChequePortfolio = nameof(CanManageChequePortfolio);
     public const string CanCollectCheque = nameof(CanCollectCheque);
     public const string CanBounceCheque = nameof(CanBounceCheque);
+    public const string CanViewSupplierFinance=nameof(CanViewSupplierFinance);public const string CanManageSupplierPayables=nameof(CanManageSupplierPayables);public const string CanRecordSupplierPayments=nameof(CanRecordSupplierPayments);public const string CanAllocateSupplierPayments=nameof(CanAllocateSupplierPayments);public const string CanReverseSupplierPayments=nameof(CanReverseSupplierPayments);public const string CanViewSupplierLedger=nameof(CanViewSupplierLedger);public const string CanManageChequeEndorsements=nameof(CanManageChequeEndorsements);public const string CanViewPaymentForecast=nameof(CanViewPaymentForecast);
 }

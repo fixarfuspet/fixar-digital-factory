@@ -74,6 +74,12 @@ public class CustomerCheque : BaseAuditableEntity
     public DateTime? ReversedAt { get; set; }
     public string? ReversedBy { get; set; }
     public string? ReversalReason { get; set; }
+    public Guid? EndorsedSupplierId { get; set; }
+    public Guid? SupplierPaymentId { get; set; }
+    public DateTime? EndorsedAt { get; set; }
+    public string? EndorsedBy { get; set; }
+    public string? EndorsementReference { get; set; }
+    public string? EndorsementNotes { get; set; }
     public ICollection<ChequeEvent> Events { get; set; } = new List<ChequeEvent>();
 }
 
