@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ success: false, message: "Invalid request body." }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Geçersiz istek." }, { status: 400 });
   }
 
   const email = typeof body.email === "string" ? body.email.trim() : "";
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   if (!email || !password) {
     return NextResponse.json(
-      { success: false, message: "Email and password are required." },
+      { success: false, message: "E-posta ve şifre zorunludur." },
       { status: 400 }
     );
   }
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     });
   } catch {
     return NextResponse.json(
-      { success: false, message: "Unable to reach the FIXAR OS API. Please try again later." },
+      { success: false, message: "Sunucuya bağlanılamadı." },
       { status: 502 }
     );
   }
@@ -46,14 +46,14 @@ export async function POST(request: Request) {
     payload = await backendResponse.json();
   } catch {
     return NextResponse.json(
-      { success: false, message: "Unexpected response from the FIXAR OS API." },
+      { success: false, message: "Sunucuya bağlanılamadı." },
       { status: 502 }
     );
   }
 
   if (!backendResponse.ok || !payload.success || !payload.data) {
     return NextResponse.json(
-      { success: false, message: payload.message ?? "Invalid email or password." },
+      { success: false, message: "E-posta veya şifre hatalı." },
       { status: backendResponse.status >= 400 ? backendResponse.status : 401 }
     );
   }

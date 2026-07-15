@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 export function LoginForm() {
@@ -9,6 +9,13 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (query.has("email") || query.has("password")) {
+      window.history.replaceState(window.history.state, "", window.location.pathname);
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,21 +32,21 @@ export function LoginForm() {
       const payload: { success: boolean; message?: string } = await response.json();
 
       if (!response.ok || !payload.success) {
-        setError(payload.message ?? "Invalid email or password.");
+        setError(response.status === 502 ? "Sunucuya bağlanılamadı." : "E-posta veya şifre hatalı.");
         setLoading(false);
         return;
       }
 
-      router.push("/dashboard");
+      router.replace("/dashboard");
       router.refresh();
     } catch {
-      setError("Unable to reach the FIXAR OS API. Please try again.");
+      setError("Sunucuya bağlanılamadı.");
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <form action="/api/auth/login" method="post" onSubmit={handleSubmit} className="space-y-4" noValidate>
       <input
         className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-white outline-none transition focus:border-emerald-400/50"
         placeholder="E-posta"

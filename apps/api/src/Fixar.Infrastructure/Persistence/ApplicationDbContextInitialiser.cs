@@ -86,6 +86,12 @@ public class ApplicationDbContextInitialiser
                 var created = await _userManager.CreateAsync(user, password);
                 if (!created.Succeeded) throw new InvalidOperationException($"Development test user could not be created: {definition.Name}");
             }
+            else if (user.Email?.EndsWith("@fixar.test", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var reset = await _userManager.ResetPasswordAsync(user, resetToken, password);
+                if (!reset.Succeeded) throw new InvalidOperationException($"Development test user password could not be refreshed: {definition.Name}");
+            }
             if (!user.IsActive) { user.IsActive = true; await _userManager.UpdateAsync(user); }
             var currentRoles = await _userManager.GetRolesAsync(user);
             if (!currentRoles.Contains(definition.Role)) await _userManager.AddToRoleAsync(user, definition.Role);
