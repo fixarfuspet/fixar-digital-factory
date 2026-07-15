@@ -46,6 +46,11 @@ public class CustomerCollection : BaseAuditableEntity
     public string? ReversedBy { get; set; }
     public string? ReversalReason { get; set; }
     public Guid? ReversalCollectionId { get; set; }
+    public Guid? FinancialAccountId { get; set; }
+    public Guid? CustomerChequeId { get; set; }
+    public Guid? FinancialTransactionId { get; set; }
+    public string FinancePostingStatus { get; set; } = "Pending";
+    public string? FinancePostingWarning { get; set; }
     public ICollection<CollectionAllocation> Allocations { get; set; } = new List<CollectionAllocation>();
 }
 

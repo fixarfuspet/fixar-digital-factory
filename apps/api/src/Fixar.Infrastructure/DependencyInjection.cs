@@ -114,6 +114,15 @@ public static class DependencyInjection
             options.AddPolicy(AuthorizationPolicies.CanReverseCollections, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
             options.AddPolicy(AuthorizationPolicies.CanViewCustomerLedger, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
             options.AddPolicy(AuthorizationPolicies.CanExportCustomerStatement, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewFinancialAccounts, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanManageFinancialAccounts, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewCashFlow, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanRecordFinancialTransactions, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanReverseFinancialTransactions, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewChequePortfolio, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanManageChequePortfolio, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanCollectCheque, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanBounceCheque, p => Roles(p, ceo, RoleNames.FinanceManager, RoleNames.Finance));
         });
         services.AddHttpContextAccessor();
 
@@ -122,6 +131,7 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IWorkOrderCostService, WorkOrderCostService>();
         services.AddScoped<IProfitabilityReportService, ProfitabilityReportService>();
+        services.AddScoped<IFinancialCashFlowService, FinancialCashFlowService>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ApplicationDbContextInitialiser>();

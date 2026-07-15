@@ -82,6 +82,10 @@ public DbSet<CustomerReceivable> CustomerReceivables => Set<CustomerReceivable>(
 public DbSet<CustomerCollection> CustomerCollections => Set<CustomerCollection>();
 public DbSet<CollectionAllocation> CollectionAllocations => Set<CollectionAllocation>();
 public DbSet<CustomerLedgerEntry> CustomerLedgerEntries => Set<CustomerLedgerEntry>();
+public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
+public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
+public DbSet<CustomerCheque> CustomerCheques => Set<CustomerCheque>();
+public DbSet<ChequeEvent> ChequeEvents => Set<ChequeEvent>();
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.AddInterceptors(_auditableEntitySaveChangesInterceptor);
@@ -148,6 +152,19 @@ public DbSet<CustomerLedgerEntry> CustomerLedgerEntries => Set<CustomerLedgerEnt
         builder.Entity<CustomerLedgerEntry>().HasIndex(x => new { x.SourceType, x.SourceId, x.EntryType }).IsUnique();
         builder.Entity<CustomerLedgerEntry>().HasIndex(x => new { x.CustomerId, x.Currency, x.TransactionDate });
         builder.Entity<CustomerLedgerEntry>().HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<FinancialAccount>().HasIndex(x=>x.AccountCode).IsUnique();
+        builder.Entity<FinancialAccount>().HasIndex(x=>x.Iban).IsUnique().HasFilter("\"Iban\" IS NOT NULL AND \"IsActive\" = TRUE");
+        builder.Entity<FinancialAccount>().HasIndex(x=>new{x.AccountType,x.Currency,x.IsActive});
+        builder.Entity<FinancialTransaction>().HasIndex(x=>x.TransactionNumber).IsUnique();
+        builder.Entity<FinancialTransaction>().HasIndex(x=>new{x.FinancialAccountId,x.Currency,x.TransactionDate});
+        builder.Entity<FinancialTransaction>().HasIndex(x=>new{x.SourceType,x.SourceId,x.Direction}).IsUnique().HasFilter("\"SourceId\" IS NOT NULL AND \"IsReversed\" = FALSE AND \"SourceType\" <> 'AccountTransfer'");
+        builder.Entity<FinancialTransaction>().HasOne(x=>x.FinancialAccount).WithMany().HasForeignKey(x=>x.FinancialAccountId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<CustomerCheque>().HasIndex(x=>x.PortfolioNumber).IsUnique();
+        builder.Entity<CustomerCheque>().HasIndex(x=>new{x.CustomerId,x.Currency,x.Status,x.DueDate});
+        builder.Entity<CustomerCheque>().HasIndex(x=>x.CustomerCollectionId).IsUnique().HasFilter("\"CustomerCollectionId\" IS NOT NULL");
+        builder.Entity<CustomerCheque>().HasOne(x=>x.Customer).WithMany().HasForeignKey(x=>x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<ChequeEvent>().HasIndex(x=>new{x.CustomerChequeId,x.EventDate});
+        builder.Entity<ChequeEvent>().HasOne(x=>x.CustomerCheque).WithMany(x=>x.Events).HasForeignKey(x=>x.CustomerChequeId).OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<Product>()
             .HasMany(x => x.Molds)

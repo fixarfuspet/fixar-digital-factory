@@ -37,4 +37,13 @@ public static class AuthorizationPolicies
     public const string CanReverseCollections = nameof(CanReverseCollections);
     public const string CanViewCustomerLedger = nameof(CanViewCustomerLedger);
     public const string CanExportCustomerStatement = nameof(CanExportCustomerStatement);
+    public const string CanViewFinancialAccounts = nameof(CanViewFinancialAccounts);
+    public const string CanManageFinancialAccounts = nameof(CanManageFinancialAccounts);
+    public const string CanViewCashFlow = nameof(CanViewCashFlow);
+    public const string CanRecordFinancialTransactions = nameof(CanRecordFinancialTransactions);
+    public const string CanReverseFinancialTransactions = nameof(CanReverseFinancialTransactions);
+    public const string CanViewChequePortfolio = nameof(CanViewChequePortfolio);
+    public const string CanManageChequePortfolio = nameof(CanManageChequePortfolio);
+    public const string CanCollectCheque = nameof(CanCollectCheque);
+    public const string CanBounceCheque = nameof(CanBounceCheque);
 }

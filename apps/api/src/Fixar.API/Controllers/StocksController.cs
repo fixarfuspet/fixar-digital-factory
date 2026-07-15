@@ -208,15 +208,15 @@ public class StocksController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail("Stok adı zorunludur.", "NAME_REQUIRED"));
 
         item.Name = request.Name;
-        item.Code = request.Code;
-        item.Category = request.Category;
-        item.Unit = request.Unit;
+        item.Code = request.Code ?? item.Code;
+        item.Category = request.Category ?? item.Category;
+        item.Unit = request.Unit ?? item.Unit;
         item.CurrentQuantity = request.CurrentQuantity;
         item.CriticalQuantity = request.CriticalQuantity;
         item.MinimumQuantity = request.MinimumQuantity;
         item.MaximumQuantity = request.MaximumQuantity;
         item.LastPurchasePrice = request.LastPurchasePrice;
-        item.Currency = request.Currency;
+        item.Currency = request.Currency ?? item.Currency;
         item.VatRate = request.VatRate;
         item.SupplierName = request.SupplierName;
         item.SupplierCode = request.SupplierCode;
