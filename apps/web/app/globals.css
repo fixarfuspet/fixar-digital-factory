@@ -20,10 +20,25 @@
 }
 
 body {
-  background: var(--background);
+  min-width: 320px;
+  background: #050706;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
 
 html, body { max-width: 100%; overflow-x: hidden; }
+main, section, article, div { min-width: 0; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, input, select, textarea { min-height: 44px; }
+input, select, textarea { font-size: 16px; }
+button, a { touch-action: manipulation; }
+.overflow-x-auto { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; }
+tbody tr { transition: background-color 150ms ease; }
+tbody tr:hover { background-color: rgb(255 255 255 / 0.025); }
+
+@media (max-width: 640px) {
+  main { padding: 1rem !important; padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important; }
+  h1 { line-height: 1.15; }
+  th, td { white-space: nowrap; }
+}
