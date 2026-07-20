@@ -5,7 +5,7 @@ import { isJwtValid } from "@/app/lib/auth/jwt";
 import { refreshSession } from "@/app/lib/auth/refresh";
 
 // Routes that require an authenticated session.
-const protectedRoutes = ["/dashboard"];
+const protectedRoutes = ["/home", "/dashboard"];
 // Routes an already-authenticated user should be bounced away from.
 const publicOnlyRoutes = ["/"];
 
@@ -52,7 +52,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isPublicOnly && isAuthenticated) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/home", request.url));
   }
 
   const response = NextResponse.next();
@@ -79,5 +79,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/dashboard", "/dashboard/:path*"],
+  matcher: ["/", "/home", "/home/:path*", "/dashboard", "/dashboard/:path*"],
 };

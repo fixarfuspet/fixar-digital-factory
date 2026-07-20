@@ -22,6 +22,7 @@ export interface AuthResultDto {
 
 export interface MeDto {
   userId: string;
+  userName?: string;
   email: string;
   roles: string[];
 }

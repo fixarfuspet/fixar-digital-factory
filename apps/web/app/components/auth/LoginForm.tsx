@@ -37,7 +37,7 @@ export function LoginForm() {
         return;
       }
 
-      router.replace("/dashboard");
+      router.replace("/home");
       router.refresh();
     } catch {
       setError("Sunucuya bağlanılamadı.");
