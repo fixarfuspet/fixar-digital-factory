@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Data;
 using Asp.Versioning;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
@@ -78,8 +79,8 @@ public sealed class MaterialLotsController(ApplicationDbContext db) : Controller
     public async Task<IActionResult> Create([FromBody] MaterialLotRequest request, CancellationToken ct)
     {
         var validation = await Validate(request, null, ct); if (validation != null) return validation;
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var stock = await db.StockItems.AsNoTracking().FirstAsync(x => x.Id == request.StockItemId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var stock = await db.StockItems.FirstAsync(x => x.Id == request.StockItemId, ct);
         var purchaseLine = request.PurchaseOrderLineId.HasValue ? await db.PurchaseOrderLines.AsNoTracking().Include(x => x.PurchaseOrder).FirstOrDefaultAsync(x => x.Id == request.PurchaseOrderLineId, ct) : null;
         var now = DateTime.UtcNow; var actor = Actor();
         var lot = new MaterialLot
@@ -92,7 +93,9 @@ public sealed class MaterialLotsController(ApplicationDbContext db) : Controller
             Warehouse = Clean(request.Warehouse) ?? stock.WarehouseName, Location = Clean(request.Location) ?? stock.LocationCode, RackCode = Clean(request.RackCode), Status = "Available", QualityStatus = ValidQuality(request.QualityStatus) ? request.QualityStatus! : "Pending",
             Notes = Clean(request.Notes), IsActive = true, CreatedAt = now, UpdatedAt = now, CreatedByName = actor, UpdatedByName = actor
         };
+        stock.CurrentQuantity += lot.InitialQuantity;
         db.MaterialLots.Add(lot); Audit("Material Lot Created", lot.Id, new { lot.LotNumber, lot.MaterialId, lot.StockItemId });
+        Audit("Material Lot Stock Increased", lot.Id, new { lot.LotNumber, lot.StockItemId, Quantity = lot.InitialQuantity, StockQuantity = stock.CurrentQuantity });
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return CreatedAtAction(nameof(Get), new { id = lot.Id, version = "1" }, ApiResponse<object>.SuccessResponse(await DetailQuery(lot.Id).FirstAsync(ct), "Malzeme lotu oluşturuldu."));
@@ -101,16 +104,33 @@ public sealed class MaterialLotsController(ApplicationDbContext db) : Controller
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] MaterialLotRequest request, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var lot = await db.MaterialLots.FirstOrDefaultAsync(x => x.Id == id, ct); if (lot is null) return NotFound(Fail("Malzeme lotu bulunamadı.", "LOT_NOT_FOUND"));
         var validation = await Validate(request, id, ct); if (validation != null) return validation;
         var allocated = await db.MaterialContainers.Where(x => x.MaterialLotId == id && x.Status != "Cancelled").SumAsync(x => x.InitialQuantity, ct);
         if (request.InitialQuantity < allocated) return BadRequest(Fail("Lot başlangıç miktarı mevcut container dağılımından küçük olamaz.", "LOT_ALLOCATION_CONFLICT"));
-        var stock = await db.StockItems.AsNoTracking().FirstAsync(x => x.Id == request.StockItemId, ct);
+        var oldStockItemId = lot.StockItemId; var oldCurrentQuantity = lot.CurrentQuantity; var newCurrentQuantity = request.CurrentQuantity ?? lot.CurrentQuantity;
+        var stock = await db.StockItems.FirstAsync(x => x.Id == request.StockItemId, ct);
+        if (oldStockItemId == request.StockItemId)
+        {
+            var difference = newCurrentQuantity - oldCurrentQuantity;
+            if (stock.CurrentQuantity + difference < 0) return Conflict(Fail("Stok miktarı negatif olamaz.", "STOCK_NEGATIVE"));
+            stock.CurrentQuantity += difference;
+        }
+        else
+        {
+            var oldStock = await db.StockItems.FirstAsync(x => x.Id == oldStockItemId, ct);
+            if (oldStock.CurrentQuantity < oldCurrentQuantity) return Conflict(Fail("Eski stok kartındaki miktar lot miktarından küçük; aktarım uygulanmadı.", "STOCK_TRANSFER_CONFLICT"));
+            oldStock.CurrentQuantity -= oldCurrentQuantity;
+            stock.CurrentQuantity += newCurrentQuantity;
+        }
         lot.MaterialId = request.MaterialId; lot.StockItemId = request.StockItemId; lot.SupplierId = request.SupplierId; lot.PurchaseOrderId = request.PurchaseOrderId; lot.PurchaseOrderLineId = request.PurchaseOrderLineId;
         lot.LotNumber = request.LotNumber!.Trim(); lot.SupplierLotNumber = Clean(request.SupplierLotNumber); lot.BatchNumber = Clean(request.BatchNumber); lot.ReceivedDate = Utc(request.ReceivedDate ?? lot.ReceivedDate); lot.ProductionDate = Utc(request.ProductionDate); lot.ExpiryDate = Utc(request.ExpiryDate);
         lot.InitialQuantity = request.InitialQuantity; lot.CurrentQuantity = request.CurrentQuantity ?? lot.CurrentQuantity; lot.ReservedQuantity = request.ReservedQuantity ?? lot.ReservedQuantity; lot.Unit = stock.Unit; lot.UnitPrice = request.UnitPrice; lot.Currency = Clean(request.Currency) ?? lot.Currency;
         lot.Warehouse = Clean(request.Warehouse); lot.Location = Clean(request.Location); lot.RackCode = Clean(request.RackCode); lot.QualityStatus = ValidQuality(request.QualityStatus) ? request.QualityStatus! : lot.QualityStatus; lot.Notes = Clean(request.Notes); lot.UpdatedAt = DateTime.UtcNow; lot.UpdatedByName = Actor();
-        RecalculateStatus(lot); Audit("Material Lot Updated", lot.Id, new { lot.LotNumber }); await db.SaveChangesAsync(ct);
+        RecalculateStatus(lot); Audit("Material Lot Updated", lot.Id, new { lot.LotNumber });
+        Audit("Material Lot Stock Adjusted", lot.Id, new { lot.LotNumber, OldStockItemId = oldStockItemId, NewStockItemId = lot.StockItemId, OldCurrentQuantity = oldCurrentQuantity, NewCurrentQuantity = lot.CurrentQuantity });
+        await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
         return Ok(ApiResponse<object>.SuccessResponse(await DetailQuery(id).FirstAsync(ct), "Malzeme lotu güncellendi."));
     }
 
