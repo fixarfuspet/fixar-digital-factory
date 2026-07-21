@@ -492,3 +492,57 @@ Durum: Kısmen hazır.
 - Backend operasyon zamanlarını ağırlıklı UTC saklıyor; API girişlerindeki birçok tarih `DateTimeKind` kontrollü normalize ediliyor. Frontend `tr-TR` gösterim kullanıyor.
 - Container/host için açık `Europe/Istanbul` ayarı ve merkezi vardiya/gün sınırı servisi yok. Bazı raporlar `DateTime.UtcNow.Date` ile gün kesiyor; Türkiye gece vardiyasında gün sınırı sapabilir.
 - Tarih kolonları ağırlıklı `timestamp with time zone` modeline uygun olsa da gerçek PostgreSQL şeması ve DST/gece vardiyası E2E testi çalıştırılmadı.
+
+## Aşama 28 — Lint ve kod kalitesi
+
+Durum: Hazır değil.
+
+- Tam ESLint yeniden ölçümü: 55 hata, 23 uyarı.
+- Hataların ana kümeleri bakım bileşenlerindeki `any`, React 19 `set-state-in-effect` / compiler immutability ve hook dependency kurallarıdır. Bazı sayfalar okunabilirliği ve bakım yapılabilirliği azaltan tek satırlık yoğun bileşenlerdir.
+- Toplu rule kapatma, dosya geneli suppression veya davranışı belirsiz mekanik rewrite uygulanmadı. Lint CI içinde zorunlu kapı yapıldığı için borç görünür ve merge'i engeller.
+- Backend build sıfır warning ile tamamlanıyor; yeni backend test kodu nullable/derleme kontrolünden geçiyor.
+
+## Aşama 29 — Test kapsamı
+
+Durum: Kısmen hazır.
+
+- 72 backend testi; auth, rol matrisi, controller sözleşmesi, migration modeli, teklif, bakım dashboard'u, sipariş/iş emri, üretim, kesim, stok, izlenebilirlik, kalite, sevkiyat, maliyet ve satın alma kritik kurallarını kapsıyor.
+- Frontend production route smoke 53 kullanıcı route'unu oturumsuz erişimde kapsıyor.
+- Test projesi solution default keşfine bağlı bırakılmayıp CI'da açık proje yoluyla çalıştırılıyor.
+- Line/branch coverage collector ve eşik tanımlı değil; authenticated browser E2E yok. Bu nedenle sayı üzerinden kapsam yüzdesi iddia edilmedi.
+
+## Aşama 30 — UI/UX ve operatör kullanılabilirliği
+
+Durum: Kısmen hazır.
+
+- Ortak kabuk, kategori menüsü, responsive kart/tablo desenleri, minimum dokunma yükseklikleri, loading/error/empty bileşenleri ve Türkçe mesajlar yaygın biçimde kullanılıyor.
+- Mobil/TV fiziksel cihaz, eldivenli dokunmatik, klavye erişilebilirliği ve screen-reader testi çalıştırılamadı.
+- Lint effect/hook borcu bazı ekranlarda gereksiz render ve state kararlılığı riski yaratıyor; Aşama 28 kapanmadan kullanılabilirlik “hazır” sayılamaz.
+
+## Aşama 31 — Deployment ve production config
+
+Durum: Kısmen hazır.
+
+- API multi-stage .NET 9 image, non-root kullanıcı, healthcheck, PostgreSQL/Seq compose bağımlılıkları, secret zorunluluğu, production-only file log ve health endpoints içeriyor.
+- Dockerfile mevcut olmayan `global.json` dosyasını kopyalamaya çalıştığı için image build'i baştan başarısız oluyordu; COPY listesi düzeltildi.
+- Non-root API kullanıcısının `/var/log/fixar-os` dizinine yazma izni yoktu; image build aşamasında dizin oluşturma/sahiplik düzeltildi.
+- Frontend production container/reverse-proxy tanımı, trusted proxy allow-list, TLS sertifika yönetimi ve migration/rollback deployment runbook'u yok.
+- Docker komutu bu makinede bulunmadığından image/compose gerçek build testi yapılamadı.
+
+## Aşama 32 — CI/CD
+
+Durum: Kısmen tamamlandı.
+
+- `.github/workflows/ci.yml` backend restore/build/test, idempotent migration SQL, .NET vulnerable package kontrolü; frontend clean install/typecheck/lint/build/dependency audit/route smoke ve gitleaks secret scan adımlarını içeriyor.
+- Workflow salt-okunur repository izniyle çalışıyor ve gerçek secret kullanmıyor.
+- Mevcut 55 lint hatası CI frontend job'unu bilinçli olarak kıracaktır; kapı bypass edilmedi.
+- GitHub runner üzerinde gerçek workflow henüz çalışmadı; branch protection repository ayarı yerel koddan yapılamaz.
+
+## Aşama 33 — Dokümantasyon
+
+Durum: Kısmen tamamlandı.
+
+- Kök README gerçek modül kapsamı, .NET/Node/PostgreSQL gereksinimleri, environment değişkenleri, BFF yolu, migration, test ve production zorunluluklarıyla yenilendi.
+- Web README jenerik create-next-app metninden gerçek cookie/BFF ve doğrulama komutlarına çevrildi.
+- API README'de “business modülü/test yok” gibi eski ifadeler hâlâ kapsamlı yeniden yazım gerektiriyor; buna karşılık kök README ve bu denetim raporu geçerli kaynak olarak işaretlendi.
+- Operatör/yönetici kullanım kılavuzu ile doğrulanmış backup/restore ve deployment runbook'u eksik.

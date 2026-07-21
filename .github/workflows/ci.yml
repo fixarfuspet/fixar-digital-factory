@@ -1,0 +1,54 @@
+name: FIXAR OS CI
+
+on:
+  push:
+    branches: [main, fix/live-production-integration]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: dotnet restore FixarOS.sln
+      - run: dotnet build src/Fixar.API/Fixar.API.csproj --no-restore -m:1 -v:minimal
+      - run: dotnet test tests/Fixar.Quotation.Tests/Fixar.Quotation.Tests.csproj --no-restore -m:1 -v:minimal
+      - run: dotnet tool install --global dotnet-ef --version 9.*
+      - run: dotnet ef migrations script --idempotent --project src/Fixar.Infrastructure/Fixar.Infrastructure.csproj --startup-project src/Fixar.API/Fixar.API.csproj --context ApplicationDbContext --no-build --output /tmp/fixar-migrations.sql
+      - run: dotnet list FixarOS.sln package --vulnerable --include-transitive
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm exec tsc -- --noEmit
+      - run: npm run lint
+      - run: npm run build
+      - run: npm audit --audit-level=high
+      - run: npm run test:smoke
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
