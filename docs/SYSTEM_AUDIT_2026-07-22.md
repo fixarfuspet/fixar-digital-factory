@@ -546,3 +546,181 @@ Durum: Kısmen tamamlandı.
 - Web README jenerik create-next-app metninden gerçek cookie/BFF ve doğrulama komutlarına çevrildi.
 - API README'de “business modülü/test yok” gibi eski ifadeler hâlâ kapsamlı yeniden yazım gerektiriyor; buna karşılık kök README ve bu denetim raporu geçerli kaynak olarak işaretlendi.
 - Operatör/yönetici kullanım kılavuzu ile doğrulanmış backup/restore ve deployment runbook'u eksik.
+
+## Aşama 34 — Veri ve demo senaryosu
+
+Durum: Çalıştırılamadı.
+
+- İstenen müşteri→ürün→fiyat→sipariş→iş emri→üretim→fire→kesim→koli→QR→sevkiyat→maliyet zinciri için kod ve kritik parça regression testleri mevcut.
+- Yerel PostgreSQL portu kapalı, Docker yok ve development test parolası tanımlı değil. Gerçek veriyi değiştirmeden izole veritabanı ve authenticated HTTP oturumu kurulamadığı için uçtan uca demo yapılmadı.
+- Kullanıcı veritabanına seed, reset veya deneme kaydı yazılmadı.
+
+## Aşama 35 — Boş ve hatalı veri senaryoları
+
+Durum: Kısmen tamamlandı.
+
+- Boş bakım dashboard'u, eksik reçete/fiyat/kur, sıfır-negatif-aşırı miktar, mükerrer iş emri/koli seçimi, üretim-kesim-sevkiyat sınırı, aynı QR indexi, bozuk/boş JSON frontend parserı ve terminal durum tekrarları testlerle veya sözleşmeyle kapsanıyor.
+- Çok büyük sayısal sınırlar, tüm geçersiz tarihler, silinmiş ilişkili master kayıtlar ve gerçek PostgreSQL constraint hata cevapları için tam API matrisi yok.
+
+## Aşama 36 — Geriye dönük regression
+
+Durum: Kısmen tamamlandı.
+
+- Proxy fallback, boş public env, güvenli response parsing, login/session, bakım dashboard'u, Sistem Kontrolü, route/session smoke ve controller authorization testleri geçiyor.
+- Bu denetimde eklenen 21 testle üretim, kesim, stok, QR, kalite, sevkiyat, maliyet ve satın alma kritik regresyonları korunuyor; toplam backend testi 72.
+- Authenticated gerçek browser regression ortam engeli nedeniyle yok.
+
+## Aşama 37 — Üretim hazırlık kontrolü
+
+| Başlık | Sonuç | Kanıt / engel |
+|---|---|---|
+| Fonksiyonel hazır olma | Kısmen hazır | Kritik miktar zincirleri testli; fiyat listesi, TV, bildirim ve geniş rapor modülleri eksik |
+| Veri güvenliği | Kısmen hazır | Restrict FK, transaction/idempotency var; pending migration ve gerçek DB mutabakatı yok |
+| Yetkilendirme | Kısmen hazır | Policy matrisi/negatif testler var; authenticated E2E yok |
+| Performans | Hazır değil | Sınırsız listeler ve p95/yük ölçümü yok |
+| Yedekleme | Hazır değil | Backup/restore runbook ve restore testi yok |
+| Hata yönetimi | Kısmen hazır | Safe parser, global handler, correlation ID var; offline/timeout E2E yok |
+| Operatör kullanılabilirliği | Kısmen hazır | Responsive ortak desenler var; fiziksel cihaz ve lint borcu açık |
+| Yönetim raporları | Kısmen hazır | Kârlılık dashboard'u var; ortak Excel/PDF rapor paketi yok |
+| İzlenebilirlik | Kısmen hazır | Zorunlu tekil QR ve zincir endpointleri var; yazıcı/recall E2E yok |
+| Maliyet doğruluğu | Kısmen hazır | Eksik girişte snapshot engeli ve atomiklik var; gerçek finans mutabakatı yok |
+| Deployment | Hazır değil | API image/CI var; frontend deploy, proxy/TLS ve migration runbook eksik |
+| Bakım yapılabilirliği | Kısmen hazır | Test/CI/doküman gelişti; 55 lint hatası ve yoğun tek satır kod açık |
+
+## Aşama 38 — Kritik hata ve risk listesi
+
+| Seviye | Modül | Hata / etki | Düzeltme veya kalan risk |
+|---|---|---|---|
+| P0 | Operasyon | Doğrulanmış backup/restore yok; canlı hatada kalıcı veri kaybı riski | Açık; canlıya geçiş engeli |
+| P1 | Veritabanı | Migrationlar gerçek PostgreSQL'e apply/rollback edilmedi | Açık; izole PostgreSQL zorunlu |
+| P1 | Stok | Eski satın alma+lot kayıtları geçmişte çift sayılmış olabilir | Yeni çift sayım kapatıldı (`0722b77`); gerçek veri mutabakatı gerekli |
+| P1 | Frontend güvenlik | Next transit `sharp` için 2 yüksek, `postcss` için 1 orta advisory | Güvenli otomatik fix yok; upstream uyumlu sürüm izlenmeli |
+| P1 | Frontend kalite | 55 lint hatası CI'yı kırıyor | Açık; suppression olmadan bileşen bazlı refactor |
+| P1 | Test | Authenticated browser ve tam demo E2E yok | Açık; izole DB/test parolası/E2E runner gerekli |
+| P1 | Üretim | Miktar aşımı ve yarış | Düzeltildi/testli (`438bc40`) |
+| P1 | Kesim | Sipariş kesim ilerlemesi güncellenmiyordu | Düzeltildi/testli (`2c94301`) |
+| P1 | Sevkiyat | Sipariş sevk ilerlemesi güncellenmiyordu | Düzeltildi/testli (`0468298`) |
+| P1 | Satın alma | Lot takipli hammadde iki kez stoğa giriyordu | Düzeltildi/testli (`0722b77`) |
+| P2 | TV | Üç ayrı TV ekranı ve stale/session davranışı yok | Açık |
+| P2 | Fiyat/Rapor/Alarm | Fiyat listesi, geniş export ve bildirim merkezi yok | Açık; ürün kararı gerekir |
+| P2 | Zaman | Türkiye gün/shift sınırı merkezi değil | Açık |
+| P3 | Doküman | API README'nin bazı tarihsel bölümleri eski | Kök README/denetim raporu güncel; API README refactor gerekli |
+
+## Aşama 39 — Kullanıma hazırlık yüzdeleri
+
+Yüzdeler çalıştırılan test, mevcut modül, açık P0/P1 ve ortamda doğrulanamayan alanlara göre muhafazakâr tahmindir.
+
+| Alan | Hazırlık |
+|---|---:|
+| Backend | %78 |
+| Frontend | %62 |
+| Veritabanı | %58 |
+| Güvenlik | %68 |
+| Test kapsamı | %57 |
+| Üretim | %72 |
+| Stok | %74 |
+| Sipariş | %73 |
+| Sevkiyat | %70 |
+| İzlenebilirlik | %66 |
+| Maliyet | %65 |
+| Dashboard | %48 |
+| Deployment | %45 |
+| Dokümantasyon | %62 |
+
+Genel ağırlıklı hazırlık: **%64**. Bu oran canlıya geçiş onayı değildir; backup/restore, gerçek migration ve P1 frontend/test engelleri nedeniyle karar **NO-GO**'dur.
+
+## Aşama 40 — Kalan iş planı
+
+| Sıra | Öncelik | İş | Zorluk | Bağımlılık | Kabul kriteri |
+|---:|---|---|---|---|---|
+| 1 | P0 | PostgreSQL backup/şifreli saklama/restore runbook ve restore testi | Yüksek | İzole PostgreSQL/depolama | Başarılı restore, RPO/RTO kaydı, checksum |
+| 2 | P1 | Tüm migrationları temiz DB apply ve production kopyasında dry-run/rollback doğrulama | Yüksek | İzole PostgreSQL | 37 migration apply, uygulama smoke, rollback planı |
+| 3 | P1 | Eski stok-lot-satın alma farklarını Sistem Kontrol raporuyla mutabakat | Yüksek | Anonimleştirilmiş DB kopyası | Sıfır açıklanamayan fark, imzalı düzeltme listesi |
+| 4 | P1 | Lint 55/23 borcunu bileşen bazında temizleme | Orta | Frontend | `npm run lint` sıfır hata/uyarı |
+| 5 | P1 | Next/sharp/postcss advisorylerini upstream uyumlu sürümle kapatma | Orta | Güvenli Next release | `npm audit --audit-level=high` başarılı |
+| 6 | P1 | Playwright authenticated rol ve kritik demo E2E | Yüksek | Test DB ve test parola secretı | Rol matrisi + uçtan uca demo yeşil |
+| 7 | P1 | Frontend container/reverse proxy/TLS/trusted proxy deployment | Yüksek | Hedef altyapı | HTTPS, health/readiness, rollback smoke |
+| 8 | P2 | Pagination ve yük/p95 performans testi | Orta | Temsili veri | Tanımlı SLA altında p95 ve sınırlı response |
+| 9 | P2 | TV ekranları ve güvenli kiosk session | Yüksek | UX/güvenlik kararı | 3 ekran, stale/offline, vardiya testi |
+| 10 | P2 | Fiyat listesi, rapor/export ve bildirim gereksinim tasarımı | Yüksek | Ürün/finans kararları | Onaylı sözleşme ve ayrı uygulama planı |
+
+## Aşama 41 — Son doğrulama
+
+| Kontrol | Sonuç |
+|---|---|
+| Backend restore | Başarılı; tüm projeler güncel |
+| Backend build | Başarılı, 0 warning / 0 error |
+| Backend test | Başarılı, 72/72 |
+| Frontend `npm ci` | Lockfile'dan bağımlılıklar kuruldu; npm 11 süreç çıktısı gecikmeli tamamlandı |
+| TypeScript | Başarılı |
+| Frontend production build | Başarılı; sandbox port engeli sonrası izinli çalıştırmada BUILD_ID üretildi |
+| Route smoke | Başarılı, 53/53 |
+| Frontend lint | Başarısız: 55 hata, 23 uyarı |
+| Migration SQL | Başarılı: idempotent script 6.022 satır; gerçek DB apply yok |
+| NuGet vulnerable scan | Başarılı: 5 projede bilinen vulnerable paket yok |
+| npm audit | Başarısız: güvenli `brace-expansion` fixinden sonra 2 yüksek `sharp`, 1 orta `postcss` |
+| Docker build | Çalıştırılamadı: Docker executable yok |
+| Git diff check | Final commit öncesi başarılı |
+
+## Aşama 42 — Son rapor ve karar
+
+### Yönetici özeti
+
+Denetim build kontrolünün ötesine geçirilerek auth, rol, route, controller, migration modeli ve üretimden finansa kritik miktar zincirlerinde 72 otomatik backend testi ve 53 route smoke testi oluşturdu. Üretim, kesim, stok, kalite, sevkiyat, maliyet ve satın almada veri bütünlüğü bozan P1 hatalar giderildi. Bununla birlikte gerçek PostgreSQL migration/restore, authenticated E2E, lint ve frontend dependency güvenliği tamamlanmadığı için sistem bugün canlıya alınmamalıdır.
+
+### Migrationlar
+
+- `20260721222949_ProtectHistoricalRecordsFromCascadeDelete`
+- `20260721225133_RequireProductionBoxTraceabilityCode`
+
+İkisi de kullanıcı veritabanına uygulanmadı.
+
+### Oluşturulan test grupları
+
+- AuthenticationSecurityTests
+- RoleAuthorizationTests
+- ControllerContractTests
+- DatabaseIntegrityTests
+- OrderWorkOrderSafetyTests
+- ProductionQuantitySafetyTests
+- CuttingWorkflowSafetyTests
+- StockIntegritySafetyTests
+- QualityWorkflowSafetyTests
+- ShipmentWorkflowSafetyTests
+- CostFinalizationSafetyTests
+- PurchaseReceiptSafetyTests
+- Route smoke scripti
+
+### Güvenlik, performans ve veri bütünlüğü sonucu
+
+- Güvenlik: Kısmen hazır; cookie/JWT/CSRF/rate-limit/policy/correlation güçlendirildi, 2 yüksek frontend advisory açık.
+- Performans: Hazır değil; gerçek yük ölçümü ve pagination tamamlama gerekli.
+- Veri bütünlüğü: Kısmen hazır; kritik yazma zincirleri kilitli/testli, gerçek DB mutabakatı ve migration apply bekliyor.
+- Backup/restore: Hazır değil ve canlıya geçiş P0 engeli.
+
+### Canlıya geçiş kararı
+
+**NO-GO.** Zorunlu ön koşullar: P0 backup/restore testi; migration apply/dry-run; eski stok mutabakatı; lint ve yüksek dependency bulguları; authenticated kritik E2E; hedef altyapıda HTTPS/reverse proxy/frontend deployment smoke.
+
+Canlı sonrasına bırakılabilecekler: TV görsel iyileştirmeleri, kapsamlı rapor formatları ve bildirim merkezinin ürün gereksinimi netleştikten sonraki uygulaması.
+
+### Denetim commitleri
+
+- `346faf3` Audit system architecture and fix blocking issues
+- `7fc03f1` Harden authentication sessions and token security
+- `fbb6afc` Harden role permissions and production corrections
+- `81545b9` Add frontend route smoke tests and error boundaries
+- `ec1b73e` Add backend controller security contract tests
+- `ecb3449` Protect historical records from cascade deletion
+- `b3fd50b` Harden order and work order quantity controls
+- `438bc40` Harden live production quantity and concurrency controls
+- `2c94301` Synchronize cutting completion with order progress
+- `e2f199a` Protect lot-controlled stock integrity
+- `8d0da84` Require traceability codes for every production box
+- `62eb4e3` Harden quality inspection and fire consistency
+- `0468298` Synchronize shipments with order item progress
+- `69f6354` Make work order cost snapshots atomic
+- `0722b77` Prevent purchase and lot receipt double counting
+- `e633bf1` Add request correlation and production log safeguards
+- `fb7adc9` Add production CI and update operational documentation
+- `469e37f` Update safe frontend transitive dependency
