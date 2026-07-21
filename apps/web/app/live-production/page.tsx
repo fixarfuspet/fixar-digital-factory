@@ -3,13 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ManageAssignmentModal from "../components/production-planning/ManageAssignmentModal";
-
-type ApiResponse<T> = {
-  data?: T;
-  message?: string;
-  errorCode?: string;
-  success?: boolean;
-};
+import { apiRequest } from "../lib/api/client";
 
 type LiveStation = {
   stationNumber: number;
@@ -149,26 +143,15 @@ export default function LiveProductionPage() {
 
   const loadSummary = useCallback(async () => {
     setError(null);
-    try {
-      const response = await fetch(`${API}/station-assignments/live-summary`, { cache: "no-store" });
-      const result = (await response.json()) as ApiResponse<LiveSummary>;
-
-      if (!response.ok) {
-        throw new Error(result.message ?? "İşlem sırasında bir hata oluştu. Lütfen tekrar deneyin.");
-      }
-
-      setSummary(result.data ?? null);
-    } catch (requestError) {
-      console.error("Canlı üretim özeti alınamadı.", requestError);
-      setError("İşlem sırasında bir hata oluştu. Lütfen tekrar deneyin.");
-      setSummary(null);
-    } finally {
-      setLoading(false);
-    }
+    const result = await apiRequest<LiveSummary>(`${API}/station-assignments/live-summary`, { cache: "no-store" });
+    if (result.ok) setSummary(result.data);
+    else { console.error("Canlı üretim özeti alınamadı.", result); setError("Canlı üretim verileri alınamadı."); }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadSummary();
+    const timer = window.setTimeout(() => void loadSummary(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadSummary]);
 
   const stations = useMemo(() => normalizeStations(summary?.stations), [summary]);
@@ -184,7 +167,12 @@ export default function LiveProductionPage() {
     setSuccess(null);
 
     try {
-      const response = await fetch(`${API}/station-assignments/add-turn`, {
+      const result = await apiRequest<{
+        activeStationCount: number;
+        skippedStationCount: number;
+        totalAddedPairs: number;
+        releaseDueStations: Array<{ stationNumber: number }>;
+      }>(`${API}/station-assignments/add-turn`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({
@@ -193,14 +181,7 @@ export default function LiveProductionPage() {
           requestId: crypto.randomUUID(),
         }),
       });
-      const result = (await response.json()) as ApiResponse<{
-        activeStationCount: number;
-        skippedStationCount: number;
-        totalAddedPairs: number;
-        releaseDueStations: Array<{ stationNumber: number }>;
-      }>;
-
-      if (!response.ok) {
+      if (!result.ok) {
         throw new Error(result.message ?? "İşlem sırasında bir hata oluştu. Lütfen tekrar deneyin.");
       }
 
@@ -592,21 +573,20 @@ function StationOperationPanel({
     if (!assignmentId) return;
 
     try {
-      const [eventsResponse, downtimesResponse] = await Promise.all([
-        fetch(`${API}/station-assignments/${assignmentId}/events`),
-        fetch(`${API}/station-assignments/${assignmentId}/downtimes`),
+      const [eventsResult, downtimesResult] = await Promise.allSettled([
+        apiRequest<StationEvent[]>(`${API}/station-assignments/${assignmentId}/events`),
+        apiRequest<Downtime[]>(`${API}/station-assignments/${assignmentId}/downtimes`),
       ]);
-      const eventsResult = (await eventsResponse.json()) as ApiResponse<StationEvent[]>;
-      const downtimesResult = (await downtimesResponse.json()) as ApiResponse<Downtime[]>;
-      setEvents(eventsResult.data ?? []);
-      setDowntimes(downtimesResult.data ?? []);
+      if (eventsResult.status === "fulfilled" && eventsResult.value.ok) setEvents(eventsResult.value.data ?? []); else console.error("İstasyon olayları alınamadı.", eventsResult);
+      if (downtimesResult.status === "fulfilled" && downtimesResult.value.ok) setDowntimes(downtimesResult.value.data ?? []); else console.error("İstasyon duruşları alınamadı.", downtimesResult);
     } catch (requestError) {
       console.error("İstasyon geçmişi alınamadı.", requestError);
     }
   }, [assignmentId]);
 
   useEffect(() => {
-    loadPanelData();
+    const timer = window.setTimeout(() => void loadPanelData(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadPanelData]);
 
   const openDowntime = downtimes.find((item) => item.isOpen);
@@ -616,14 +596,12 @@ function StationOperationPanel({
 
     setSaving(true);
     try {
-      const response = await fetch(`${API}${path}`, {
+      const result = await apiRequest<unknown>(`${API}${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as ApiResponse<unknown>;
-
-      if (!response.ok) {
+      if (!result.ok) {
         throw new Error(result.message ?? "İşlem sırasında bir hata oluştu. Lütfen tekrar deneyin.");
       }
 
