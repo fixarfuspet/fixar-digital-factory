@@ -1,6 +1,9 @@
+using System.Data;
 using Asp.Versioning;
+using Fixar.API.Security;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
+using Fixar.Infrastructure.Identity;
 using Fixar.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -75,10 +78,13 @@ public class StocksController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.CanManageMaterials), Idempotent]
     public async Task<IActionResult> Create([FromBody] CreateStockItemRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(ApiResponse<object>.Fail("Stok adı zorunludur.", "NAME_REQUIRED"));
+        if (request.CurrentQuantity < 0)
+            return BadRequest(ApiResponse<object>.Fail("Stok miktarı negatif olamaz.", "STOCK_NEGATIVE"));
 
         var item = new StockItem
         {
@@ -114,12 +120,17 @@ public class StocksController : ControllerBase
     }
 
     [HttpPost("movement")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWarehouse), Idempotent]
     public async Task<IActionResult> AddMovement([FromBody] CreateStockMovementRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockStockWrites(cancellationToken);
         var item = await _db.StockItems.FirstOrDefaultAsync(x => x.Id == request.StockItemId, cancellationToken);
 
         if (item is null)
             return NotFound(ApiResponse<object>.Fail("Stok kartı bulunamadı.", "STOCK_NOT_FOUND"));
+        if (item.MaterialId.HasValue)
+            return Conflict(ApiResponse<object>.Fail("Hammadde stok miktarı lot, tüketim veya geri alma işlemi üzerinden değiştirilmelidir.", "LOT_CONTROLLED_STOCK"));
 
         if (request.Quantity <= 0)
             return BadRequest(ApiResponse<object>.Fail("Miktar 0'dan büyük olmalıdır.", "INVALID_QUANTITY"));
@@ -154,6 +165,7 @@ public class StocksController : ControllerBase
 
         _db.StockMovements.Add(movement);
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(new
         {
@@ -197,8 +209,11 @@ public class StocksController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageMaterials), Idempotent]
     public async Task<IActionResult> Update(Guid id, [FromBody] CreateStockItemRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockStockWrites(cancellationToken);
         var item = await _db.StockItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (item is null)
@@ -206,6 +221,24 @@ public class StocksController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(ApiResponse<object>.Fail("Stok adı zorunludur.", "NAME_REQUIRED"));
+        if (request.CurrentQuantity < 0)
+            return BadRequest(ApiResponse<object>.Fail("Stok miktarı negatif olamaz.", "STOCK_NEGATIVE"));
+        if (item.MaterialId.HasValue && request.CurrentQuantity != item.CurrentQuantity)
+            return Conflict(ApiResponse<object>.Fail("Hammadde stok miktarı stok kartından değiştirilemez; lot işlemlerini kullanın.", "LOT_CONTROLLED_STOCK"));
+        if (!item.MaterialId.HasValue && request.CurrentQuantity != item.CurrentQuantity && string.IsNullOrWhiteSpace(request.Note))
+            return BadRequest(ApiResponse<object>.Fail("Stok miktarı düzeltmesi için açıklama zorunludur.", "ADJUSTMENT_REASON_REQUIRED"));
+
+        if (!item.MaterialId.HasValue && request.CurrentQuantity != item.CurrentQuantity)
+        {
+            var difference = request.CurrentQuantity - item.CurrentQuantity;
+            _db.StockMovements.Add(new StockMovement
+            {
+                Id = Guid.NewGuid(), StockItemId = item.Id,
+                MovementType = difference > 0 ? "Sayım Girişi" : "Sayım Çıkışı",
+                Quantity = Math.Abs(difference), MovementDate = DateTime.UtcNow,
+                SourceType = "StockAdjustment", Note = request.Note!.Trim()
+            });
+        }
 
         item.Name = request.Name;
         item.Code = request.Code ?? item.Code;
@@ -231,8 +264,15 @@ public class StocksController : ControllerBase
         item.Note = request.Note;
 
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(item, "Stok kartı güncellendi."));
+    }
+
+    private async Task LockStockWrites(CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational())
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81005)", cancellationToken);
     }
 }
 

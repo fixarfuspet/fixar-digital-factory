@@ -247,3 +247,31 @@ Durum: Kısmen tamamlandı; kesim miktarı bütünlüğü, düzeltme yetkisi ve 
 - Tamamlanmış kesim iptalinin sipariş kalemi miktarını geri alması ve audit oluşturması.
 
 Sonuç: Backend testleri 57/57 başarılı.
+
+## Aşama 10 — Stok ve hammadde
+
+Durum: Kısmen tamamlandı; lot/container/rezervasyon/tüketim zinciri ile ana stok kaynağını bozabilen doğrudan değişiklikler kapatıldı. Gerçek PostgreSQL FIFO ve eşzamanlı tüketim E2E testi ortam eksikliği nedeniyle çalıştırılamadı.
+
+### Doğrulanan mevcut zincir
+
+- Lot oluşturma ana stok miktarını artırıyor; lot güncelleme eski/yeni mevcut miktar farkını ana karta yansıtıyor ve kart değişiminde eski karttan düşüp yeni karta ekliyor.
+- Container lot içi fiziksel dağılım olarak tutuluyor; oluşturma, açma veya kapatma ana stok toplamını değiştirmiyor.
+- Rezervasyon lot ve container rezerve miktarını transaction içinde artırıyor; serbest bırakma/iptal kullanılmayan miktarı geri açıyor.
+- Tüketim stok, lot ve container miktarını birlikte azaltıyor; rezervasyon tüketimini ilerletiyor ve stok hareketi/audit oluşturuyor.
+- Reversal aynı fiziksel miktarları geri ekliyor, rezervasyonu uygun durumdaysa yeniden açıyor ve ikinci geri almayı engelliyor.
+- Birim eşleşmesi, negatif stok, lot/container uygunluğu, kalite/son kullanma ve rezervasyon bakiyesi kontrolleri mevcut.
+
+### Bu aşamada düzeltilenler
+
+- Hammaddeye bağlı `StockItem` miktarı genel stok hareketi veya kart güncellemesiyle değiştirilebiliyordu. Bu, lot toplamı ile ana stok arasında sessiz fark oluşturuyordu. Bağlı kartların miktarı artık yalnız lot/tüketim/reversal iş akışından değiştirilebilir; doğrudan giriş `409 LOT_CONTROLLED_STOCK` ile engellenir.
+- Genel stok kartlarında negatif başlangıç veya güncelleme miktarı engellendi.
+- Genel stok miktarı kart düzenlemesinden değiştirildiğinde açıklama zorunlu ve fark kadar `Sayım Girişi` / `Sayım Çıkışı` hareketi oluşturuluyor.
+- Manuel hareket ve kart güncellemesi ilgili policy, idempotency, serializable transaction ve PostgreSQL advisory lock ile korunuyor.
+
+### Regression testleri
+
+- Hammaddeye bağlı karta doğrudan hareketin miktarı ve hareket tablosunu değiştirmeden engellenmesi.
+- Hammaddeye bağlı kart miktarının doğrudan düzenlenememesi.
+- Genel stok sayım farkında gerekçe zorunluluğu ve fark kadar stok hareketi oluşturulması.
+
+Sonuç: Backend testleri 60/60 başarılı.
