@@ -81,8 +81,8 @@ public static class DependencyInjection
             var ceo = RoleNames.CEO;
             options.AddPolicy(AuthorizationPolicies.CanManageUsers, p => Roles(p, ceo));
             options.AddPolicy(AuthorizationPolicies.CanViewSystemHealth, p => Roles(p, ceo));
-            options.AddPolicy(AuthorizationPolicies.CanManageCustomers, p => Roles(p, ceo, RoleNames.SalesManager));
-            options.AddPolicy(AuthorizationPolicies.CanManageSalesOrders, p => Roles(p, ceo, RoleNames.SalesManager, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanManageCustomers, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.SalesManager));
+            options.AddPolicy(AuthorizationPolicies.CanManageSalesOrders, p => Roles(p, ceo, RoleNames.ProductionManager, RoleNames.SalesManager));
             options.AddPolicy(AuthorizationPolicies.CanViewQuotes, p => Roles(p, ceo, RoleNames.SalesManager, RoleNames.ProductionManager));
             options.AddPolicy(AuthorizationPolicies.CanManageQuotes, p => Roles(p, ceo, RoleNames.SalesManager));
             options.AddPolicy(AuthorizationPolicies.CanManagePurchases, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing));

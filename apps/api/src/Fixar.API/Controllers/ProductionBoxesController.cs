@@ -137,6 +137,7 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductionBoxRequest request, CancellationToken cancellationToken)
     {
         var box = await _db.ProductionBoxes.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -165,6 +166,7 @@ public class ProductionBoxesController : ControllerBase
         => Transition(id, "Packed", "InWarehouse", request.WarehouseLocation, request.RackCode, "ReceivedToWarehouse", request.Note, null, null, cancellationToken);
 
     [HttpPost("{id:guid}/mark-ready-for-shipment")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWarehouse), Idempotent]
     public Task<IActionResult> MarkReadyForShipment(Guid id, [FromBody] WarehouseTransitionRequest request, CancellationToken cancellationToken)
         => Transition(id, "InWarehouse", "ReadyForShipment", request.WarehouseLocation, request.RackCode, "MarkedReadyForShipment", request.Note, null, null, cancellationToken);
 
@@ -174,6 +176,7 @@ public class ProductionBoxesController : ControllerBase
         => Transition(id, "ReadyForShipment", "Shipped", null, null, "Shipped", request.Notes, request.ShipmentReference, request.ShipmentDate, cancellationToken);
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules), Idempotent]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelProductionBoxRequest request, CancellationToken cancellationToken)
     {
         var box = await _db.ProductionBoxes.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -287,6 +290,7 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPost("create")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageBoxes), Idempotent]
     public async Task<IActionResult> LegacyCreate([FromBody] LegacyCreateBoxRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.BoxCode))
@@ -316,6 +320,7 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPost("fill")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageBoxes), Idempotent]
     public async Task<IActionResult> Fill([FromBody] FillBoxRequest request, CancellationToken cancellationToken)
     {
         var box = await _db.ProductionBoxes.FirstOrDefaultAsync(x => x.BoxCode == request.BoxCode || x.BoxNumber == request.BoxCode, cancellationToken);
@@ -344,18 +349,23 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPost("start-cutting")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordCutting), Idempotent]
     public Task<IActionResult> StartCutting([FromBody] BoxMoveRequest request, CancellationToken cancellationToken) => LegacyMove(request, "Kesime Başladı", "Kesim", cancellationToken);
 
     [HttpPost("finish-cutting")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordCutting), Idempotent]
     public Task<IActionResult> FinishCutting([FromBody] BoxMoveRequest request, CancellationToken cancellationToken) => LegacyMove(request, "Kesim Bitti", "Kesim Tamamlandı", cancellationToken);
 
     [HttpPost("move-to-warehouse")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWarehouse), Idempotent]
     public Task<IActionResult> MoveToWarehouse([FromBody] BoxMoveRequest request, CancellationToken cancellationToken) => LegacyMove(request, "Depoya Girdi", request.ToLocation ?? "Depo", cancellationToken);
 
     [HttpPost("ship")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageShipments), Idempotent]
     public Task<IActionResult> LegacyShip([FromBody] BoxMoveRequest request, CancellationToken cancellationToken) => LegacyMove(request, "Sevk Edildi", "Sevkiyat", cancellationToken);
 
     [HttpPost("empty")]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules), Idempotent]
     public async Task<IActionResult> EmptyBox([FromBody] BoxMoveRequest request, CancellationToken cancellationToken)
     {
         var box = await _db.ProductionBoxes.FirstOrDefaultAsync(x => x.BoxCode == request.BoxCode || x.BoxNumber == request.BoxCode, cancellationToken);

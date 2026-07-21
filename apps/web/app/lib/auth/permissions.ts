@@ -1,7 +1,7 @@
 export const rolePermissions: Record<string, readonly string[]> = {
   CEO: ["*"],
   "Factory Manager": ["production", "work-orders", "reservations", "consumption", "quality", "cutting", "boxes", "warehouse", "shipments", "stocks", "lots", "containers", "materials", "products", "recipes", "maintenance", "maintenance-request", "maintenance-plan", "costs"],
-  "Production Manager": ["production", "work-orders", "reservations", "consumption", "quality", "cutting", "boxes", "warehouse", "shipments", "stocks", "lots", "containers", "materials", "products", "recipes", "maintenance", "maintenance-request", "maintenance-plan", "costs", "profitability", "quotes"],
+  "Production Manager": ["production", "work-orders", "reservations", "consumption", "quality", "cutting", "boxes", "warehouse", "shipments", "stocks", "lots", "containers", "materials", "products", "recipes", "maintenance", "maintenance-request", "maintenance-plan", "costs", "profitability", "quotes", "customers", "orders"],
   "Production Supervisor": ["production", "work-orders", "quality", "cutting", "boxes", "warehouse", "maintenance-request"],
   "Production Operator": ["production", "consumption", "maintenance-request"],
   InjectionOperator: ["production", "consumption", "maintenance-request"],
@@ -16,8 +16,8 @@ export const rolePermissions: Record<string, readonly string[]> = {
   "Quality Manager": ["quality", "lots", "maintenance-request"],
   "Quality Inspector": ["quality", "lots", "maintenance-request"],
   "Sales Manager": ["customers", "quotes", "orders", "customer-finance", "cheques"],
-  "Finance Manager": ["orders", "purchases", "costs", "profitability", "customer-finance", "financial-accounts", "cheques", "cash-flow", "supplier-finance", "maintenance"],
-  Finance: ["orders", "purchases", "costs", "profitability", "customer-finance", "financial-accounts", "cheques", "cash-flow", "supplier-finance", "maintenance"],
+  "Finance Manager": ["purchases", "costs", "profitability", "executive", "customer-finance", "financial-accounts", "cheques", "cash-flow", "supplier-finance", "maintenance"],
+  Finance: ["purchases", "costs", "profitability", "executive", "customer-finance", "financial-accounts", "cheques", "cash-flow", "supplier-finance", "maintenance"],
   Viewer: ["read"],
 };
 

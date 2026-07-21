@@ -262,6 +262,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("add-production")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> AddProduction([FromBody] AddProductionRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -404,6 +405,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("pause")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> Pause([FromBody] AssignmentActionRequest request, CancellationToken cancellationToken)
     {
         var assignment = await _db.StationAssignments
@@ -422,6 +424,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("resume")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> Resume([FromBody] AssignmentActionRequest request, CancellationToken cancellationToken)
     {
         var assignment = await _db.StationAssignments
@@ -443,6 +446,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("finish")]
+    [Authorize(Policy = AuthorizationPolicies.CanPlanProduction), Idempotent]
     public async Task<IActionResult> Finish([FromBody] AssignmentActionRequest request, CancellationToken cancellationToken)
     {
         var assignment = await _db.StationAssignments
@@ -467,6 +471,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("{assignmentId:guid}/fires")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> CreateFire(Guid assignmentId, [FromBody] CreateFireRequest request, CancellationToken cancellationToken)
     {
         if (request.FirePairs <= 0)
@@ -519,6 +524,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("{assignmentId:guid}/fires/{fireId:guid}/cancel")]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules), Idempotent]
     public async Task<IActionResult> CancelFire(Guid assignmentId, Guid fireId, [FromBody] CancelFireRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -553,6 +559,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("{assignmentId:guid}/downtimes/start")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> StartDowntime(Guid assignmentId, [FromBody] StartDowntimeRequest request, CancellationToken cancellationToken)
     {
         if (!DowntimeTypes.Contains(request.DowntimeType))
@@ -584,6 +591,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("{assignmentId:guid}/downtimes/{downtimeId:guid}/finish")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> FinishDowntime(Guid assignmentId, Guid downtimeId, [FromBody] FinishDowntimeRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -637,6 +645,7 @@ public class StationAssignmentsController : ControllerBase
     }
 
     [HttpPost("{assignmentId:guid}/release-applied")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordProduction), Idempotent]
     public async Task<IActionResult> ApplyRelease(Guid assignmentId, [FromBody] ReleaseAppliedRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);

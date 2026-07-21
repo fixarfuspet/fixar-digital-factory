@@ -79,3 +79,34 @@ Sonuç: Backend testleri 28/28 başarılı; backend build, TypeScript, ilgili fr
 
 - Gerçek tarayıcıda çoklu sekme ve token süresi ilerletme testi henüz E2E altyapısı kurulmadığı için Aşama 4/29 kapsamına bırakıldı.
 - Refresh token hash geçişi şema değiştirmedi; migration oluşturulmadı.
+
+## Aşama 3 — Rol ve yetki denetimi
+
+Durum: Tamamlandı (tanımlı rol/policy matrisi ve kritik mutation endpointleri).
+
+### Düzeltilen yetki açıkları
+
+- Station assignment üzerindeki üretim ekleme, durdurma, devam ettirme, bitirme, fire, duruş ve release işlemleri yalnız genel oturum kontrolünden çıkarılarak ilgili üretim/planlama policy'lerine bağlandı.
+- Fire iptali yalnız CEO ve Üretim Müdürü'nün bulunduğu `CanOverrideProductionRules` policy'sine alındı.
+- ProductionBox güncelleme, iptal ve boşaltma işlemleri yönetici override policy'sine alındı.
+- Eski ProductionBox create/fill/cutting/warehouse/shipment endpointleri de policy ve idempotency korumasına alındı; eski endpointler paralel sistem olarak genişletilmedi.
+- Üretim Müdürü frontend'de müşteri ve sipariş modüllerini görebiliyor; backend müşteri/sipariş yönetimiyle eşleştirildi.
+- Finans rollerinin sipariş değiştirme yetkisi kaldırıldı. Backend'in izin verdiği yönetici dashboard'u frontend'de Finans rollerine görünür hâle getirildi.
+
+### Doğrulanan rol sınırları
+
+| Rol | Üretim kaydı | Kesim | Depo | Sipariş/müşteri düzeltme | Maliyet/kârlılık |
+|---|---:|---:|---:|---:|---:|
+| CEO | Evet | Evet | Evet | Evet | Evet |
+| Üretim Müdürü | Evet | Evet | Evet | Evet | Evet |
+| Enjeksiyon Operatörü | Evet | Hayır | Hayır | Hayır | Hayır |
+| Kesim Operatörü | Hayır | Evet | Hayır | Hayır | Hayır |
+| Depo Operatörü | Hayır | Hayır | Evet | Hayır | Hayır |
+
+Kod modelinde Gezer Kafa ve Döner Kafa operatörleri ayrı roller değil, ortak `CuttingOperator` rolüdür. Makine bazlı ayrım rol katmanında iddia edilmedi; operasyon ataması düzeyinde sonraki kesim denetiminde ele alınacaktır.
+
+### Test sonucu
+
+- 13 pozitif/negatif rol-policy senaryosu ve 4 kritik controller action policy testi eklendi.
+- Backend toplamı 45/45 test başarılı.
+- Backend build, TypeScript ve ilgili frontend lint başarılı.
