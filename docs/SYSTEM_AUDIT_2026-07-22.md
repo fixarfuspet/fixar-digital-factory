@@ -226,3 +226,24 @@ Durum: Kısmen tamamlandı; kritik hedef aşımı ve eşzamanlı yazım riski gi
 - Tam kalan miktardaki tur istasyon ile sipariş kalemini birlikte hedefe getiriyor ve denetim olayı yazıyor.
 
 Sonuç: Backend testleri 54/54 başarılı.
+
+## Aşama 9 — Kesim modülü
+
+Durum: Kısmen tamamlandı; kesim miktarı bütünlüğü, düzeltme yetkisi ve eşzamanlı yazım güvenliği sağlandı. Makine/bıçak eşleşmesi ve gerçek iki makine paralel E2E senaryosu mevcut veri modeli ve test ortamı sınırları nedeniyle doğrulanamadı.
+
+### Kök neden ve düzeltmeler
+
+- Kesim kaydı `Completed` durumuna geçerken `OrderItem.CutPairs` hiç güncellenmiyordu. Sipariş ilerlemesi bu nedenle gerçek kesimi göstermiyor ve sonraki iş akışları yanlış kalan miktar hesaplayabiliyordu.
+- Tamamlama artık sağlam çift miktarını sipariş kaleminin kesilen miktarına aynı transaction içinde ekliyor; üretilen kalan miktarın aşılması `409 CUTTING_EXCEEDS_ORDER_REMAINING` ile engelleniyor.
+- Tamamlanmış bir kesim, bağlı aktif koli yoksa yetkili düzeltmeyle iptal edildiğinde aynı miktar sipariş kaleminden güvenli biçimde geri alınıyor ve değer negatife düşmüyor.
+- Create doğrulaması transaction ve PostgreSQL advisory lock içine taşındı. Create, update, complete ve cancel işlemleri aynı seri kesim yazma kilidini kullanıyor; böylece iki makinenin eşzamanlı olarak aynı üretilmiş bakiyeyi tüketmesi engelleniyor.
+- Update ve cancel yalnız CEO/Üretim Müdürü override policy'sine, idempotency korumasıyla bağlandı. Complete kesim operatörü policy'sini ve idempotency korumasını kullanmaya devam ediyor.
+- Oluşturma, güncelleme, tamamlama ve iptal denetim kayıtları korunuyor.
+
+### Regression testleri
+
+- Kesim tamamlamanın sipariş kalemi kesilen miktarını tek kez artırması.
+- Üretilmiş kalan miktarı aşan kesim tamamlamanın hiçbir değeri değiştirmeden engellenmesi.
+- Tamamlanmış kesim iptalinin sipariş kalemi miktarını geri alması ve audit oluşturması.
+
+Sonuç: Backend testleri 57/57 başarılı.

@@ -117,11 +117,13 @@ public class CuttingRecordsController : ControllerBase
     [Authorize(Policy = AuthorizationPolicies.CanRecordCutting), Idempotent]
     public async Task<IActionResult> Create([FromBody] UpsertCuttingRecordRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockCuttingWrites(cancellationToken);
+
         var validation = await ValidateRequest(request, null, cancellationToken);
         if (validation is not null)
             return validation;
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var assignment = await QueryAssignments().FirstAsync(x => x.Id == request.StationAssignmentId, cancellationToken);
         var machine = await _db.CuttingMachines.FirstAsync(x => x.Id == request.CuttingMachineId, cancellationToken);
         var operatorEntity = request.OperatorId.HasValue
@@ -167,8 +169,12 @@ public class CuttingRecordsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules), Idempotent]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpsertCuttingRecordRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockCuttingWrites(cancellationToken);
+
         var record = await _db.CuttingRecords.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (record is null)
             return NotFound(ApiResponse<object>.Fail("Kesim kaydı bulunamadı.", "CUTTING_RECORD_NOT_FOUND"));
@@ -202,6 +208,7 @@ public class CuttingRecordsController : ControllerBase
         record.UpdatedByName = GetActor();
         AddAudit("Cutting Record Updated", record.Id, new { record.RecordNumber });
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var dto = await ProjectRecords(id: record.Id).FirstAsync(cancellationToken);
         return Ok(ApiResponse<object>.SuccessResponse(dto, "Kesim kaydı güncellendi."));
@@ -211,29 +218,46 @@ public class CuttingRecordsController : ControllerBase
     [Authorize(Policy = AuthorizationPolicies.CanRecordCutting), Idempotent]
     public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken)
     {
-        var record = await _db.CuttingRecords.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockCuttingWrites(cancellationToken);
+
+        var record = await _db.CuttingRecords
+            .Include(x => x.OrderItem)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (record is null)
             return NotFound(ApiResponse<object>.Fail("Kesim kaydı bulunamadı.", "CUTTING_RECORD_NOT_FOUND"));
         if (record.IsCancelled)
             return BadRequest(ApiResponse<object>.Fail("İptal edilmiş kesim kaydı tamamlanamaz.", "CUTTING_CANCELLED"));
         if (record.Status == "Completed")
             return BadRequest(ApiResponse<object>.Fail("Kesim kaydı zaten tamamlanmış.", "CUTTING_ALREADY_COMPLETED"));
+        if (record.OrderItem is null)
+            return Conflict(ApiResponse<object>.Fail("Kesim kaydının sipariş kalemi bulunamadı.", "CUTTING_ORDER_ITEM_MISSING"));
+        if (record.GoodPairs > record.OrderItem.ProducedPairs - record.OrderItem.CutPairs)
+            return Conflict(ApiResponse<object>.Fail("Sağlam kesim miktarı sipariş kaleminin kalan üretilmiş miktarını aşıyor.", "CUTTING_EXCEEDS_ORDER_REMAINING"));
 
         record.Status = "Completed";
         record.EndTime = DateTime.UtcNow;
         record.UpdatedAt = DateTime.UtcNow;
         record.UpdatedByName = GetActor();
+        record.OrderItem.CutPairs += record.GoodPairs;
         AddAudit("Cutting Record Completed", record.Id, new { record.RecordNumber });
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var dto = await ProjectRecords(id: record.Id).FirstAsync(cancellationToken);
         return Ok(ApiResponse<object>.SuccessResponse(dto, "Kesim kaydı tamamlandı."));
     }
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules), Idempotent]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelCuttingRecordRequest request, CancellationToken cancellationToken)
     {
-        var record = await _db.CuttingRecords.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockCuttingWrites(cancellationToken);
+
+        var record = await _db.CuttingRecords
+            .Include(x => x.OrderItem)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (record is null)
             return NotFound(ApiResponse<object>.Fail("Kesim kaydı bulunamadı.", "CUTTING_RECORD_NOT_FOUND"));
         if (record.IsCancelled)
@@ -243,6 +267,7 @@ public class CuttingRecordsController : ControllerBase
         if (hasBoxes)
             return BadRequest(ApiResponse<object>.Fail("Kolilenmiş kesim kaydı iptal edilemez.", "CUTTING_HAS_BOXES"));
 
+        var wasCompleted = record.Status == "Completed";
         record.IsCancelled = true;
         record.IsActive = false;
         record.Status = "Cancelled";
@@ -251,8 +276,11 @@ public class CuttingRecordsController : ControllerBase
         record.CancelledBy = GetActor();
         record.UpdatedAt = DateTime.UtcNow;
         record.UpdatedByName = GetActor();
+        if (wasCompleted && record.OrderItem is not null)
+            record.OrderItem.CutPairs = Math.Max(record.OrderItem.CutPairs - record.GoodPairs, 0);
         AddAudit("Cutting Record Cancelled", record.Id, new { record.RecordNumber, record.CancellationReason });
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(new { record.Id, record.Status }, "Kesim kaydı iptal edildi."));
     }
@@ -420,6 +448,12 @@ public class CuttingRecordsController : ControllerBase
         return prefix + next.ToString("0000");
     }
 
+    private async Task LockCuttingWrites(CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational())
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81004)", cancellationToken);
+    }
+
     private void AddAudit(string eventName, Guid entityId, object payload)
     {
         _db.AuditLogs.Add(new AuditLog
@@ -431,7 +465,7 @@ public class CuttingRecordsController : ControllerBase
             EntityId = entityId.ToString(),
             NewValues = JsonSerializer.Serialize(payload),
             Timestamp = DateTime.UtcNow,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+            IpAddress = HttpContext?.Connection.RemoteIpAddress?.ToString()
         });
     }
 
