@@ -81,6 +81,7 @@ public class ProductionBoxesController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail("Koli çift adedi 0'dan büyük olmalıdır.", "INVALID_PAIR_COUNT"));
 
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockBoxWrites(cancellationToken);
         var cutting = await QueryCuttingRecords()
             .FirstOrDefaultAsync(x => x.Id == request.CuttingRecordId.Value, cancellationToken);
         if (cutting is null)
@@ -137,7 +138,7 @@ public class ProductionBoxesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules)]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules), Idempotent]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductionBoxRequest request, CancellationToken cancellationToken)
     {
         var box = await _db.ProductionBoxes.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -218,19 +219,33 @@ public class ProductionBoxesController : ControllerBase
     {
         if (request.BoxIds.Count == 0)
             return BadRequest(ApiResponse<object>.Fail("Sevk edilecek koli seçilmelidir.", "BOX_SELECTION_REQUIRED"));
+        if (request.BoxIds.Distinct().Count() != request.BoxIds.Count)
+            return BadRequest(ApiResponse<object>.Fail("Aynı koli sevkiyat listesinde birden fazla kez bulunamaz.", "DUPLICATE_BOX_SELECTION"));
         if (string.IsNullOrWhiteSpace(request.ShipmentReference))
             return BadRequest(ApiResponse<object>.Fail("Sevkiyat referansı zorunludur.", "SHIPMENT_REFERENCE_REQUIRED"));
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-        var boxes = await _db.ProductionBoxes.Where(x => request.BoxIds.Contains(x.Id)).ToListAsync(cancellationToken);
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockBoxWrites(cancellationToken);
+        var boxes = await _db.ProductionBoxes.Include(x => x.OrderItem).Where(x => request.BoxIds.Contains(x.Id)).ToListAsync(cancellationToken);
         if (boxes.Count != request.BoxIds.Count)
             return NotFound(ApiResponse<object>.Fail("Seçilen kolilerden biri bulunamadı.", "BOX_NOT_FOUND"));
         if (boxes.Any(x => x.Status != "ReadyForShipment" || x.IsCancelled))
             return BadRequest(ApiResponse<object>.Fail("Yalnızca sevkiyata hazır koliler sevk edilebilir.", "BOX_NOT_READY"));
+        if (boxes.Any(x => x.OrderItem is null))
+            return Conflict(ApiResponse<object>.Fail("Sevk edilecek kolilerden birinin sipariş kalemi bağlantısı yok.", "BOX_ORDER_ITEM_MISSING"));
+
+        foreach (var group in boxes.GroupBy(x => x.OrderItemId))
+        {
+            var item = group.First().OrderItem!;
+            var requestedPairs = group.Sum(PairCount);
+            if (requestedPairs > item.CutPairs - item.ShippedPairs)
+                return Conflict(ApiResponse<object>.Fail("Sevkiyat miktarı sipariş kaleminin kesilmiş kalan miktarını aşıyor.", "SHIPMENT_EXCEEDS_CUT_REMAINING"));
+        }
 
         var utcNow = request.ShipmentDate.HasValue ? NormalizeUtc(request.ShipmentDate.Value) : DateTime.UtcNow;
         foreach (var box in boxes)
         {
+            box.OrderItem!.ShippedPairs += PairCount(box);
             box.Status = "Shipped";
             box.CurrentStatus = "Shipped";
             box.CurrentLocation = "Sevkiyat";
@@ -386,7 +401,9 @@ public class ProductionBoxesController : ControllerBase
 
     private async Task<IActionResult> Transition(Guid id, string expectedStatus, string nextStatus, string? warehouseLocation, string? rackCode, string eventType, string? note, string? shipmentReference, DateTime? shipmentDate, CancellationToken cancellationToken)
     {
-        var box = await _db.ProductionBoxes.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockBoxWrites(cancellationToken);
+        var box = await _db.ProductionBoxes.Include(x => x.OrderItem).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (box is null)
             return NotFound(ApiResponse<object>.Fail("Koli bulunamadı.", "BOX_NOT_FOUND"));
         if (box.IsCancelled)
@@ -397,6 +414,10 @@ public class ProductionBoxesController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail(GetTransitionError(expectedStatus), "INVALID_BOX_STATUS"));
         if (nextStatus == "Shipped" && string.IsNullOrWhiteSpace(shipmentReference))
             return BadRequest(ApiResponse<object>.Fail("Sevkiyat referansı zorunludur.", "SHIPMENT_REFERENCE_REQUIRED"));
+        if (nextStatus == "Shipped" && box.OrderItem is null)
+            return Conflict(ApiResponse<object>.Fail("Kolinin sipariş kalemi bağlantısı bulunamadı.", "BOX_ORDER_ITEM_MISSING"));
+        if (nextStatus == "Shipped" && PairCount(box) > box.OrderItem!.CutPairs - box.OrderItem.ShippedPairs)
+            return Conflict(ApiResponse<object>.Fail("Sevkiyat miktarı sipariş kaleminin kesilmiş kalan miktarını aşıyor.", "SHIPMENT_EXCEEDS_CUT_REMAINING"));
 
         var from = box.Status;
         var now = shipmentDate.HasValue ? NormalizeUtc(shipmentDate.Value) : DateTime.UtcNow;
@@ -420,6 +441,7 @@ public class ProductionBoxesController : ControllerBase
         }
         else if (nextStatus == "Shipped")
         {
+            box.OrderItem!.ShippedPairs += PairCount(box);
             box.ShippedAt = now;
             box.ShipmentReference = shipmentReference!.Trim();
             box.ShipmentNotes = note;
@@ -435,6 +457,7 @@ public class ProductionBoxesController : ControllerBase
             _ => "Production Box Updated"
         }, box.Id, new { box.BoxNumber, box.Status, box.ShipmentReference });
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         var dto = await ProjectBoxes(id: box.Id).FirstAsync(cancellationToken);
         return Ok(ApiResponse<object>.SuccessResponse(dto, GetTransitionMessage(nextStatus)));
     }
@@ -556,6 +579,12 @@ public class ProductionBoxesController : ControllerBase
 
     private static int PairCount(ProductionBox box) => box.PairCount > 0 ? box.PairCount : box.QuantityPairs;
 
+    private async Task LockBoxWrites(CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational())
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81006)", cancellationToken);
+    }
+
     private void AddBoxEvent(ProductionBox box, string eventType, string? from, string? to, string? note, DateTime eventTime)
     {
         _db.ProductionBoxEvents.Add(new ProductionBoxEvent
@@ -582,7 +611,7 @@ public class ProductionBoxesController : ControllerBase
             EntityId = entityId.ToString(),
             NewValues = JsonSerializer.Serialize(payload),
             Timestamp = DateTime.UtcNow,
-            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+            IpAddress = HttpContext?.Connection.RemoteIpAddress?.ToString()
         });
     }
 
