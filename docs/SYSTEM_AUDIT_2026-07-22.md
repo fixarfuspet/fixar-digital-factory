@@ -110,3 +110,27 @@ Kod modelinde Gezer Kafa ve Döner Kafa operatörleri ayrı roller değil, ortak
 - 13 pozitif/negatif rol-policy senaryosu ve 4 kritik controller action policy testi eklendi.
 - Backend toplamı 45/45 test başarılı.
 - Backend build, TypeScript ve ilgili frontend lint başarılı.
+
+## Aşama 4 — Frontend route ve sayfa denetimi
+
+Durum: Kısmen tamamlandı; production route/session smoke tamam, authenticated browser CRUD ve responsive görsel denetim test edilemedi.
+
+### Eklenen güvenlik ağı
+
+- `npm run test:smoke` production Next.js sunucusunu izole portta başlatır, `app/**/page.tsx` dosyalarından route'ları otomatik keşfeder ve bütün 53 kullanıcı sayfasını kontrol eder.
+- Login sayfasının 200 açılması ve korunan 52 sayfanın oturum yokken 307/308 ile login'e yönlenmesi doğrulanır.
+- Dinamik `/traceability/[code]` route'u kontrollü `TEST-SMOKE` koduyla kapsanır.
+- Global Türkçe runtime hata ekranı eklendi; teknik ayrıntı yalnız `console.error` içine yazılır.
+- Türkçe 404 ekranı ve ana sayfaya dönüş bağlantısı eklendi.
+
+### Sonuç
+
+- Production build: 57 Next.js route başarılı.
+- Route smoke: 53/53 kullanıcı route'u başarılı.
+- TypeScript ve eklenen dosyaların lint kontrolü başarılı.
+
+### Test edilemeyenler
+
+- Depoda Playwright/Cypress bulunmuyor.
+- `FIXAR_DEV_TEST_PASSWORD` mevcut süreç ortamında tanımlı değil. Kullanıcı verisine veya mevcut hesap parolalarına müdahale etmeden authenticated browser CRUD, console, mobil/tablet/TV ve form state senaryoları çalıştırılamadı.
+- Bu maddeler tamamlanmadan Aşama 4 için “Tamamlandı” sonucu verilmedi.
