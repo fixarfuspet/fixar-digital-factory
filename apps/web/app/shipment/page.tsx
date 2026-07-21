@@ -5,7 +5,7 @@ import Link from "next/link";
 
 type ApiResponse<T> = { data?: T; message?: string; errorMessage?: string };
 type Box = { id: string; boxNumber: string; customerName?: string | null; productName?: string | null; productCode?: string | null; workOrderNumber?: string | null; pairCount: number; status: string; warehouseLocation?: string | null; rackCode?: string | null; readyForShipmentAt?: string | null; shippedAt?: string | null; shipmentReference?: string | null };
-const API = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/api/backend/api/v1";
+const API = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
 const CONTROL = "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none focus:border-emerald-400/60";
 
 export default function ShipmentPage() {

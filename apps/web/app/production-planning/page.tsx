@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AssignmentModal from "../components/production-planning/AssignmentModal";
 import ManageAssignmentModal from "../components/production-planning/ManageAssignmentModal";
+import { safeResponseJson } from "../lib/api/client";
 
 type Station = {
   station: number;
@@ -63,7 +64,7 @@ export default function ProductionPlanningPage() {
   async function loadStations() {
     try {
       const response = await fetch(API + "/station-assignments/active");
-      const result = await response.json();
+      const result = await safeResponseJson<any[]>(response);
 
       const list = [...emptyStations];
 
@@ -134,7 +135,13 @@ export default function ProductionPlanningPage() {
       return;
     }
 
-    const result = await response.json();
+    const result = await safeResponseJson<LastTurn>(response);
+
+    if (!result.data) {
+      setSavingTurn(false);
+      alert("Tur sonucu alınamadı.");
+      return;
+    }
 
     const record: LastTurn = {
       time: new Date().toLocaleTimeString("tr-TR"),

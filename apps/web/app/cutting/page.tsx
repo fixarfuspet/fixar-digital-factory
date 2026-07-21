@@ -10,7 +10,7 @@ type CuttingRecord = { id: string; recordNumber: string; recordDate: string; sta
 type Summary = { totalInputPairs?: number; todayCutPairs?: number; goodPairs?: number; rejectedPairs?: number; reworkPairs?: number; waitingForPacking?: number };
 type FormState = { stationAssignmentId: string; cuttingMachineId: string; shift: string; inputPairs: string; goodPairs: string; rejectedPairs: string; reworkPairs: string; notes: string };
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "/api/backend/api/v1";
+const API = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
 const CONTROL = "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none focus:border-emerald-400/60";
 const emptyForm: FormState = { stationAssignmentId: "", cuttingMachineId: "", shift: "1", inputPairs: "", goodPairs: "", rejectedPairs: "0", reworkPairs: "0", notes: "" };
 

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACCESS_TOKEN_COOKIE, getApiBaseUrl } from "./constants";
-import type { BackendApiResponse, MeDto } from "./backend";
+import { parseJsonResponse, type BackendApiResponse, type MeDto } from "./backend";
 
 export type SessionUser = MeDto;
 
@@ -25,8 +25,8 @@ export async function getSession(): Promise<SessionUser | null> {
 
     if (!response.ok) return null;
 
-    const payload: BackendApiResponse<MeDto> = await response.json();
-    if (!payload.success || !payload.data) return null;
+    const payload = await parseJsonResponse<BackendApiResponse<MeDto>>(response);
+    if (!payload?.success || !payload.data) return null;
 
     return payload.data;
   } catch {

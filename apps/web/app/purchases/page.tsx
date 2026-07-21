@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "red" | "cyan" | "amber";
 
@@ -124,7 +125,7 @@ export default function PurchasesPage() {
         throw new Error("Satın alma kayıtları alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setPurchases(extractPurchases(result));
     } catch (err) {
       setPurchases([]);
@@ -593,7 +594,7 @@ function PurchaseFormModal({
         throw new Error("Stok listesi alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setStocks(extractStocks(result));
     } catch (err) {
       setStocks([]);
@@ -614,7 +615,7 @@ function PurchaseFormModal({
         throw new Error("Malzeme listesi alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setMaterials(extractMaterials(result).filter((material) => material.isActive !== false));
     } catch (err) {
       setMaterials([]);
@@ -635,7 +636,7 @@ function PurchaseFormModal({
         throw new Error("Tedarikçi listesi alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setSuppliers(extractSuppliers(result).filter((supplier) => supplier.isActive !== false));
     } catch (err) {
       setSuppliers([]);
@@ -1089,7 +1090,7 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
           throw new Error("Satın alma detayı alınamadı.");
         }
 
-        const result: unknown = await response.json();
+        const result: unknown = await safeResponseJson(response);
         const detail = extractPurchase(result);
 
         if (!detail) {
@@ -1097,8 +1098,8 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
         }
 
         setPurchase(detail);
-        setStocks(stocksResponse.ok ? extractStocks(await stocksResponse.json()) : []);
-        setMaterials(materialsResponse.ok ? extractMaterials(await materialsResponse.json()) : []);
+        setStocks(stocksResponse.ok ? extractStocks(await safeResponseJson(stocksResponse)) : []);
+        setMaterials(materialsResponse.ok ? extractMaterials(await safeResponseJson(materialsResponse)) : []);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Satın alma detayı alınırken beklenmeyen bir hata oluştu.");

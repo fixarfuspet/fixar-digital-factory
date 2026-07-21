@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "red" | "cyan" | "amber";
 type DialogMode = "create" | "edit" | null;
@@ -66,7 +67,7 @@ export default function SuppliersPage() {
         throw new Error("Tedarikçi listesi alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setSuppliers(extractSuppliers(result));
     } catch (err) {
       setSuppliers([]);

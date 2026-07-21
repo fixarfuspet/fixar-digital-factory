@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ErrorState, LoadingState, PageHeader, SectionCard, StatCard, StatusBadge } from "../components/ui/SystemUI";
+import { apiRequest } from "../lib/api/client";
 
 const API = "/api/backend/api/v1/system-control";
 type Check = { key: string; title: string; count: number; status: string; details: unknown[] };
@@ -15,10 +16,10 @@ export default function SystemControlPage() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const response = await fetch(API, { cache: "no-store" });
+      const response = await apiRequest<Report>(API, { cache: "no-store" });
       if (response.status === 403) throw new Error("Bu ekran yalnız CEO tarafından görüntülenebilir.");
-      if (!response.ok) throw new Error("Sistem kontrolü tamamlanamadı.");
-      const body = await response.json(); setReport(body.data);
+      if (!response.ok || !response.data) throw new Error("Sistem kontrolü tamamlanamadı.");
+      setReport(response.data);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sistem kontrolü tamamlanamadı.");
     } finally { setLoading(false); }

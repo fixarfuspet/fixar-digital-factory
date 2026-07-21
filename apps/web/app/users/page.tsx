@@ -1,4 +1,4 @@
-"use client";
+"use client";import{safeResponseJson}from"../lib/api/client";
 
 import { useEffect, useState } from "react";
 
@@ -14,8 +14,8 @@ export default function UsersPage() {
     const [userResponse, roleResponse] = await Promise.all([fetch("/api/backend/api/v1/users"), fetch("/api/backend/api/v1/users/roles")]);
     if (userResponse.status === 403) { setMessage("Bu ekran için kullanıcı yönetimi yetkiniz bulunmuyor."); return; }
     if (userResponse.status === 401) { window.location.href = "/"; return; }
-    setUsers(((await userResponse.json()) as ApiResponse<User[]>).data ?? []);
-    setRoles(((await roleResponse.json()) as ApiResponse<string[]>).data ?? []);
+    setUsers(((await safeResponseJson(userResponse)) as ApiResponse<User[]>).data ?? []);
+    setRoles(((await safeResponseJson(roleResponse)) as ApiResponse<string[]>).data ?? []);
   }
 
   useEffect(() => { void load(); }, []);

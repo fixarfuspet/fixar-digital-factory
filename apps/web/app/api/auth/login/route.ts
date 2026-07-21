@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, getApiBaseUrl } from "@/app/lib/auth/constants";
-import type { AuthResultDto, BackendApiResponse } from "@/app/lib/auth/backend";
+import { parseJsonResponse, type AuthResultDto, type BackendApiResponse } from "@/app/lib/auth/backend";
 
 /**
  * Backend-for-frontend proxy for login. The browser never talks to the
@@ -41,10 +41,8 @@ export async function POST(request: Request) {
     );
   }
 
-  let payload: BackendApiResponse<AuthResultDto>;
-  try {
-    payload = await backendResponse.json();
-  } catch {
+  const payload = await parseJsonResponse<BackendApiResponse<AuthResultDto>>(backendResponse);
+  if (!payload) {
     return NextResponse.json(
       { success: false, message: "Sunucuya bağlanılamadı." },
       { status: 502 }

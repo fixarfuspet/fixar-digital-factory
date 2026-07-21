@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -242,8 +243,8 @@ export default function MoldsPage() {
         throw new Error(await readError(productsResponse, "Product Master listesi alınamadı."));
       }
 
-      setMolds(extractArray<Mold>(await moldsResponse.json()));
-      setProducts(extractArray<Product>(await productsResponse.json()).filter((item) => item.isActive !== false));
+      setMolds(extractArray<Mold>(await safeResponseJson(moldsResponse)));
+      setProducts(extractArray<Product>(await safeResponseJson(productsResponse)).filter((item) => item.isActive !== false));
     } catch (err) {
       setMolds([]);
       setProducts([]);
@@ -280,7 +281,7 @@ export default function MoldsPage() {
     if (moldId && selectedMold?.id === moldId) {
       const response = await fetch(`${API}/molds/${moldId}`);
       if (response.ok) {
-        setSelectedMold(extractOne<Mold>(await response.json()));
+        setSelectedMold(extractOne<Mold>(await safeResponseJson(response)));
       }
     }
     closeAction();
@@ -1222,7 +1223,7 @@ function extractOne<T>(result: unknown): T | null {
 
 async function readError(response: Response, fallback: string) {
   try {
-    const result = await response.json() as ApiResponse<unknown>;
+    const result = await safeResponseJson(response) as ApiResponse<unknown>;
     return result.message || result.errorCode || result.errors?.join(" ") || fallback;
   } catch {
     return fallback;

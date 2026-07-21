@@ -1,19 +1,19 @@
-"use client";
+"use client";import{safeResponseJson}from"../lib/api/client";
 
 import { useEffect, useMemo, useState } from "react";
 
-const API = (process.env.NEXT_PUBLIC_API_URL ?? "/api/backend/api/v1").replace(/\/$/, "");
+const API = (process.env.NEXT_PUBLIC_API_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
 type Customer = { id:string; customerCode:string; name:string; contactName?:string; phone?:string; email?:string; city?:string; country?:string; defaultCurrency:string; paymentTermDays:number; creditLimit:number; isActive:boolean; activeOrderCount:number; createdAt:string };
 type Form = { id?:string; name:string; legalName:string; contactName:string; phone:string; email:string; taxOffice:string; taxNumber:string; addressLine1:string; addressLine2:string; district:string; city:string; postalCode:string; country:string; defaultCurrency:string; paymentTermDays:string; creditLimit:string; notes:string };
 const empty:Form={name:"",legalName:"",contactName:"",phone:"",email:"",taxOffice:"",taxNumber:"",addressLine1:"",addressLine2:"",district:"",city:"",postalCode:"",country:"Türkiye",defaultCurrency:"TRY",paymentTermDays:"0",creditLimit:"0",notes:""};
 
 export default function CustomersPage(){
   const [rows,setRows]=useState<Customer[]>([]),[search,setSearch]=useState(""),[status,setStatus]=useState(""),[currency,setCurrency]=useState(""),[form,setForm]=useState<Form|null>(null),[error,setError]=useState("");
-  async function load(){const p=new URLSearchParams();if(search)p.set("search",search);if(status)p.set("isActive",status);if(currency)p.set("currency",currency);const r=await fetch(`${API}/customers?${p}`);const j=await r.json();setRows(j.data??[])}
+  async function load(){const p=new URLSearchParams();if(search)p.set("search",search);if(status)p.set("isActive",status);if(currency)p.set("currency",currency);const r=await fetch(`${API}/customers?${p}`);const j=await safeResponseJson(r);setRows(j.data??[])}
   useEffect(()=>{void load()},[search,status,currency]);
   const cards=useMemo(()=>({total:rows.length,active:rows.filter(x=>x.isActive).length,open:rows.filter(x=>x.activeOrderCount>0).length,newThisMonth:rows.filter(x=>new Date(x.createdAt).getMonth()===new Date().getMonth()).length}),[rows]);
-  async function edit(id:string){const r=await fetch(`${API}/customers/${id}`),j=await r.json(),x=j.data;setForm({id:x.id,name:x.companyName||x.name||"",legalName:x.legalName||"",contactName:x.contactName||"",phone:x.phone||"",email:x.email||"",taxOffice:x.taxOffice||"",taxNumber:x.taxNumber||"",addressLine1:x.addressLine1||"",addressLine2:x.addressLine2||"",district:x.district||"",city:x.city||"",postalCode:x.postalCode||"",country:x.country||"",defaultCurrency:x.defaultCurrency||"TRY",paymentTermDays:String(x.paymentTermDays??0),creditLimit:String(x.creditLimit??0),notes:x.notes||""})}
-  async function save(){if(!form)return;setError("");const body={...form,paymentTermDays:Number(form.paymentTermDays),creditLimit:Number(form.creditLimit)};const r=await fetch(`${API}/customers${form.id?`/${form.id}`:""}`,{method:form.id?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();if(!r.ok){setError(j.message??"Kayıt başarısız.");return}setForm(null);await load()}
+  async function edit(id:string){const r=await fetch(`${API}/customers/${id}`),j=await safeResponseJson(r),x=j.data;setForm({id:x.id,name:x.companyName||x.name||"",legalName:x.legalName||"",contactName:x.contactName||"",phone:x.phone||"",email:x.email||"",taxOffice:x.taxOffice||"",taxNumber:x.taxNumber||"",addressLine1:x.addressLine1||"",addressLine2:x.addressLine2||"",district:x.district||"",city:x.city||"",postalCode:x.postalCode||"",country:x.country||"",defaultCurrency:x.defaultCurrency||"TRY",paymentTermDays:String(x.paymentTermDays??0),creditLimit:String(x.creditLimit??0),notes:x.notes||""})}
+  async function save(){if(!form)return;setError("");const body={...form,paymentTermDays:Number(form.paymentTermDays),creditLimit:Number(form.creditLimit)};const r=await fetch(`${API}/customers${form.id?`/${form.id}`:""}`,{method:form.id?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await safeResponseJson(r);if(!r.ok){setError(j.message??"Kayıt başarısız.");return}setForm(null);await load()}
   async function toggle(x:Customer){await fetch(`${API}/customers/${x.id}/${x.isActive?"deactivate":"activate"}`,{method:"POST"});await load()}
   return <main className="min-h-screen bg-[#05070A] px-6 py-8 text-white"><div className="mx-auto max-w-7xl space-y-6">
     <header className="flex justify-between"><div><p className="text-xs font-black tracking-[.3em] text-emerald-400">CUSTOMER MASTER</p><h1 className="text-3xl font-black">Müşteriler</h1></div><button onClick={()=>setForm({...empty})} className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-black">Yeni Müşteri</button></header>

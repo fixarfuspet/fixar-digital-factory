@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -128,7 +129,7 @@ async function fetchMasterData(url: string): Promise<unknown> {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   if (!contentType.includes("json")) throw new Error(`Beklenmeyen yanıt türü: ${contentType || "boş"}`);
   try {
-    return await response.json() as unknown;
+    return await safeResponseJson(response) as unknown;
   } catch (error) {
     throw new Error("API yanıtı ayrıştırılamadı.", { cause: error });
   }
@@ -468,7 +469,7 @@ function RecipeModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toRecipeRequest(form, selectedLines, materials)),
       });
-      const result = await response.json() as ApiResponse<unknown>;
+      const result = await safeResponseJson(response) as ApiResponse<unknown>;
       if (!response.ok) throw new Error(result.message || "Reçete kaydedilemedi.");
       const saved = recipeFromApi(result.data, materials);
       if (!saved) throw new Error("API reçete cevabı okunamadı.");
@@ -502,7 +503,7 @@ function RecipeModal({
         headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       });
-      const result = await response.json() as ApiResponse<unknown>;
+      const result = await safeResponseJson(response) as ApiResponse<unknown>;
       if (!response.ok) throw new Error(result.message || "İşlem tamamlanamadı.");
       const updated = recipeFromApi(result.data, materials);
       if (!updated) throw new Error("API reçete cevabı okunamadı.");

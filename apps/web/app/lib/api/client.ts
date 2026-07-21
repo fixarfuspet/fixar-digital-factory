@@ -2,7 +2,9 @@ export const API_PROXY = "/api/backend/api/v1";
 
 type ApiEnvelope<T> = { data?: T; message?: string };
 
-export async function safeResponseJson<T = never>(response: Response): Promise<ApiEnvelope<T>> {
+// A default is required for legacy callers whose response contracts are still untyped.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function safeResponseJson<T = any>(response: Response): Promise<ApiEnvelope<T>> {
   if (response.status === 401) {
     window.location.assign("/");
     return {};
@@ -13,12 +15,12 @@ export async function safeResponseJson<T = never>(response: Response): Promise<A
     const body = await response.text();
     if (!body.trim()) return {};
     if (!contentType.includes("json")) {
-      console.error("API JSON olmayan yanıt döndürdü.", { status: response.status, contentType });
+      console.error("API JSON olmayan yanıt döndürdü.", { url: response.url, status: response.status, contentType });
       return {};
     }
     return JSON.parse(body) as ApiEnvelope<T>;
   } catch (error) {
-    console.error("API yanıtı ayrıştırılamadı.", { status: response.status, error });
+    console.error("API yanıtı ayrıştırılamadı.", { url: response.url, status: response.status, error });
     return {};
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { safeResponseJson } from "../../lib/api/client";
 
 type Props = {
   open: boolean;
@@ -26,6 +27,8 @@ type AssignmentDetail = {
   note?: string;
 };
 
+type AddTurnResult = { turnCount: number; activeStationCount: number; totalAddedPairs: number };
+
 const API = "/api/backend/api/v1";
 
 export default function ManageAssignmentModal({ open, station, onClose }: Props) {
@@ -49,12 +52,12 @@ export default function ManageAssignmentModal({ open, station, onClose }: Props)
   async function load() {
     setLoading(true);
     const response = await fetch(API + "/station-assignments/station/" + station);
-    const result = await response.json();
+    const result = await safeResponseJson<AssignmentDetail>(response);
     setItem(result.data ?? null);
     setLoading(false);
   }
 
-  async function post(url: string, body: any) {
+  async function post<T = unknown>(url: string, body: any) {
     const response = await fetch(API + url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,7 +70,7 @@ export default function ManageAssignmentModal({ open, station, onClose }: Props)
       return null;
     }
 
-    const result = await response.json();
+    const result = await safeResponseJson<T>(response);
     await load();
     return result;
   }
@@ -92,7 +95,7 @@ export default function ManageAssignmentModal({ open, station, onClose }: Props)
     setSavingTurn(true);
     setMessage("");
 
-    const result = await post("/station-assignments/add-turn", {
+    const result = await post<AddTurnResult>("/station-assignments/add-turn", {
       turnCount: turns,
       note: note || "Tur üretimi",
     });

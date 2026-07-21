@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -167,7 +168,7 @@ export default function MachinesPage() {
         throw new Error(await readError(response, "Makine listesi alınamadı."));
       }
 
-      setMachines(extractArray<Machine>(await response.json()));
+      setMachines(extractArray<Machine>(await safeResponseJson(response)));
     } catch (err) {
       setMachines([]);
       setError(err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.");
@@ -203,7 +204,7 @@ export default function MachinesPage() {
     if (machineId && selectedMachine?.id === machineId) {
       const response = await fetch(`${API}/machines/${machineId}`);
       if (response.ok) {
-        setSelectedMachine(extractOne<Machine>(await response.json()));
+        setSelectedMachine(extractOne<Machine>(await safeResponseJson(response)));
       }
     }
     closeAction();
@@ -1096,7 +1097,7 @@ function extractOne<T>(result: unknown): T | null {
 
 async function readError(response: Response, fallback: string) {
   try {
-    const result = await response.json() as ApiResponse<unknown>;
+    const result = await safeResponseJson(response) as ApiResponse<unknown>;
     return result.message || result.errorCode || result.errors?.join(" ") || fallback;
   } catch {
     return fallback;

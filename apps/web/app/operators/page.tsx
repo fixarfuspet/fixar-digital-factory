@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -218,8 +219,8 @@ export default function OperatorsPage() {
       ]);
       if (!operatorsResponse.ok) throw new Error(await readError(operatorsResponse, "Operatör listesi alınamadı."));
       if (!machinesResponse.ok) throw new Error(await readError(machinesResponse, "Makine listesi alınamadı."));
-      setOperators(extractArray<Operator>(await operatorsResponse.json()));
-      setMachines(extractArray<Machine>(await machinesResponse.json()).filter((machine) => machine.isActive !== false));
+      setOperators(extractArray<Operator>(await safeResponseJson(operatorsResponse)));
+      setMachines(extractArray<Machine>(await safeResponseJson(machinesResponse)).filter((machine) => machine.isActive !== false));
     } catch (err) {
       setOperators([]);
       setMachines([]);
@@ -255,7 +256,7 @@ export default function OperatorsPage() {
     await loadData();
     if (operatorId && selectedOperator?.id === operatorId) {
       const response = await fetch(`${API}/operators/${operatorId}`);
-      if (response.ok) setSelectedOperator(extractOne<Operator>(await response.json()));
+      if (response.ok) setSelectedOperator(extractOne<Operator>(await safeResponseJson(response)));
     }
     closeAction();
     setSuccessMessage(message);
@@ -1052,7 +1053,7 @@ function extractOne<T>(result: unknown): T | null {
 
 async function readError(response: Response, fallback: string) {
   try {
-    const result = await response.json() as ApiResponse<unknown>;
+    const result = await safeResponseJson(response) as ApiResponse<unknown>;
     return result.message || result.errorCode || result.errors?.join(" ") || fallback;
   } catch {
     return fallback;

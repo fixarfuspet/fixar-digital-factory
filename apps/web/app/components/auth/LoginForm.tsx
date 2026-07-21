@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { parseJsonResponse } from "@/app/lib/auth/backend";
 
 export function LoginForm() {
   const router = useRouter();
@@ -29,9 +30,9 @@ export function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
 
-      const payload: { success: boolean; message?: string } = await response.json();
+      const payload = await parseJsonResponse<{ success: boolean; message?: string }>(response);
 
-      if (!response.ok || !payload.success) {
+      if (!response.ok || !payload?.success) {
         setError(response.status === 502 ? "Sunucuya bağlanılamadı." : "E-posta veya şifre hatalı.");
         setLoading(false);
         return;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type MovementType = "Giriş" | "Çıkış";
 type StockDialogMode = "create" | "edit" | "delete";
@@ -123,7 +124,7 @@ export default function StocksPage() {
         throw new Error("Stok listesi alınamadı.");
       }
 
-      const result = await response.json();
+      const result = await safeResponseJson(response);
       setStocks(Array.isArray(result.data) ? result.data : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.");
@@ -602,7 +603,7 @@ function MovementHistoryModal({ stock, onClose }: { stock: StockItem | null; onC
           throw new Error("Hareket geçmişi alınamadı.");
         }
 
-        const result: unknown = await response.json();
+        const result: unknown = await safeResponseJson(response);
         setMovements(extractMovements(result));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;

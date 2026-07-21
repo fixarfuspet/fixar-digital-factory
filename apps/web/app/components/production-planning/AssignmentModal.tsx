@@ -1,4 +1,4 @@
-"use client";
+"use client";import{safeResponseJson}from"../../lib/api/client";
 
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -92,19 +92,19 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
     if (!open) return;
 
     fetch(API + "/production-planning/lookups/customers")
-      .then((r) => r.json())
+      .then((r) => safeResponseJson(r))
       .then((r) => setCustomers(r.data ?? []));
 
     fetch(API + "/production-planning/lookups/operators")
-      .then((r) => r.json())
+      .then((r) => safeResponseJson(r))
       .then((r) => setOperators(r.data ?? []));
 
     fetch(API + "/station-assignments/active")
-      .then((r) => r.json())
+      .then((r) => safeResponseJson(r))
       .then((r) => setActiveAssignments(r.data ?? []));
 
     fetch(API + "/work-orders/available-for-planning")
-      .then((r) => r.json())
+      .then((r) => safeResponseJson(r))
       .then((r) => setWorkOrders(r.data ?? []));
   }, [open]);
 
@@ -116,7 +116,7 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
     }
 
     fetch(API + "/production-planning/lookups/orders?customerId=" + customerId)
-      .then((r) => r.json())
+      .then((r) => safeResponseJson(r))
       .then((r) => setOrders(r.data ?? []));
   }, [customerId]);
 

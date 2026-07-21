@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -251,7 +252,7 @@ export default function MaterialsPage() {
         throw new Error("Malzeme listesi alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setMaterials(extractMaterials(result));
     } catch (err) {
       setMaterials([]);
@@ -282,7 +283,7 @@ export default function MaterialsPage() {
         throw new Error("Malzeme detayı alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setDialogMaterial(extractMaterial(result) ?? material);
     } catch (err) {
       setDetailError(err instanceof Error ? err.message : "Malzeme detayı yüklenemedi.");
@@ -612,7 +613,7 @@ function MaterialModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toRequestBody(form)),
       });
-      const result: ApiResponse<unknown> = await response.json().catch(() => ({}));
+      const result: ApiResponse<unknown> = await safeResponseJson(response).catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(extractErrorMessage(result) || "Malzeme kaydedilemedi.");

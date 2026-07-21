@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red";
 type ProductDialogMode = "create" | "edit" | "detail" | null;
@@ -344,7 +345,7 @@ export default function ProductsPage() {
         throw new Error("Ürün listesi alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setProducts(extractProducts(result));
     } catch (err) {
       setProducts([]);
@@ -375,7 +376,7 @@ export default function ProductsPage() {
         throw new Error("Ürün detayı alınamadı.");
       }
 
-      const result: unknown = await response.json();
+      const result: unknown = await safeResponseJson(response);
       setDialogProduct(extractProduct(result) ?? product);
     } catch (err) {
       setDetailError(err instanceof Error ? err.message : "Ürün detayı yüklenirken hata oluştu.");
@@ -690,7 +691,7 @@ function ProductMasterModal({
         body: JSON.stringify(toRequestBody(form)),
       });
 
-      const result: ApiResponse<unknown> = await response.json().catch(() => ({}));
+      const result: ApiResponse<unknown> = await safeResponseJson(response).catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(extractErrorMessage(result) || "Ürün kaydedilemedi.");

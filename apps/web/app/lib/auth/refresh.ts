@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from "./constants";
-import type { AuthResultDto, BackendApiResponse } from "./backend";
+import { parseJsonResponse, type AuthResultDto, type BackendApiResponse } from "./backend";
 
 export interface RefreshedTokens {
   accessToken: string;
@@ -23,8 +23,8 @@ export async function refreshSession(refreshToken: string): Promise<RefreshedTok
 
     if (!response.ok) return null;
 
-    const payload: BackendApiResponse<AuthResultDto> = await response.json();
-    if (!payload.success || !payload.data) return null;
+    const payload = await parseJsonResponse<BackendApiResponse<AuthResultDto>>(response);
+    if (!payload?.success || !payload.data) return null;
 
     return {
       accessToken: payload.data.accessToken,
