@@ -24,10 +24,11 @@ public sealed class WorkOrderCostService(ApplicationDbContext db) : IWorkOrderCo
 
     public async Task<WorkOrderCostSnapshot> CreateSnapshotAsync(Guid workOrderId, CreateCostSnapshotRequest request, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        if (db.Database.IsRelational())
+            await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81201)", ct);
         var preview = await CalculateAsync(workOrderId, request.ReportingCurrency, DateTime.UtcNow, ct);
         if (!preview.CanCreateSnapshot) throw new InvalidOperationException(string.Join(" ", preview.MissingInputs));
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81201)", ct);
         var today = DateTime.UtcNow.Date;
         var prefix = $"COST-{today:yyyyMMdd}-";
         var last = await db.WorkOrderCostSnapshots.Where(x => x.SnapshotNumber.StartsWith(prefix))

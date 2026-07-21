@@ -342,3 +342,30 @@ Durum: Kısmen tamamlandı; modern kesim→koli→depo→sevkiyat akışında si
 - Toplu sevkiyatta mükerrer koli seçiminin engellenmesi.
 
 Sonuç: Backend testleri 67/67 başarılı.
+
+## Aşama 14 — Maliyet ve kârlılık
+
+Durum: Kısmen tamamlandı; snapshot atomikliği ve kesin maliyet tekilliği düzeltildi. Gerçek üretim verisi ve güncel kur tablosuyla finansal mutabakat ortam eksikliği nedeniyle yapılamadı.
+
+### Doğrulanan hesap kontrolleri
+
+- Tahmini malzeme reçete miktarı, fire yüzdesi, lot ağırlıklı fiyatı ve stok/malzeme son fiyat fallback sırasıyla hesaplanıyor.
+- Gerçek malzeme maliyeti reversal olmayan tüketimlerden ve tüketilen lotun fiyat/para biriminden geliyor.
+- İşçilik, enerji, makine, fire, kesim, paketleme, kalite, sevkiyat hazırlığı ve genel gider ayrı maliyet satırlarıdır.
+- Eksik reçete, fiyat, birim dönüşümü veya döviz kuru sahte sıfır maliyet üretmek yerine snapshot oluşturmayı engelliyor.
+- Üretilen veya sağlam çift sıfırken birim maliyet null bırakılıyor; sıfıra bölme yapılmıyor.
+- Gelir vergisiz net sipariş kalemi tutarından iş emri plan oranıyla ayrılıyor; marj yalnız gelir sıfır değilse hesaplanıyor.
+- Maliyet ve kârlılık endpointleri operatör rollerine kapalı policy'lerle korunuyor.
+
+### Kök neden ve düzeltmeler
+
+- Snapshot önizlemesi transaction başlamadan hesaplanıyordu. Hesap ile kayıt arasındaki üretim/tüketim değişikliği tutarsız snapshot oluşturabilirdi. Hesap artık serializable transaction ve maliyet advisory lock alındıktan sonra yapılıyor.
+- Aynı iş emrinde birden fazla snapshot `Final` yapılabiliyordu. Finalize işlemi ortak kilit altında aynı iş emrinin mevcut kesin snapshot'ını kontrol ediyor ve ikincisini `409 FINAL_COST_EXISTS` ile engelliyor.
+- Kesinleştirme için açık audit kaydı eklendi. Relational olmayan test sağlayıcılarında advisory SQL çalıştırılmıyor.
+
+### Regression testleri
+
+- Aynı iş emrinde ikinci kesin maliyet snapshot'ının engellenmesi.
+- Başarılı kesinleştirmenin durum/tür güncellemesi ve audit kaydı oluşturması.
+
+Sonuç: Backend testleri 69/69 başarılı.

@@ -9,6 +9,10 @@ using Fixar.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
+using System.Text.Json;
+using Fixar.Domain.Entities;
+using Fixar.Domain.Enums;
 
 namespace Fixar.API.Controllers;
 
@@ -27,7 +31,20 @@ public sealed class WorkOrderCostsController(ApplicationDbContext db, IWorkOrder
     [HttpPost("work-order/{workOrderId:guid}/calculate"), Authorize(Policy = AuthorizationPolicies.CanCalculateCosts), Idempotent]
     public async Task<IActionResult> Calculate(Guid workOrderId, CreateCostSnapshotRequest request, CancellationToken ct) { try { var x = await costs.CreateSnapshotAsync(workOrderId, request, ct); return Ok(ApiResponse<object>.SuccessResponse(new { x.Id, x.SnapshotNumber }, "İş emri maliyeti hesaplandı.")); } catch (KeyNotFoundException ex) { return NotFound(ApiResponse<object>.Fail(ex.Message, "WORK_ORDER_NOT_FOUND")); } catch (InvalidOperationException ex) { return UnprocessableEntity(ApiResponse<object>.Fail(ex.Message, "COST_INPUT_MISSING")); } }
     [HttpPost("{id:guid}/finalize"), Authorize(Policy = AuthorizationPolicies.CanFinalizeCosts), Idempotent]
-    public async Task<IActionResult> Finalize(Guid id, CancellationToken ct) { var x = await db.WorkOrderCostSnapshots.FirstOrDefaultAsync(x => x.Id == id, ct); if (x is null) return NotFound(ApiResponse<object>.Fail("Maliyet snapshot'ı bulunamadı.", "COST_NOT_FOUND")); if (x.IsFinal) return Conflict(ApiResponse<object>.Fail("Bu maliyet snapshot’ı daha önce kesinleştirilmiş.", "ALREADY_FINAL")); x.IsFinal = true; x.CalculationType = "Final"; await db.SaveChangesAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { x.Id, x.IsFinal }, "Maliyet snapshot'ı kesinleştirildi.")); }
+    public async Task<IActionResult> Finalize(Guid id, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        if (db.Database.IsRelational()) await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81201)", ct);
+        var x = await db.WorkOrderCostSnapshots.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (x is null) return NotFound(ApiResponse<object>.Fail("Maliyet snapshot'ı bulunamadı.", "COST_NOT_FOUND"));
+        if (x.IsFinal) return Conflict(ApiResponse<object>.Fail("Bu maliyet snapshot’ı daha önce kesinleştirilmiş.", "ALREADY_FINAL"));
+        if (await db.WorkOrderCostSnapshots.AnyAsync(s => s.WorkOrderId == x.WorkOrderId && s.IsFinal && s.Id != id, ct))
+            return Conflict(ApiResponse<object>.Fail("İş emrinin başka bir kesin maliyet snapshot'ı bulunuyor.", "FINAL_COST_EXISTS"));
+        x.IsFinal = true; x.CalculationType = "Final";
+        db.AuditLogs.Add(new AuditLog { Id = Guid.NewGuid(), UserName = User?.Identity?.Name ?? "system", Action = AuditAction.Update, EntityName = "Work Order Cost Finalized", EntityId = x.Id.ToString(), NewValues = JsonSerializer.Serialize(new { x.WorkOrderId, x.SnapshotNumber }), Timestamp = DateTime.UtcNow, IpAddress = HttpContext?.Connection.RemoteIpAddress?.ToString() });
+        await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
+        return Ok(ApiResponse<object>.SuccessResponse(new { x.Id, x.IsFinal }, "Maliyet snapshot'ı kesinleştirildi."));
+    }
     [HttpGet("work-order/{workOrderId:guid}/latest")] public async Task<IActionResult> Latest(Guid workOrderId, CancellationToken ct) { var x = await costs.GetLatestSnapshotAsync(workOrderId, ct); if (x is null) return NotFound(ApiResponse<object>.Fail("İş emri için maliyet snapshot'ı bulunamadı.", "COST_NOT_FOUND")); return Ok(ApiResponse<object>.SuccessResponse(WorkOrderCostService.ToListDto(await Query().FirstAsync(y => y.Id == x.Id, ct)))); }
     [HttpGet("summary")] public async Task<IActionResult> Summary(string? currency, CancellationToken ct) { var q = Query(); if (!string.IsNullOrWhiteSpace(currency)) q = q.Where(x => x.ReportingCurrency == currency.ToUpper()); var latestIds = await q.GroupBy(x => x.WorkOrderId).Select(g => g.OrderByDescending(x => x.SnapshotDate).Select(x => x.Id).First()).ToListAsync(ct); var rows = await q.Where(x => latestIds.Contains(x.Id)).ToListAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { SnapshotCount = rows.Count, TotalEstimatedCost = rows.Sum(x => x.TotalEstimatedCost), TotalActualCost = rows.Sum(x => x.TotalActualCost), AverageCostPerGoodPair = rows.Where(x => x.ActualCostPerGoodPair.HasValue).Select(x => x.ActualCostPerGoodPair!.Value).DefaultIfEmpty().Average(), TotalSalesRevenue = rows.Sum(x => x.SalesRevenue), GrossProfit = rows.Sum(x => x.GrossProfit), GrossMarginPercent = rows.Sum(x => x.SalesRevenue) == 0 ? (decimal?)null : rows.Sum(x => x.GrossProfit) / rows.Sum(x => x.SalesRevenue) * 100, VarianceAmount = rows.Sum(x => x.VarianceAmount), Currency = currency?.ToUpperInvariant() })); }
     private IQueryable<Fixar.Domain.Entities.WorkOrderCostSnapshot> Query() => db.WorkOrderCostSnapshots.AsNoTracking().Include(x => x.WorkOrder).ThenInclude(x => x.Product).Include(x => x.WorkOrder).ThenInclude(x => x.OrderItem).ThenInclude(x => x.Order).ThenInclude(x => x.Customer);
