@@ -86,8 +86,9 @@ public class AuthService : IAuthService
 
     public async Task<AuthResult> RefreshTokenAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken = default)
     {
+        var tokenHash = HashRefreshToken(refreshToken);
         var existingToken = await _context.RefreshTokens
-            .SingleOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+            .SingleOrDefaultAsync(t => t.Token == tokenHash || t.Token == refreshToken, cancellationToken);
 
         if (existingToken is null || !existingToken.IsActive)
         {
@@ -105,7 +106,7 @@ public class AuthService : IAuthService
 
         var result = await IssueTokensAsync(user, ipAddress, cancellationToken);
 
-        existingToken.ReplacedByToken = result.RefreshToken;
+        existingToken.ReplacedByToken = HashRefreshToken(result.RefreshToken);
         await _context.SaveChangesAsync(cancellationToken);
 
         return result;
@@ -113,8 +114,9 @@ public class AuthService : IAuthService
 
     public async Task RevokeTokenAsync(string refreshToken, string? ipAddress, CancellationToken cancellationToken = default)
     {
+        var tokenHash = HashRefreshToken(refreshToken);
         var existingToken = await _context.RefreshTokens
-            .SingleOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+            .SingleOrDefaultAsync(t => t.Token == tokenHash || t.Token == refreshToken, cancellationToken);
 
         if (existingToken is null || !existingToken.IsActive)
         {
@@ -139,7 +141,7 @@ public class AuthService : IAuthService
         _context.RefreshTokens.Add(new RefreshToken
         {
             UserId = user.Id,
-            Token = refreshToken,
+            Token = HashRefreshToken(refreshToken),
             ExpiresAtUtc = now.AddDays(_jwtSettings.RefreshTokenExpirationDays),
             CreatedAtUtc = now,
             CreatedByIp = ipAddress
@@ -191,5 +193,11 @@ public class AuthService : IAuthService
     {
         var randomBytes = RandomNumberGenerator.GetBytes(64);
         return Convert.ToBase64String(randomBytes);
+    }
+
+    private static string HashRefreshToken(string token)
+    {
+        var hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+        return $"sha256:{Convert.ToHexString(hash)}";
     }
 }

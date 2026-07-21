@@ -45,6 +45,7 @@ try
     app.UseHttpsRedirection();
 
     app.UseCors(ApiServiceExtensions.CorsPolicyName);
+    app.UseRateLimiter();
 
     app.UseAuthentication();
     app.UseAuthorization();

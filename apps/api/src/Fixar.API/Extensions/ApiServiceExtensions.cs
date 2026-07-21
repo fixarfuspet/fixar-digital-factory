@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Fixar.API.Middleware;
 using Fixar.API.Security;
+using System.Threading.RateLimiting;
 
 namespace Fixar.API.Extensions;
 
@@ -45,6 +46,20 @@ public static class ApiServiceExtensions
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("authentication", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+        });
 
         services.AddSwaggerDocumentation();
         services.AddApiHealthChecks();

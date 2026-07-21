@@ -5,6 +5,11 @@ import { ACCESS_TOKEN_COOKIE, getApiBaseUrl } from "@/app/lib/auth/constants";
 type Context = { params: Promise<{ path: string[] }> };
 
 async function proxy(request: NextRequest, context: Context) {
+  const origin = request.headers.get("origin");
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method) && origin && origin !== request.nextUrl.origin) {
+    console.error("Çapraz kaynaklı değişiklik isteği engellendi.", { url: request.nextUrl.pathname, origin });
+    return NextResponse.json({ message: "İstek kaynağı doğrulanamadı." }, { status: 403 });
+  }
   const { path } = await context.params;
   const accessToken = (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value;
   if (!accessToken) return NextResponse.json({ message: "Oturum gerekli." }, { status: 401 });

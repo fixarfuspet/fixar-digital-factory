@@ -9,6 +9,10 @@ import { parseJsonResponse, type AuthResultDto, type BackendApiResponse } from "
  * cookies so they're inaccessible to client-side JavaScript (XSS-safe).
  */
 export async function POST(request: Request) {
+  const origin = request.headers.get("origin");
+  if (origin && origin !== new URL(request.url).origin) {
+    return NextResponse.json({ success: false, message: "İstek kaynağı doğrulanamadı." }, { status: 403 });
+  }
   let body: { email?: unknown; password?: unknown };
   try {
     body = await request.json();

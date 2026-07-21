@@ -48,3 +48,34 @@ Branch: `fix/live-production-integration`
 - Veritabanı migration'ı oluşturulmadı.
 - Gerçek secret rapora veya kaynak koda yazılmadı.
 - Bu rapordaki “başarılı” ifadeleri yalnız çalıştırılmış otomatik doğrulamalar için kullanılır.
+
+## Aşama 2 — Authentication ve session
+
+Durum: Tamamlandı (kod tabanında ve otomatik güvenlik testleriyle).
+
+### Düzeltilenler
+
+- Login, refresh ve logout endpointlerine IP bazlı sabit pencere rate-limit eklendi: dakikada en fazla 10 istek, kuyruk yok, aşımda HTTP 429.
+- Yeni refresh tokenlar veritabanında ham değer yerine `SHA-256` hash ile saklanıyor. Geçiş sırasında mevcut düz metin tokenlar bir kez daha kullanılabildiği için aktif oturumlar bozulmuyor; döndürülen yeni token hashleniyor.
+- Logout, süresi dolmuş access token nedeniyle refresh tokenı iptal edememe sorununu gidermek için refresh tokenı kendi yetkilendirme kanıtı olarak kabul ediyor. Token bilinmeden başka oturum iptal edilemiyor.
+- BFF login, logout ve tüm veri değiştiren proxy isteklerine same-origin kontrolü eklendi. Cookie tabanlı oturumda CSRF için `SameSite=Lax` korumasına ek savunma sağlandı.
+- Next.js session kapısı yalnız `/home` ve `/dashboard` yerine bütün uygulama sayfalarını kapsayacak şekilde genişletildi; API ve statik asset yolları hariç tutuldu.
+- Access ve refresh cookie'lerinin `HttpOnly`, production ortamında `Secure`, `SameSite=Lax` ve kök path ayarları doğrulandı.
+- JWT issuer, audience, imza, ömür ve 1 dakikalık clock-skew doğrulaması; 15 dakikalık access ve 7 günlük refresh ömrü doğrulandı.
+- Identity parola politikası: en az 12 karakter, büyük/küçük harf, rakam ve özel karakter. Beş başarısız denemede 15 dakika kilit.
+- Development test kullanıcıları yalnız `Development` ortamında ve `FIXAR_DEV_TEST_PASSWORD` açıkça verilirse hazırlanıyor; parola loglanmıyor.
+
+### Otomatik test matrisi
+
+- Auth endpoint rate-limit attribute kontrolü.
+- Süresi dolmuş access token durumunda logout/revoke sözleşmesi.
+- Refresh token hashinin deterministik ve tek yönlü olması.
+- Parola, unique email ve lockout ayarları.
+- Enjeksiyon, kesim ve depo operatörlerinin maliyet, kârlılık ve yönetici dashboard policy'lerinden dışlanması.
+
+Sonuç: Backend testleri 28/28 başarılı; backend build, TypeScript, ilgili frontend lint ve 57 route production build başarılı.
+
+### Sınırlar
+
+- Gerçek tarayıcıda çoklu sekme ve token süresi ilerletme testi henüz E2E altyapısı kurulmadığı için Aşama 4/29 kapsamına bırakıldı.
+- Refresh token hash geçişi şema değiştirmedi; migration oluşturulmadı.

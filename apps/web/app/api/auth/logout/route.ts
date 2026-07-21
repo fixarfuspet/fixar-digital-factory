@@ -7,7 +7,11 @@ import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, getApiBaseUrl } from "@/app/
  * clears the local session cookies regardless of whether the backend
  * call succeeds, so the browser is logged out either way.
  */
-export async function POST() {
+export async function POST(request: Request) {
+  const origin = request.headers.get("origin");
+  if (origin && origin !== new URL(request.url).origin) {
+    return NextResponse.json({ success: false, message: "İstek kaynağı doğrulanamadı." }, { status: 403 });
+  }
   const cookieStore = await cookies();
   const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
   const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
