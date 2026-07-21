@@ -369,3 +369,43 @@ Durum: Kısmen tamamlandı; snapshot atomikliği ve kesin maliyet tekilliği dü
 - Başarılı kesinleştirmenin durum/tür güncellemesi ve audit kaydı oluşturması.
 
 Sonuç: Backend testleri 69/69 başarılı.
+
+## Aşama 15 — Dashboard ve TV ekranları
+
+Durum: Hazır değil.
+
+- CEO yönetim dashboard'u, canlı üretim ekranı ve güvenli response katmanı mevcut; route/build smoke kapsamında açılış ve oturum kapısı doğrulandı.
+- Enjeksiyon TV, Gezer Kafa TV ve Döner Kafa TV için ayrı route/bileşen bulunamadı. Otomatik slayt, tam ekran, stale-data uyarısı ve güvenli uzun süreli TV session davranışını doğrulayacak uygulama kodu/E2E testi yok.
+- Bu eksikliği tahmini bir ekran veya anonim kalıcı token oluşturarak kapatmak güvenlik ve iş kuralı riski yaratacağı için yeni TV sistemi eklenmedi.
+
+## Aşama 16 — Bakım modülü
+
+Durum: Kısmen hazır.
+
+- Varlık, talep, iş emri, periyodik plan, checklist, parça kullanımı, duruş süresi, maliyet ve dashboard controllerları mevcut ve açık bakım policy'leriyle korunuyor.
+- Boş veritabanında bakım dashboard'unun sıfır değerli geçerli cevap üretmesi regression testiyle korunuyor.
+- Aşama 5 controller route/authorization sözleşme testleri bakım endpointlerini kapsıyor; production build içinde bakım sayfaları bulunuyor.
+- Gerçek makine arızası→üretim duruşu→parça tüketimi→onay/tamamlama senaryosu PostgreSQL ve authenticated tarayıcı olmadan uçtan uca çalıştırılamadı.
+
+## Aşama 17 — Satın alma ve tedarikçi
+
+Durum: Kısmen tamamlandı; hammadde satın alma/lot çift sayımı ve fazla lot kabulü engellendi. Gerçek tedarikçi/irsaliye/fatura mutabakatı ortam eksikliği nedeniyle yapılamadı.
+
+### Kök neden ve düzeltmeler
+
+- Lot takipli hammadde satın alma oluşturulurken `StockItem.CurrentQuantity` doğrudan artırılıyor, daha sonra aynı satın alma satırından lot açıldığında lot akışı ana stoğu tekrar artırıyordu.
+- Hammaddeye bağlı satın alma satırı artık finansal/sipariş kaydı ve fiyat kaynağıdır; fiziksel stok yalnız lot kabulünde artar. Lot takipli satır için satın alma create/update/cancel doğrudan stok hareketi üretmez.
+- Genel, lot takibi olmayan stok kartlarında mevcut doğrudan giriş davranışı korunur.
+- Aynı satın alma satırına bağlı lotların başlangıç toplamı sipariş satırı miktarını aşamaz ve birimler stok kartıyla eşleşmelidir.
+- Aktif lot kabulü bulunan satın alma iptal edilemez; herhangi bir lot bağlantısı olan satın alma satırları sonradan değiştirilemez.
+- Genel stok satın alma azaltması/iptali stoğu negatife düşüremez.
+- Create/update/cancel idempotency, serializable transaction ve satın alma advisory lock ile korunuyor.
+- Daha önce çift sayılmış olabilecek gerçek kayıtlar otomatik değiştirilmedi; Aşama 1 Sistem Kontrolündeki stok-lot farkı kontrolü bunları görünür kılar ve kullanıcı verisi incelenerek mutabakat gerektirir.
+
+### Regression testleri
+
+- Lot takipli satın almanın lot kabulünden önce ana stoğu artırmaması.
+- Genel stok satın almasının mevcut doğrudan giriş davranışını koruması.
+- Lot kabul toplamının satın alma satırı miktarını aşamaması.
+
+Sonuç: Backend testleri 72/72 başarılı.

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Fixar.API.Security;
+using System.Data;
 
 namespace Fixar.API.Controllers;
 
@@ -57,8 +58,11 @@ public class PurchasesController : ControllerBase
     }
 
     [HttpPost]
+    [Idempotent]
     public async Task<IActionResult> Create([FromBody] CreatePurchaseOrderRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockPurchaseWrites(cancellationToken);
         if (string.IsNullOrWhiteSpace(request.SupplierName))
             return BadRequest(ApiResponse<object>.Fail("Tedarikçi adı zorunludur.", "SUPPLIER_NAME_REQUIRED"));
 
@@ -124,13 +128,14 @@ public class PurchasesController : ControllerBase
                 Note = requestLine.Note
             });
 
-            stockItem.CurrentQuantity += requestLine.Quantity;
+            if (!stockItem.MaterialId.HasValue)
+                stockItem.CurrentQuantity += requestLine.Quantity;
             stockItem.LastPurchasePrice = requestLine.UnitPrice;
             stockItem.SupplierName = purchase.SupplierName;
             stockItem.SupplierCode = purchase.SupplierCode;
             stockItem.Currency = purchase.Currency;
 
-            _db.StockMovements.Add(new StockMovement
+            if (!stockItem.MaterialId.HasValue) _db.StockMovements.Add(new StockMovement
             {
                 StockItemId = stockItem.Id,
                 MovementType = "Giriş",
@@ -149,13 +154,17 @@ public class PurchasesController : ControllerBase
 
         _db.PurchaseOrders.Add(purchase);
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(ToPurchaseResponse(purchase), "Satın alma oluşturuldu."));
     }
 
     [HttpPut("{id:guid}")]
+    [Idempotent]
     public async Task<IActionResult> Update(Guid id, [FromBody] CreatePurchaseOrderRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockPurchaseWrites(cancellationToken);
         var purchase = await _db.PurchaseOrders
             .Include(x => x.Lines)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -165,6 +174,8 @@ public class PurchasesController : ControllerBase
 
         if (IsCancelled(purchase))
             return BadRequest(ApiResponse<object>.Fail("İptal edilmiş satın alma düzenlenemez.", "PURCHASE_CANCELLED"));
+        if (await _db.MaterialLots.AnyAsync(x => x.PurchaseOrderId == id, cancellationToken))
+            return Conflict(ApiResponse<object>.Fail("Lot kabulü yapılmış satın alma satırları değiştirilemez.", "PURCHASE_HAS_LOTS"));
 
         var validation = await ValidatePurchaseRequest(request, cancellationToken);
 
@@ -220,7 +231,10 @@ public class PurchasesController : ControllerBase
                 continue;
 
             var stockItem = stockItems[stockId];
-            stockItem.CurrentQuantity += difference;
+            if (!stockItem.MaterialId.HasValue && stockItem.CurrentQuantity + difference < 0)
+                return Conflict(ApiResponse<object>.Fail("Satın alma güncellemesi stok miktarını negatife düşüremez.", "PURCHASE_STOCK_CONFLICT"));
+            if (!stockItem.MaterialId.HasValue)
+                stockItem.CurrentQuantity += difference;
             stockItem.SupplierName = purchase.SupplierName;
             stockItem.SupplierCode = purchase.SupplierCode;
             stockItem.Currency = purchase.Currency;
@@ -230,7 +244,7 @@ public class PurchasesController : ControllerBase
             if (requestLine is not null)
                 stockItem.LastPurchasePrice = requestLine.UnitPrice;
 
-            _db.StockMovements.Add(new StockMovement
+            if (!stockItem.MaterialId.HasValue) _db.StockMovements.Add(new StockMovement
             {
                 StockItemId = stockItem.Id,
                 MovementType = difference > 0 ? "Giriş" : "Çıkış",
@@ -278,6 +292,7 @@ public class PurchasesController : ControllerBase
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -290,8 +305,11 @@ public class PurchasesController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cancel")]
+    [Idempotent]
     public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockPurchaseWrites(cancellationToken);
         var purchase = await _db.PurchaseOrders
             .Include(x => x.Lines)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -301,6 +319,8 @@ public class PurchasesController : ControllerBase
 
         if (IsCancelled(purchase))
             return BadRequest(ApiResponse<object>.Fail("Satın alma zaten iptal edilmiş.", "PURCHASE_ALREADY_CANCELLED"));
+        if (await _db.MaterialLots.AnyAsync(x => x.PurchaseOrderId == id && x.IsActive, cancellationToken))
+            return Conflict(ApiResponse<object>.Fail("Aktif lot kabulü bulunan satın alma iptal edilemez.", "PURCHASE_HAS_ACTIVE_LOTS"));
 
         var stockIds = purchase.Lines.Select(x => x.StockItemId).Distinct().ToList();
         var stockItems = await _db.StockItems
@@ -313,9 +333,12 @@ public class PurchasesController : ControllerBase
             if (!stockItems.TryGetValue(line.StockItemId, out var stockItem))
                 return NotFound(ApiResponse<object>.Fail("Stok kartı bulunamadı.", "STOCK_NOT_FOUND"));
 
-            stockItem.CurrentQuantity -= line.Quantity;
+            if (!stockItem.MaterialId.HasValue && stockItem.CurrentQuantity < line.Quantity)
+                return Conflict(ApiResponse<object>.Fail("Satın alma iptali stok miktarını negatife düşüremez.", "PURCHASE_STOCK_CONFLICT"));
+            if (!stockItem.MaterialId.HasValue)
+                stockItem.CurrentQuantity -= line.Quantity;
 
-            _db.StockMovements.Add(new StockMovement
+            if (!stockItem.MaterialId.HasValue) _db.StockMovements.Add(new StockMovement
             {
                 StockItemId = stockItem.Id,
                 MovementType = "Çıkış",
@@ -331,6 +354,7 @@ public class PurchasesController : ControllerBase
         purchase.Status = "Cancelled";
 
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok(ApiResponse<object>.SuccessResponse(ToPurchaseResponse(purchase), "Satın alma iptal edildi."));
     }
@@ -376,6 +400,12 @@ public class PurchasesController : ControllerBase
     private static bool IsCancelled(PurchaseOrder purchase)
     {
         return string.Equals(purchase.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task LockPurchaseWrites(CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational())
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81007)", cancellationToken);
     }
 
     private static DateTime? ToUtc(DateTime? value)

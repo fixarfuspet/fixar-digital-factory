@@ -167,6 +167,9 @@ public sealed class MaterialLotsController(ApplicationDbContext db) : Controller
             if (line is null) return BadRequest(Fail("Satın alma satırı bulunamadı.", "PURCHASE_LINE_NOT_FOUND"));
             if (line.StockItemId != r.StockItemId || line.StockItem.MaterialId != r.MaterialId) return BadRequest(Fail("Satın alma satırı seçilen malzeme ve stok kartıyla uyumlu değil.", "PURCHASE_LINE_MISMATCH"));
             if (r.PurchaseOrderId.HasValue && line.PurchaseOrderId != r.PurchaseOrderId) return BadRequest(Fail("Satın alma siparişi ile satırı uyumlu değil.", "PURCHASE_ORDER_MISMATCH"));
+            if (!string.Equals(line.Unit, stock.Unit, StringComparison.OrdinalIgnoreCase)) return BadRequest(Fail("Satın alma satırı birimi stok kartı birimiyle uyumlu değil.", "PURCHASE_UNIT_MISMATCH"));
+            var accepted = await db.MaterialLots.Where(x => x.PurchaseOrderLineId == r.PurchaseOrderLineId && x.Id != existingId).SumAsync(x => x.InitialQuantity, ct);
+            if (accepted + r.InitialQuantity > line.Quantity) return Conflict(Fail("Lot kabul miktarı satın alma satırı miktarını aşıyor.", "PURCHASE_LINE_OVER_RECEIPT"));
         }
         return null;
     }
