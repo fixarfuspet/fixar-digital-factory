@@ -38,6 +38,7 @@ try
         app.UseSwaggerDocumentation();
     }
 
+    app.UseMiddleware<Fixar.API.Middleware.RequestContextMiddleware>();
     app.UseSerilogRequestLogging();
 
     app.UseExceptionHandler();

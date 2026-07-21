@@ -20,7 +20,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system --gid 1000 fixar \
-    && adduser --system --uid 1000 --ingroup fixar --shell /bin/false fixar
+    && adduser --system --uid 1000 --ingroup fixar --shell /bin/false fixar \
+    && mkdir -p /var/log/fixar-os \
+    && chown -R fixar:fixar /var/log/fixar-os
 
 COPY --from=build /app/publish .
 

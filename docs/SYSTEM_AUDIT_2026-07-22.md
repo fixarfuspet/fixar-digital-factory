@@ -409,3 +409,86 @@ Durum: Kısmen tamamlandı; hammadde satın alma/lot çift sayımı ve fazla lot
 - Lot kabul toplamının satın alma satırı miktarını aşamaması.
 
 Sonuç: Backend testleri 72/72 başarılı.
+
+## Aşama 18 — Müşteri ve fiyat yönetimi
+
+Durum: Kısmen hazır.
+
+- Müşteri kartı, teklif kalem fiyatı, sipariş kalem snapshot fiyatı, para birimi, iskonto ve KDV alanları mevcut; teklif→sipariş dönüşümünde fiyat geçmiş siparişte korunuyor.
+- Ayrı fiyat listesi, model/numara/çocuk-zenne-erkek ve etiketli/etiketsiz tarihsel fiyat entity/controller/sayfası bulunmuyor. Bu nedenle fiyat geçmişi ve geçerlilik dönemi gereksinimleri hazır değildir.
+- Fiyat ve teklif mutation endpointleri satış yönetimi policy'siyle operatörlere kapalıdır.
+
+## Aşama 19 — Raporlar ve dışa aktarım
+
+Durum: Hazır değil.
+
+- Yönetim kârlılık, üretim/kalite/kesim/stok özetleri ve finansal hareket CSV çıktısı mevcut.
+- İstenen üretim, fire, stok, sipariş, sevkiyat, maliyet, müşteri, operatör, makine ve bakım için ortak filtreli Excel/CSV/PDF rapor paketi yok. Büyük veri/pagination ve çıktı toplamı mutabakat testleri de yok.
+
+## Aşama 20 — Bildirim ve alarmlar
+
+Durum: Hazır değil.
+
+- Dashboard özetlerinde kritik stok, gecikme, eksik maliyet ve sistem bütünlüğü göstergeleri bulunuyor.
+- Kalıcı Notification/Alarm entity'si, kullanıcı hedefleme, okundu/okunmadı, tekrar bastırma ve alarm teslim kanalı bulunmuyor. Yeni bir bildirim mimarisi iş kararı olmadan eklenmedi.
+
+## Aşama 21 — Audit log
+
+Durum: Kısmen hazır.
+
+- `AuditableEntitySaveChangesInterceptor` entity create/update/delete değişikliklerini kullanıcı, IP, zaman, eski/yeni değer ve etkilenen kolonlarla kaydediyor.
+- Kritik üretim, kalite, lot, tüketim, maliyet, finans, koli ve sevkiyat işlemlerinde açıklayıcı iş olayı auditleri de mevcut.
+- Audit endpointi normal kullanıcıya açılmamış; controller üzerinden silme/güncelleme yolu yok.
+- Başarısız login olayları Serilog'a yazılıyor ancak veritabanı AuditLog'una ayrı güvenlik olayı olarak kaydedilmiyor. Log deposunda append-only/WORM garantisi altyapı seviyesinde doğrulanmadı.
+
+## Aşama 22 — Hata yönetimi ve log
+
+Durum: Kısmen tamamlandı.
+
+- Global exception handler bilinen hataları standart API zarfına, bilinmeyenleri teknik ayrıntı sızdırmayan 500 cevabına çeviriyor.
+- Beklenmeyen hata ve 401 mesajları Türkçeleştirildi.
+- Her isteğe güvenli `X-Correlation-ID` atanıyor; istemciden yalnız 64 karaktere kadar harf/rakam/`-_.` kabul ediliyor. Kimlik response'a ve Serilog contextine ekleniyor; exception logları method, path ve correlation ID içeriyor.
+- `nosniff`, frame deny, no-referrer ve kamera/mikrofon/konum izinlerini kapatan güvenlik headerları eklendi.
+- Frontend global error boundary ve ortak güvenli JSON/boş body parserı mevcut.
+- Merkezi log rotation production ayarında 30 gün; gerçek Seq/dosya yazma ve offline log disk dolumu testi yapılmadı.
+
+## Aşama 23 — Güvenlik
+
+Durum: Kısmen hazır.
+
+- JWT/cookie/session, rate limit, same-origin mutation kontrolü, CORS allow-list, policy matrisi, idempotency, generic production exception ve development-only Swagger/seed doğrulandı.
+- Controller route/authorization sözleşmesi ve operatör negatif yetki testleri mevcut.
+- Dosya yükleme endpointi bulunmadığından MIME/zararlı dosya yüzeyi yok.
+- Otomatik DAST, SAST ve dependency vulnerability sonuçları Aşama 41'e bırakıldı. CSP headerı frontend davranışı ölçülmeden zorla eklenmedi.
+
+## Aşama 24 — Performans
+
+Durum: Kısmen hazır.
+
+- Dashboard ve liste sorgularında `AsNoTracking`, projection ve bazı büyük include zincirlerinde `AsSplitQuery` kullanılıyor.
+- Frontend production build route bazında statik/dinamik çıktıları üretiyor.
+- Çok sayıda liste endpointinde pagination yok; traceability, stok ve finans listeleri veri büyüdükçe sınırsız dönebilir. Gerçek PostgreSQL veri hacmi ve yük aracı olmadığından p95 API süresi/connection pool ölçümü yapılamadı.
+
+## Aşama 25 — Concurrency ve veri bütünlüğü
+
+Durum: Kısmen tamamlandı.
+
+- Bu denetimde üretim, kesim, stok, kalite, koli/sevkiyat, satın alma ve maliyet yazmaları serializable transaction ve modül advisory locklarıyla seri hâle getirildi.
+- Idempotency kayıt tablosu unique anahtar ile tekrar istekleri koruyor; kritik endpointlerin idempotency kapsamı genişletildi.
+- Gerçek PostgreSQL'e paralel HTTP yük testi ortam yokluğu nedeniyle çalıştırılamadı; InMemory regression testleri iş kuralı sonuçlarını doğruluyor ancak izolasyon seviyesini kanıtlamıyor.
+
+## Aşama 26 — Offline, yedekleme ve felaket
+
+Durum: Hazır değil.
+
+- Frontend ağ hatalarını kullanıcı dostu mesajla ele alıyor; idempotency yeniden denemede duplicate riskini azaltıyor.
+- Depoda PostgreSQL backup/restore scripti, şifreleme, saklama politikası, zamanlanmış yedek veya doğrulanmış uygulama rollback runbook'u yok.
+- Docker/PostgreSQL çalışmadığı için izole backup→restore testi yapılamadı. Gerçek kullanıcı verisine dokunulmadı.
+
+## Aşama 27 — Tarih, saat ve zaman dilimi
+
+Durum: Kısmen hazır.
+
+- Backend operasyon zamanlarını ağırlıklı UTC saklıyor; API girişlerindeki birçok tarih `DateTimeKind` kontrollü normalize ediliyor. Frontend `tr-TR` gösterim kullanıyor.
+- Container/host için açık `Europe/Istanbul` ayarı ve merkezi vardiya/gün sınırı servisi yok. Bazı raporlar `DateTime.UtcNow.Date` ile gün kesiyor; Türkiye gece vardiyasında gün sınırı sapabilir.
+- Tarih kolonları ağırlıklı `timestamp with time zone` modeline uygun olsa da gerçek PostgreSQL şeması ve DST/gece vardiyası E2E testi çalıştırılmadı.
