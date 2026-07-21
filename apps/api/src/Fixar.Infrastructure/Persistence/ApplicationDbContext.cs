@@ -281,6 +281,9 @@ public DbSet<MaintenanceAsset> MaintenanceAssets=>Set<MaintenanceAsset>(); publi
         builder.Entity<OrderItem>().HasIndex(x => new { x.OrderId, x.LineNumber }).IsUnique();
         builder.Entity<OrderItem>().HasIndex(x => x.IsActive);
 
+        builder.Entity<Order>().HasOne(x => x.Customer).WithMany(x => x.Orders).HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<Order>().HasOne(x => x.Product).WithMany(x => x.Orders).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+
         builder.Entity<WorkOrder>()
             .HasOne(x => x.Product)
             .WithMany(x => x.WorkOrders)
@@ -569,6 +572,15 @@ public DbSet<MaintenanceAsset> MaintenanceAssets=>Set<MaintenanceAsset>(); publi
             .WithMany()
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CuttingRecord>().HasOne(x => x.CuttingMachine).WithMany(x => x.CuttingRecords).HasForeignKey(x => x.CuttingMachineId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<CuttingRecord>().HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductionRecord>().HasOne(x => x.InjectionStation).WithMany(x => x.ProductionRecords).HasForeignKey(x => x.InjectionStationId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<ProductionRecord>().HasOne(x => x.Mold).WithMany(x => x.ProductionRecords).HasForeignKey(x => x.MoldId).OnDelete(DeleteBehavior.Restrict);
+        builder.Entity<ProductionRecord>().HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<PurchaseOrderLine>().HasOne(x => x.StockItem).WithMany().HasForeignKey(x => x.StockItemId).OnDelete(DeleteBehavior.Restrict);
 
         builder.Entity<CuttingRecord>()
             .HasOne(x => x.Operator)

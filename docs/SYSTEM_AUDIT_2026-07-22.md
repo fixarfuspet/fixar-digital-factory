@@ -8,7 +8,7 @@ Branch: `fix/live-production-integration`
 - Backend: 48 controller dosyasında 52 controller sınıfı; ASP.NET Core, EF Core ve PostgreSQL.
 - Frontend: 53 `page.tsx`, production build çıktısında 57 route.
 - Domain: 53 C# kaynak dosyası.
-- Migration: 34 ana migration ve güncel model snapshot.
+- Migration: başlangıçta 35 ana migration; denetimde eklenen güvenli FK migrationıyla 36 ve güncel model snapshot.
 - Otomatik test: tek test projesinde 24 test.
 - Ana üretim zinciri: `Customer → Quote → Order → OrderItem → WorkOrder → StationAssignment → InjectionStation → add-turn → ProductionBox`.
 - Stok zinciri: `Material → StockItem → MaterialLot → MaterialContainer → StockReservation → MaterialConsumption`.
@@ -153,3 +153,35 @@ Sonuç: Toplam backend testi 48/48 başarılı. Açık authorization action veya
 
 - Her endpoint için gerçek veritabanıyla ayrı success, validation, not-found, conflict, transaction rollback ve IDOR testi henüz yoktur.
 - Bu nedenle controller katmanı için “canlıya hazır/tamamlandı” sonucu verilmedi.
+
+## Aşama 6 — Veritabanı ve migration
+
+Durum: Kısmen tamamlandı; migration zinciri ve yeni migration SQL'i doğrulandı, izole PostgreSQL apply/rollback testi ortam yokluğu nedeniyle yapılamadı.
+
+### Düzeltme
+
+`ProtectHistoricalRecordsFromCascadeDelete` migrationı aşağıdaki sekiz tarihsel ilişkiyi Cascade yerine Restrict yaptı:
+
+- Customer → Order
+- Product → Order
+- CuttingMachine → CuttingRecord
+- Order → CuttingRecord
+- InjectionStation → ProductionRecord
+- Mold → ProductionRecord
+- Order → ProductionRecord
+- StockItem → PurchaseOrderLine
+
+Bu değişiklik kayıt veya kolon silmez; yalnız master kaydın yanlışlıkla fiziksel silinmesi halinde geçmiş sipariş, üretim, kesim ve satın alma kayıtlarının zincirleme silinmesini engeller. `Down` bölümü önceki davranışı açıkça geri yükler.
+
+### Doğrulama
+
+- 35 mevcut migration sıralı listelendi; yeni migration ile toplam 36.
+- Tam idempotent migration SQL'i üretildi: 5.878 satır.
+- Yeni migration için 38 satırlık hedef SQL üretildi; `DROP TABLE`, `DROP COLUMN`, `DELETE` veya `TRUNCATE` içermiyor.
+- Sekiz ilişkinin EF modelinde `DeleteBehavior.Restrict` olduğunu doğrulayan regression testi eklendi.
+- Backend testleri 49/49 başarılı.
+
+### Ortam engeli
+
+- `127.0.0.1:5432` kapalı, Docker ve yerel PostgreSQL istemcisi mevcut değil. Bu nedenle temiz izole PostgreSQL veritabanına apply ve rollback testi çalıştırılamadı.
+- Migration gerçek kullanıcı veritabanına uygulanmadı.
