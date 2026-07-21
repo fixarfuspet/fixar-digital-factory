@@ -36,6 +36,8 @@ button, a { touch-action: manipulation; }
 table { border-collapse: collapse; }
 tbody tr { transition: background-color 150ms ease; }
 tbody tr:hover { background-color: rgb(255 255 255 / 0.025); }
+.action { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid rgb(255 255 255 / .1); border-radius: .75rem; padding: .5rem 1rem; background: rgb(255 255 255 / .05); font-size: .875rem; font-weight: 700; }
+.action:hover { background: rgb(52 211 153 / .15); color: rgb(110 231 183); }
 
 @media (max-width: 640px) {
   main { padding: 1rem !important; padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important; }

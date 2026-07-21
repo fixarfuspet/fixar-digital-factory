@@ -95,6 +95,20 @@ public sealed class SystemControlController(ApplicationDbContext db) : Controlle
             .Select(x => new { x.Id, x.PaymentNumber, x.PaymentMethod, x.Amount, x.Currency, x.FinancePostingStatus }).ToArrayAsync(cancellationToken);
         var overdueMaintenance = await db.PreventiveMaintenancePlans.AsNoTracking().Where(x => x.IsActive && x.NextDueDate < DateTime.UtcNow.Date)
             .Select(x => new { x.Id, x.PlanCode, x.Name, x.NextDueDate }).ToArrayAsync(cancellationToken);
+        var expiredOpenQuotes = await db.Quotes.AsNoTracking().Where(x => x.ValidUntil < DateTime.UtcNow.Date && (x.Status == "Draft" || x.Status == "Sent" || x.Status == "Approved"))
+            .Select(x => new { x.Id, x.QuoteNumber, x.ValidUntil, x.Status }).ToArrayAsync(cancellationToken);
+        var approvedUnconvertedQuotes = await db.Quotes.AsNoTracking().Where(x => x.Status == "Approved" && x.ConvertedOrderId == null)
+            .Select(x => new { x.Id, x.QuoteNumber, x.ApprovedAt }).ToArrayAsync(cancellationToken);
+        var quoteItemsWithoutRecipe = await db.QuoteItems.AsNoTracking().Where(x => !db.Recipes.Any(r => r.ProductId == x.ProductId && r.IsActive))
+            .Select(x => new { x.Id, x.QuoteId, x.LineNumber, x.ProductId }).ToArrayAsync(cancellationToken);
+        var quotesWithCostWarnings = await db.Quotes.AsNoTracking().Where(x => x.CalculationWarnings != null && x.TotalEstimatedCost == null)
+            .Select(x => new { x.Id, x.QuoteNumber, x.CalculationWarnings }).ToArrayAsync(cancellationToken);
+        var quotesWithoutLeadTime = await db.Quotes.AsNoTracking().Where(x => !x.IsCancelled && x.Status != "Converted" && x.EstimatedLeadTimeDays == null)
+            .Select(x => new { x.Id, x.QuoteNumber, x.Status }).ToArrayAsync(cancellationToken);
+        var convertedQuotesWithoutOrder = await db.Quotes.AsNoTracking().Where(x => x.Status == "Converted" && x.ConvertedOrderId == null)
+            .Select(x => new { x.Id, x.QuoteNumber }).ToArrayAsync(cancellationToken);
+        var quotesWithMismatchedOrder = await db.Quotes.AsNoTracking().Where(x => x.ConvertedOrderId != null && x.ConvertedOrder != null && x.ConvertedOrder.CustomerId != x.CustomerId)
+            .Select(x => new { x.Id, x.QuoteNumber, x.CustomerId, x.ConvertedOrderId, OrderCustomerId = x.ConvertedOrder!.CustomerId }).ToArrayAsync(cancellationToken);
 
         var checks = new object[]
         {
@@ -118,7 +132,14 @@ public sealed class SystemControlController(ApplicationDbContext db) : Controlle
             Check("order-without-receivable", "Cari kaydı olmayan onaylı sipariş", confirmedOrdersWithoutReceivable.Length, confirmedOrdersWithoutReceivable),
             Check("collection-without-finance", "Finans hesabına işlenmemiş tahsilat", collectionsWithoutFinance.Length, collectionsWithoutFinance),
             Check("supplier-payment-without-finance", "Finans hesabına işlenmemiş tedarikçi ödemesi", supplierPaymentsWithoutFinance.Length, supplierPaymentsWithoutFinance),
-            Check("overdue-maintenance", "Gecikmiş bakım planı", overdueMaintenance.Length, overdueMaintenance)
+            Check("overdue-maintenance", "Gecikmiş bakım planı", overdueMaintenance.Length, overdueMaintenance),
+            Check("expired-open-quote", "Süresi geçmiş açık teklif", expiredOpenQuotes.Length, expiredOpenQuotes),
+            Check("approved-unconverted-quote", "Onaylı fakat siparişe dönüşmemiş teklif", approvedUnconvertedQuotes.Length, approvedUnconvertedQuotes),
+            Check("quote-item-without-recipe", "Reçetesi eksik teklif kalemi", quoteItemsWithoutRecipe.Length, quoteItemsWithoutRecipe),
+            Check("quote-cost-warning", "Eksik maliyet girdili teklif", quotesWithCostWarnings.Length, quotesWithCostWarnings),
+            Check("quote-without-lead-time", "Termin hesaplanamayan teklif", quotesWithoutLeadTime.Length, quotesWithoutLeadTime),
+            Check("converted-quote-without-order", "Siparişe dönüşmüş fakat sipariş bağlantısı boş teklif", convertedQuotesWithoutOrder.Length, convertedQuotesWithoutOrder),
+            Check("quote-order-mismatch", "Teklif / dönüştürülen sipariş müşteri tutarsızlığı", quotesWithMismatchedOrder.Length, quotesWithMismatchedOrder)
         };
 
         return Ok(ApiResponse<object>.SuccessResponse(new

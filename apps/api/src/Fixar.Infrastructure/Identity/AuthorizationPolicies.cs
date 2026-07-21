@@ -6,6 +6,8 @@ public static class AuthorizationPolicies
     public const string CanViewSystemHealth = nameof(CanViewSystemHealth);
     public const string CanManageCustomers = nameof(CanManageCustomers);
     public const string CanManageSalesOrders = nameof(CanManageSalesOrders);
+    public const string CanViewQuotes = nameof(CanViewQuotes);
+    public const string CanManageQuotes = nameof(CanManageQuotes);
     public const string CanManagePurchases = nameof(CanManagePurchases);
     public const string CanManageMaterials = nameof(CanManageMaterials);
     public const string CanManageLots = nameof(CanManageLots);

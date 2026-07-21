@@ -1,5 +1,6 @@
 const UI_LABELS: Record<string, string> = {
   Draft: "Taslak", Confirmed: "Onaylandı", InProduction: "Üretimde",
+  Sent: "Gönderildi", Converted: "Siparişe Dönüştürüldü",
   PartiallyCompleted: "Kısmen Tamamlandı", Completed: "Tamamlandı", Cancelled: "İptal Edildi",
   Active: "Aktif", Inactive: "Pasif", Available: "Kullanılabilir",
   PartiallyUsed: "Kısmen Kullanıldı", FullyUsed: "Tükendi", Depleted: "Tükendi",

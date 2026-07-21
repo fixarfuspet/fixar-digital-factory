@@ -83,6 +83,8 @@ public static class DependencyInjection
             options.AddPolicy(AuthorizationPolicies.CanViewSystemHealth, p => Roles(p, ceo));
             options.AddPolicy(AuthorizationPolicies.CanManageCustomers, p => Roles(p, ceo, RoleNames.SalesManager));
             options.AddPolicy(AuthorizationPolicies.CanManageSalesOrders, p => Roles(p, ceo, RoleNames.SalesManager, RoleNames.FinanceManager, RoleNames.Finance));
+            options.AddPolicy(AuthorizationPolicies.CanViewQuotes, p => Roles(p, ceo, RoleNames.SalesManager, RoleNames.ProductionManager));
+            options.AddPolicy(AuthorizationPolicies.CanManageQuotes, p => Roles(p, ceo, RoleNames.SalesManager));
             options.AddPolicy(AuthorizationPolicies.CanManagePurchases, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing));
             options.AddPolicy(AuthorizationPolicies.CanManageMaterials, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing));
             options.AddPolicy(AuthorizationPolicies.CanManageLots, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing, RoleNames.QualityManager, RoleNames.QualityInspector, RoleNames.QualityOperator));
