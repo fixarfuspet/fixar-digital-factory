@@ -133,7 +133,7 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders)]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public async Task<IActionResult> Create([FromBody] SaveWorkOrderRequest request, CancellationToken cancellationToken)
     {
         var validation = await ValidateRequest(request, null, null, cancellationToken);
@@ -203,9 +203,11 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/plan")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public Task<IActionResult> Plan(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "Planned", cancellationToken);
 
     [HttpPost("{id:guid}/mark-ready")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public Task<IActionResult> MarkReady(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "Ready", cancellationToken);
 
     [HttpPost("{id:guid}/start")]
@@ -304,13 +306,15 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/pause")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public Task<IActionResult> Pause(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "Paused", cancellationToken);
 
     [HttpPost("{id:guid}/resume")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public Task<IActionResult> Resume(Guid id, CancellationToken cancellationToken) => ChangeStatus(id, "InProduction", cancellationToken);
 
     [HttpPost("{id:guid}/complete")]
-    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders)]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public async Task<IActionResult> Complete(Guid id, [FromBody] CompleteWorkOrderRequest request, CancellationToken cancellationToken)
     {
         var workOrder = await QueryWorkOrders().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -342,7 +346,7 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cancel")]
-    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders)]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelWorkOrderRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.CancellationReason))
@@ -377,11 +381,18 @@ public class WorkOrdersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/duplicate")]
+    [Authorize(Policy = AuthorizationPolicies.CanManageWorkOrders), Idempotent]
     public async Task<IActionResult> Duplicate(Guid id, CancellationToken cancellationToken)
     {
         var source = await QueryWorkOrders().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (source is null)
             return NotFound(ApiResponse<object>.Fail("İş emri bulunamadı.", "WORK_ORDER_NOT_FOUND"));
+
+        var duplicateRequest = new SaveWorkOrderRequest(source.OrderItemId, source.RecipeId, source.PlannedPairs, source.Priority,
+            source.PlannedStartDate, source.PlannedEndDate, source.AssignedMachineId, source.Shift, source.Notes, true);
+        var validation = await ValidateRequest(duplicateRequest, null, null, cancellationToken);
+        if (validation is not null)
+            return validation;
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         var utcNow = DateTime.UtcNow;

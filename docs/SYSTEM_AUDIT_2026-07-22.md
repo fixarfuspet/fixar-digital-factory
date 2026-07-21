@@ -185,3 +185,22 @@ Bu değişiklik kayıt veya kolon silmez; yalnız master kaydın yanlışlıkla 
 
 - `127.0.0.1:5432` kapalı, Docker ve yerel PostgreSQL istemcisi mevcut değil. Bu nedenle temiz izole PostgreSQL veritabanına apply ve rollback testi çalıştırılamadı.
 - Migration gerçek kullanıcı veritabanına uygulanmadı.
+
+## Aşama 7 — Sipariş ve iş emri
+
+Durum: Kısmen tamamlandı; kritik miktar, tekrar gönderim ve yetki açıkları düzeltildi. Gerçek PostgreSQL uçtan uca sipariş üretim/sevkiyat senaryosu test edilemedi.
+
+### Düzeltilenler
+
+- Sipariş oluşturma ve çoğaltma idempotency korumasına alındı.
+- Sipariş toplamlarını yeniden hesaplayan yazma endpointi satış siparişi yönetim policy'sine ve idempotency korumasına alındı.
+- Sipariş kalemi miktarı artık yalnız üretilen miktarın değil; üretilen, kesilen veya sevk edilen değerlerin en büyüğünün altına indirilemiyor.
+- İş emri create, plan, ready, pause, resume, complete, cancel ve duplicate endpointleri yönetim policy'sine ve idempotency korumasına alındı.
+- İş emri çoğaltma akışı ortak kalan-miktar doğrulamasını atlıyordu. Çoğaltma öncesinde sipariş kaleminin kalan miktarı ve diğer açık iş emirlerinin planlanan toplamı kontrol ediliyor.
+
+### Regression testleri
+
+- Sevk edilmiş miktarın altına sipariş kalemi düşürme engeli.
+- Sipariş kalanını aşan mükerrer iş emri engeli.
+
+Sonuç: Backend testleri 51/51 başarılı.
