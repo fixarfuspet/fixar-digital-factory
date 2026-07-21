@@ -3,6 +3,7 @@ using Asp.Versioning;
 using Fixar.API.Security;
 using Fixar.Application.Common.Models;
 using Fixar.Domain.Entities;
+using Fixar.Domain.Enums;
 using Fixar.Domain.Services;
 using Fixar.Infrastructure.Identity;
 using Fixar.Infrastructure.Persistence;
@@ -14,7 +15,7 @@ namespace Fixar.API.Controllers;
 
 [ApiController, ApiVersion("1.0"), Authorize(Policy = AuthorizationPolicies.CanViewQuotes)]
 [Route("api/v{version:apiVersion}/quotes")]
-public sealed class QuotesController(ApplicationDbContext db) : ControllerBase
+public sealed class QuotesController(ApplicationDbContext db, ILogger<QuotesController> logger) : ControllerBase
 {
     private static readonly string[] Currencies = ["TRY", "EUR", "USD", "GBP"];
 
@@ -48,9 +49,33 @@ public sealed class QuotesController(ApplicationDbContext db) : ControllerBase
     [HttpPut("{id:guid}"), Authorize(Policy = AuthorizationPolicies.CanManageQuotes)]
     public async Task<IActionResult> Update(Guid id, QuoteRequest request, CancellationToken ct)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var quote = await db.Quotes.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id, ct); if (quote is null) return NotFound(ApiResponse<object>.Fail("Teklif bulunamadı.", "QUOTE_NOT_FOUND"));
-        if (quote.Status != "Draft") return Conflict(ApiResponse<object>.Fail("Yalnız taslak teklif değiştirilebilir.", "QUOTE_LOCKED")); var validation = await Validate(request, ct); if (validation is not null) return BadRequest(ApiResponse<object>.Fail(validation, "VALIDATION_ERROR"));
-        await using var tx = await db.Database.BeginTransactionAsync(ct); db.QuoteItems.RemoveRange(quote.Items); quote.Items.Clear(); Apply(quote, request); await db.SaveChangesAsync(ct); await Recalculate(quote, ct); await tx.CommitAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { quote.Id, quote.QuoteNumber }, "Teklif güncellendi."));
+        if (!QuoteWorkflowRules.CanEdit(quote.Status)) return Conflict(ApiResponse<object>.Fail("Yalnız taslak teklif değiştirilebilir.", "QUOTE_LOCKED")); var validation = await Validate(request, ct); if (validation is not null) return BadRequest(ApiResponse<object>.Fail(validation, "VALIDATION_ERROR"));
+        var sync = QuoteItemSynchronizer.Synchronize(quote, request.Items); if (sync.Error is not null) return BadRequest(ApiResponse<object>.Fail(sync.Error, "QUOTE_ITEM_VALIDATION_ERROR"));
+        ApplyHeader(quote, request); db.QuoteItems.RemoveRange(sync.Removed);
+        var finalLineNumbers = quote.Items.ToDictionary(x => x, x => x.LineNumber);
+        var temporaryLine = 0; foreach (var item in quote.Items) item.LineNumber = --temporaryLine;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            foreach (var item in quote.Items) item.LineNumber = finalLineNumbers[item];
+            await db.SaveChangesAsync(ct);
+            await Recalculate(quote, ct);
+            db.AuditLogs.Add(new AuditLog { UserName = User.Identity?.Name ?? "system", Action = AuditAction.Update, EntityName = "Quotation Updated", EntityId = quote.Id.ToString(), NewValues = JsonSerializer.Serialize(new { quote.QuoteNumber, ItemCount = quote.Items.Count, quote.TotalSalesAmount, quote.TotalEstimatedCost }), Timestamp = DateTime.UtcNow, IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString() });
+            await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+            return Ok(ApiResponse<object>.SuccessResponse(new { quote.Id, quote.QuoteNumber }, "Teklif güncellendi."));
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            logger.LogWarning(ex, "Teklif güncelleme eşzamanlılık çakışması. QuoteId: {QuoteId}", id);
+            await tx.RollbackAsync(ct); return Conflict(ApiResponse<object>.Fail("Teklif başka bir işlem tarafından değiştirildi. Lütfen yenileyip tekrar deneyin.", "QUOTE_CONCURRENCY_CONFLICT"));
+        }
+        catch (DbUpdateException ex)
+        {
+            logger.LogError(ex, "Teklif kalemleri güncellenirken veri çakışması oluştu. QuoteId: {QuoteId}", id);
+            await tx.RollbackAsync(ct); return Conflict(ApiResponse<object>.Fail("Teklif kalemleri güncellenemedi. Lütfen verileri kontrol edip tekrar deneyin.", "QUOTE_UPDATE_CONFLICT"));
+        }
     }
 
     [HttpPost("{id:guid}/send"), Authorize(Policy = AuthorizationPolicies.CanManageQuotes), Idempotent]
@@ -99,9 +124,38 @@ public sealed class QuotesController(ApplicationDbContext db) : ControllerBase
     private async Task<IActionResult> Transition(Guid id, string from, string to, string message, Action<Quote>? apply, CancellationToken ct) { var quote = await db.Quotes.FirstOrDefaultAsync(x => x.Id == id, ct); if (quote is null) return NotFound(ApiResponse<object>.Fail("Teklif bulunamadı.")); if (quote.Status != from) return Conflict(ApiResponse<object>.Fail($"Bu işlem yalnız {from} durumundaki teklif için yapılabilir.")); quote.Status = to; apply?.Invoke(quote); await db.SaveChangesAsync(ct); return Ok(ApiResponse<object>.SuccessResponse(new { quote.Id, quote.Status }, message)); }
     private async Task<string> NextNumber(DateTime date, CancellationToken ct) { var prefix = $"TKL-{date:yyyy}-"; var values = await db.Quotes.Where(x => x.QuoteNumber.StartsWith(prefix)).Select(x => x.QuoteNumber).ToListAsync(ct); var next = values.Select(x => int.TryParse(x[prefix.Length..], out var n) ? n : 0).DefaultIfEmpty().Max() + 1; return $"{prefix}{next:000000}"; }
     private async Task<string?> Validate(QuoteRequest request, CancellationToken ct) { if (request.QuoteDate == default || request.ValidUntil < request.QuoteDate.Date) return "Teklif ve geçerlilik tarihleri geçersiz."; if (!Currencies.Contains(request.Currency)) return "Desteklenmeyen para birimi."; if (request.PaymentTermDays < 0) return "Vade günü negatif olamaz."; if (!await db.Customers.AnyAsync(x => x.Id == request.CustomerId && x.IsActive, ct)) return "Aktif müşteri bulunamadı."; if (request.Items.Count == 0) return "En az bir teklif kalemi zorunludur."; foreach (var item in request.Items) { if (item.Quantity <= 0 || item.UnitPrice < 0) return "Miktar sıfırdan büyük, fiyat negatif olmamalıdır."; if (!await db.Products.AnyAsync(x => x.Id == item.ProductId && x.IsActive, ct)) return "Aktif ürün bulunamadı."; } return null; }
-    private static void Apply(Quote quote, QuoteRequest request) { quote.CustomerId = request.CustomerId; quote.QuoteDate = DateTime.SpecifyKind(request.QuoteDate, DateTimeKind.Utc); quote.ValidUntil = DateTime.SpecifyKind(request.ValidUntil, DateTimeKind.Utc); quote.Currency = request.Currency; quote.PaymentTermDays = request.PaymentTermDays; quote.PartialDeliveryAllowed = request.PartialDeliveryAllowed; quote.Notes = request.Notes; var line = 0; foreach (var item in request.Items) quote.Items.Add(new QuoteItem { LineNumber = ++line, ProductId = item.ProductId, Size = item.Size, Color = item.Color, Quantity = item.Quantity, UnitPrice = item.UnitPrice, FabricRequired = item.FabricRequired, DtfRequired = item.DtfRequired, LabelDescription = item.LabelDescription, Notes = item.Notes }); }
+    private static void Apply(Quote quote, QuoteRequest request) { ApplyHeader(quote, request); var line = 0; foreach (var item in request.Items) { var entity = new QuoteItem { LineNumber = ++line }; QuoteItemSynchronizer.Apply(entity, item); quote.Items.Add(entity); } }
+    private static void ApplyHeader(Quote quote, QuoteRequest request) { quote.CustomerId = request.CustomerId; quote.QuoteDate = DateTime.SpecifyKind(request.QuoteDate, DateTimeKind.Utc); quote.ValidUntil = DateTime.SpecifyKind(request.ValidUntil, DateTimeKind.Utc); quote.Currency = request.Currency; quote.PaymentTermDays = request.PaymentTermDays; quote.PartialDeliveryAllowed = request.PartialDeliveryAllowed; quote.Notes = request.Notes; }
 }
 
 public sealed record QuoteRequest(Guid CustomerId, DateTime QuoteDate, DateTime ValidUntil, string Currency, int PaymentTermDays, bool PartialDeliveryAllowed, string? Notes, List<QuoteItemRequest> Items);
-public sealed record QuoteItemRequest(Guid ProductId, string? Size, string? Color, int Quantity, decimal UnitPrice, bool FabricRequired, bool DtfRequired, string? LabelDescription, string? Notes);
+public sealed record QuoteItemRequest(Guid? Id, Guid ProductId, string? Size, string? Color, int Quantity, decimal UnitPrice, bool FabricRequired, bool DtfRequired, string? LabelDescription, string? Notes);
 public sealed record QuoteReasonRequest(string Reason);
+
+public sealed record QuoteItemSyncResult(IReadOnlyList<QuoteItem> Removed, string? Error);
+
+public static class QuoteItemSynchronizer
+{
+    public static QuoteItemSyncResult Synchronize(Quote quote, IReadOnlyList<QuoteItemRequest> requests)
+    {
+        var requestedIds = requests.Where(x => x.Id.HasValue).Select(x => x.Id!.Value).ToList();
+        if (requestedIds.Count != requestedIds.Distinct().Count()) return new([], "Aynı teklif kalemi birden fazla kez gönderilemez.");
+        var existing = quote.Items.ToDictionary(x => x.Id);
+        if (requestedIds.Any(id => !existing.ContainsKey(id))) return new([], "Teklif kalemi bulunamadı veya bu teklife ait değil.");
+        var removed = quote.Items.Where(x => !requestedIds.Contains(x.Id)).ToList();
+        foreach (var item in removed) quote.Items.Remove(item);
+        for (var index = 0; index < requests.Count; index++)
+        {
+            var request = requests[index];
+            var entity = request.Id.HasValue ? existing[request.Id.Value] : new QuoteItem();
+            entity.LineNumber = index + 1; Apply(entity, request);
+            if (!request.Id.HasValue) quote.Items.Add(entity);
+        }
+        return new(removed, null);
+    }
+
+    public static void Apply(QuoteItem entity, QuoteItemRequest request)
+    {
+        entity.ProductId = request.ProductId; entity.Size = request.Size; entity.Color = request.Color; entity.Quantity = request.Quantity; entity.UnitPrice = request.UnitPrice; entity.FabricRequired = request.FabricRequired; entity.DtfRequired = request.DtfRequired; entity.LabelDescription = request.LabelDescription; entity.Notes = request.Notes;
+    }
+}
