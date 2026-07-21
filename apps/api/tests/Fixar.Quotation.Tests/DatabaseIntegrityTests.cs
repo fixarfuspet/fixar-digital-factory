@@ -35,6 +35,19 @@ public sealed class DatabaseIntegrityTests
         }
     }
 
+    [Fact]
+    public void Production_box_traceability_code_is_required_and_unique()
+    {
+        using var db = CreateDb();
+        var entity = db.Model.FindEntityType(typeof(ProductionBox))!;
+        var property = entity.FindProperty(nameof(ProductionBox.TraceabilityCode))!;
+        var index = entity.GetIndexes().Single(x => x.Properties.Select(p => p.Name)
+            .SequenceEqual([nameof(ProductionBox.TraceabilityCode)]));
+
+        Assert.False(property.IsNullable);
+        Assert.True(index.IsUnique);
+    }
+
     private static ApplicationDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;

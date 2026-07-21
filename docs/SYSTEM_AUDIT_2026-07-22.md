@@ -275,3 +275,27 @@ Durum: Kısmen tamamlandı; lot/container/rezervasyon/tüketim zinciri ile ana s
 - Genel stok sayım farkında gerekçe zorunluluğu ve fark kadar stok hareketi oluşturulması.
 
 Sonuç: Backend testleri 60/60 başarılı.
+
+## Aşama 11 — İzlenebilirlik ve QR
+
+Durum: Kısmen tamamlandı; geçmiş koli QR erişimini engelleyen şema boşluğu giderildi ve izlenebilirlik kodu benzersizlik/zorunluluk sözleşmesi test edildi. Gerçek etiket yazıcısı, QR tekrar baskı cihazı ve müşteri dış erişim senaryosu ortamda bulunmadığından test edilemedi.
+
+### Doğrulanan zincir
+
+- Koli kaydı kesim, istasyon ataması, iş emri, sipariş kalemi, sipariş, müşteri ve ürün kimliklerini/snapshot verilerini taşıyor.
+- Detay endpointi sipariş, reçete, üretim/istasyon, kalıp, operatör, kesim, kalite, depo ve sevkiyat bilgilerini tek cevapta birleştiriyor.
+- Timeline sipariş, iş emri, istasyon üretim/fire/duruş olayları, hammadde lot tüketimi ve reversal, kesim, kalite, koli, depo ve sevkiyat olaylarını geriye dönük sunuyor.
+- `BoxNumber` ve `TraceabilityCode` benzersiz indekslerle korunuyor; yeni koli kodu ve izlenebilirlik kodu transaction içinde üretiliyor.
+
+### Kök neden ve düzeltme
+
+- Önceki koli akışı migrationı eski kayıtların `BoxNumber` ve `Barcode` alanlarını dolduruyor, ancak `TraceabilityCode` üretmiyordu. Alan nullable kaldığı için eski koliler listelenebilse de QR, detay, timeline ve label endpointleriyle adreslenemiyordu.
+- `RequireProductionBoxTraceabilityCode` migrationı yalnız boş/null eski kodları koli kimliğinden deterministik 32 karakterli kodla dolduruyor ve ardından kolonu `NOT NULL` yapıyor. Mevcut benzersiz indeks korunuyor; kayıt silme veya yeniden numaralandırma yok.
+- Domain modeli alanı zorunlu hâle getirildi. İzlenebilirlik controllerı açık `CanViewTraceability` policy'sine bağlandı.
+- Üretilen hedef migration SQL'i backfill → `SET NOT NULL` sırasını doğruladı ve veri silen komut içermiyor.
+
+### Regression testi
+
+- `ProductionBox.TraceabilityCode` alanının EF modelinde zorunlu ve tekil indeksli olduğu doğrulanıyor.
+
+Sonuç: Backend testleri 61/61 başarılı. Migration gerçek kullanıcı veritabanına uygulanmadı.

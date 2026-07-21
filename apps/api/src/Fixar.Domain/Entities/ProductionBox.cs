@@ -10,7 +10,7 @@ public class ProductionBox : BaseAuditableEntity
 
     public string? Barcode { get; set; }
 
-    public string? TraceabilityCode { get; set; }
+    public string TraceabilityCode { get; set; } = string.Empty;
 
     public Guid? StationAssignmentId { get; set; }
     public StationAssignment? StationAssignment { get; set; }
