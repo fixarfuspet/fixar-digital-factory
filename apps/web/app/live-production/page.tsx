@@ -79,9 +79,7 @@ type Downtime = {
   isOpen: boolean;
 };
 
-const API =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "/api/backend/api/v1";
+const API = "/api/backend/api/v1";
 
 const FIRE_REASONS = [
   "Eksik Döküm",
