@@ -5,7 +5,7 @@ Branch: `fix/live-production-integration`
 
 ## Envanter
 
-- Backend: 48 controller dosyası; ASP.NET Core, EF Core ve PostgreSQL.
+- Backend: 48 controller dosyasında 52 controller sınıfı; ASP.NET Core, EF Core ve PostgreSQL.
 - Frontend: 53 `page.tsx`, production build çıktısında 57 route.
 - Domain: 53 C# kaynak dosyası.
 - Migration: 34 ana migration ve güncel model snapshot.
@@ -134,3 +134,22 @@ Durum: Kısmen tamamlandı; production route/session smoke tamam, authenticated 
 - Depoda Playwright/Cypress bulunmuyor.
 - `FIXAR_DEV_TEST_PASSWORD` mevcut süreç ortamında tanımlı değil. Kullanıcı verisine veya mevcut hesap parolalarına müdahale etmeden authenticated browser CRUD, console, mobil/tablet/TV ve form state senaryoları çalıştırılamadı.
 - Bu maddeler tamamlanmadan Aşama 4 için “Tamamlandı” sonucu verilmedi.
+
+## Aşama 5 — Backend controller ve API denetimi
+
+Durum: Kısmen tamamlandı; controller güvenlik/route sözleşmesi otomatikleştirildi, tüm endpointlerin gerçek PostgreSQL başarılı-hatalı-yetkisiz matrisi tamamlanmadı.
+
+### Otomatik sözleşme denetimi
+
+- Gerçek envanter 48 dosya içinde 52 controller sınıfı olarak düzeltildi.
+- Her controller sınıfında `[ApiController]` ve route tanımı bulunması zorunlu testle korunuyor.
+- Her HTTP action için class veya action seviyesinde açık `[Authorize]` / `[AllowAnonymous]` sözleşmesi zorunlu.
+- HTTP verb + controller route + action route birleşimlerinin benzersizliği kontrol ediliyor; 150'den fazla endpoint keşfedilmezse test hata veriyor.
+- Anonim endpointler yalnız Auth ve development seed controller alanıyla sınırlandırılıyor.
+
+Sonuç: Toplam backend testi 48/48 başarılı. Açık authorization action veya çakışan HTTP route bulunmadı.
+
+### Açık kapsam
+
+- Her endpoint için gerçek veritabanıyla ayrı success, validation, not-found, conflict, transaction rollback ve IDOR testi henüz yoktur.
+- Bu nedenle controller katmanı için “canlıya hazır/tamamlandı” sonucu verilmedi.
