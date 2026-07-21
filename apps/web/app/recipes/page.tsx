@@ -102,9 +102,7 @@ type ApiResponse<T> = {
   errorCode?: string;
 };
 
-const API =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
-  "/api/backend/api/v1";
+const API = "/api/backend/api/v1";
 const PRODUCT_MARKER = "\n\n---FIXAR_PRODUCT_MASTER_JSON---\n";
 const RECIPE_MARKER = "\n\n---FIXAR_RECIPE_UI_JSON---\n";
 const CONTROL_CLASS =
@@ -118,6 +116,27 @@ const TABS: Array<{ id: RecipeTab; label: string }> = [
   { id: "revision", label: "5 Revizyon" },
   { id: "notes", label: "6 Açıklamalar" },
 ];
+const AUTH_REDIRECT = "AUTH_REDIRECT";
+
+async function fetchMasterData(url: string): Promise<unknown> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (response.status === 401) {
+    window.location.assign("/");
+    throw new Error(AUTH_REDIRECT);
+  }
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!contentType.includes("json")) throw new Error(`Beklenmeyen yanıt türü: ${contentType || "boş"}`);
+  try {
+    return await response.json() as unknown;
+  } catch (error) {
+    throw new Error("API yanıtı ayrıştırılamadı.", { cause: error });
+  }
+}
+
+function isAuthRedirect(reason: unknown) {
+  return reason instanceof Error && reason.message === AUTH_REDIRECT;
+}
 
 export default function RecipesPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -137,31 +156,37 @@ export default function RecipesPage() {
   async function loadData() {
     setLoading(true);
     setError(null);
+    const [productsResult, materialsResult, recipesResult] = await Promise.allSettled([
+      fetchMasterData(API + "/products"),
+      fetchMasterData(API + "/materials"),
+      fetchMasterData(API + "/recipes?includeItems=true"),
+    ]);
+    const errors: string[] = [];
+    const productList = productsResult.status === "fulfilled"
+      ? extractProducts(productsResult.value).filter((product) => product.isActive !== false)
+      : [];
+    const materialList = materialsResult.status === "fulfilled"
+      ? extractMaterials(materialsResult.value).filter((material) => material.isActive !== false)
+      : [];
 
-    try {
-      const [productsResponse, materialsResponse, recipesResponse] = await Promise.all([
-        fetch(API + "/products"),
-        fetch(API + "/materials"),
-        fetch(API + "/recipes?includeItems=true"),
-      ]);
-
-      if (!productsResponse.ok || !materialsResponse.ok || !recipesResponse.ok) {
-        throw new Error("Product, Material veya reçete listesi alınamadı.");
-      }
-
-      const productList = extractProducts(await productsResponse.json()).filter((product) => product.isActive !== false);
-      const materialList = extractMaterials(await materialsResponse.json()).filter((material) => material.isActive !== false);
-      setProducts(productList);
-      setMaterials(materialList);
-      setRecipes(extractRecipes(await recipesResponse.json(), materialList));
-    } catch (err) {
-      setProducts([]);
-      setMaterials([]);
-      setRecipes([]);
-      setError(err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.");
-    } finally {
-      setLoading(false);
+    if (productsResult.status === "rejected" && !isAuthRedirect(productsResult.reason)) {
+      console.error("Ürün listesi yüklenemedi.", productsResult.reason);
+      errors.push("Ürün listesi yüklenemedi.");
     }
+    if (materialsResult.status === "rejected" && !isAuthRedirect(materialsResult.reason)) {
+      console.error("Malzeme listesi yüklenemedi.", materialsResult.reason);
+      errors.push("Malzeme listesi yüklenemedi.");
+    }
+    if (recipesResult.status === "rejected" && !isAuthRedirect(recipesResult.reason)) {
+      console.error("Reçete listesi yüklenemedi.", recipesResult.reason);
+      errors.push("Reçete listesi yüklenemedi.");
+    }
+
+    setProducts(productList);
+    setMaterials(materialList);
+    setRecipes(recipesResult.status === "fulfilled" ? extractRecipes(recipesResult.value, materialList) : []);
+    setError(errors.length ? errors.join(" ") : null);
+    setLoading(false);
   }
 
   function openDialog(mode: DialogMode, recipe: RecipeRecord | null = null) {
@@ -209,7 +234,7 @@ export default function RecipesPage() {
     { title: "Aktif Reçete", value: activeCount.toLocaleString("tr-TR"), note: "Üretime açık", tone: "cyan" as DashboardTone },
     { title: "Memory Foam", value: memoryFoamCount.toLocaleString("tr-TR"), note: "Ürün tipi", tone: "amber" as DashboardTone },
     { title: "Normal PU", value: normalPuCount.toLocaleString("tr-TR"), note: "10100 normal ürün", tone: "blue" as DashboardTone },
-    { title: "Toplam Hammadde", value: totalMaterialCount.toLocaleString("tr-TR"), note: "Seçili Material satırı", tone: "violet" as DashboardTone },
+    { title: "Toplam Hammadde", value: totalMaterialCount.toLocaleString("tr-TR"), note: "Seçili malzeme satırı", tone: "violet" as DashboardTone },
     { title: "Ortalama Maliyet", value: formatMoney(averageCost, "TRY"), note: "Tahmini çift maliyeti", tone: "red" as DashboardTone },
   ];
 
@@ -220,9 +245,9 @@ export default function RecipesPage() {
           <header className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-black tracking-[0.38em] text-emerald-300">FIXAR OS</p>
-              <h1 className="mt-2 text-3xl font-black sm:text-4xl">Recipe / BOM Master</h1>
+              <h1 className="mt-2 text-3xl font-black sm:text-4xl">Reçete / Ürün Ağacı</h1>
               <p className="mt-2 max-w-3xl text-sm text-zinc-400">
-                Product Master ve Material Master kartlarını birleştirerek üretim, maliyet, stok ve satın alma süreçlerini besleyen reçete ana verisini yönetin.
+                Ürün Kartı ve Malzeme Kartı bilgilerini birleştirerek üretim, maliyet, stok ve satın alma süreçlerini besleyen reçete ana verisini yönetin.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -264,14 +289,14 @@ export default function RecipesPage() {
 
             {!loading && error && (
               <div className="mt-5 rounded-xl border border-red-400/30 bg-red-500/10 p-5 text-sm text-red-100">
-                <p className="font-black">Master veriler yüklenemedi.</p>
+                <p className="font-black">Reçete ana verileri yüklenemedi.</p>
                 <p className="mt-1 text-red-200">{error}</p>
               </div>
             )}
 
             {!loading && !error && filteredRecipes.length === 0 && (
               <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-8 text-center text-zinc-300">
-                Henüz reçete kaydı bulunmuyor. Product Master ve Material Master seçimleriyle yeni reçete oluşturun.
+                Henüz reçete kaydı bulunmuyor. Ürün Kartı ve Malzeme Kartı seçimleriyle yeni reçete oluşturun.
               </div>
             )}
 
@@ -400,7 +425,7 @@ function RecipeModal({
     setError(null);
 
     if (!form.productId) {
-      setError("Product Master seçmelisiniz.");
+      setError("Ürün Kartı seçmelisiniz.");
       setActiveTab("general");
       return;
     }
@@ -424,7 +449,7 @@ function RecipeModal({
     }
 
     if (form.lines.some((line) => !line.materialId && line.quantity.trim())) {
-      setError("Miktar girilen her satırda Material Master seçilmelidir.");
+      setError("Miktar girilen her satırda Malzeme Kartı seçilmelidir.");
       setActiveTab("materials");
       return;
     }
@@ -461,7 +486,7 @@ function RecipeModal({
     setSaving(true);
 
     try {
-      let endpoint = `${API}/recipes/${recipe.id}/${action}`;
+      const endpoint = `${API}/recipes/${recipe.id}/${action}`;
       let body: unknown = undefined;
       if (action === "duplicate") {
         const nextVersion = Math.max(1, Number(form.version) || 1) + 1;
@@ -495,9 +520,9 @@ function RecipeModal({
         <div className="border-b border-white/10 bg-white/[0.04] p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-black tracking-[0.34em] text-emerald-300">RECIPE / BOM MASTER</p>
+              <p className="text-xs font-black tracking-[0.34em] text-emerald-300">REÇETE / ÜRÜN AĞACI</p>
               <h2 className="mt-2 text-2xl font-black text-white">{readonly ? "Reçete Detayı" : mode === "edit" ? "Reçete Düzenle" : "Yeni Reçete"}</h2>
-              <p className="mt-1 text-sm text-zinc-400">Product Master ve Material Master seçimleri üzerinden üretim reçetesini yönetin.</p>
+              <p className="mt-1 text-sm text-zinc-400">Ürün Kartı ve Malzeme Kartı seçimleri üzerinden üretim reçetesini yönetin.</p>
             </div>
             <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-black text-white transition hover:bg-white/[0.12]">Kapat</button>
           </div>
@@ -605,11 +630,11 @@ function GeneralTab({
   updateForm: <K extends keyof RecipeRecord>(key: K, value: RecipeRecord[K]) => void;
 }) {
   return (
-    <TabPanel title="Genel" note="Product Master seçimi reçetenin ürün teknik bilgisini otomatik doldurur.">
+    <TabPanel title="Genel" note="Ürün Kartı seçimi reçetenin ürün teknik bilgisini otomatik doldurur.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <TextInput label="Reçete Kodu" value={form.code} readonly={readonly} onChange={(value) => updateForm("code", value)} />
         <TextInput label="Reçete Adı" value={form.name} readonly={readonly} onChange={(value) => updateForm("name", value)} />
-        <Field label="Product Master seç">
+        <Field label="Ürün Kartı seç">
           <select value={form.productId} disabled={readonly} onChange={(event) => selectProduct(event.target.value)} className={CONTROL_CLASS}>
             <option value="">Ürün ara / seç</option>
             {products.map((item) => (
@@ -666,7 +691,7 @@ function MaterialsTab({
   currency: string;
 }) {
   return (
-    <TabPanel title="Hammadde Listesi" note="Material Master seçimi kod, birim, fiyat, para birimi ve tipi otomatik getirir.">
+    <TabPanel title="Hammadde Listesi" note="Malzeme Kartı seçimi kod, birim, fiyat, para birimi ve tipi otomatik getirir.">
       <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/20">
         <table className="min-w-[1240px] w-full text-left text-sm">
           <thead>
@@ -698,7 +723,7 @@ function MaterialsTab({
                     <td className="p-3 font-black text-white">{line.order}</td>
                     <td className="p-3">
                       <select value={line.materialId} disabled={readonly} onChange={(event) => updateLine(line.key, "materialId", event.target.value)} className={CONTROL_CLASS}>
-                        <option value="">{line.role} için Material seç</option>
+                        <option value="">{line.role} için malzeme seç</option>
                         {materials.map((item) => (
                           <option key={item.id} value={item.id}>{formatMaterialOption(item)}</option>
                         ))}
@@ -748,7 +773,7 @@ function FragmentRow({ line, children }: { line: RecipeLine; children: ReactNode
 
 function ProductionTab({ form, readonly, updateForm }: RecipeFormTabProps) {
   return (
-    <TabPanel title="Üretim Parametreleri" note="Product Master seçimi bu alanları otomatik başlatır; reçete özelinde revize edilebilir.">
+    <TabPanel title="Üretim Parametreleri" note="Ürün Kartı seçimi bu alanları otomatik başlatır; reçete özelinde revize edilebilir.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <TextInput label="Standart Gramaj" value={form.standardWeight} readonly={readonly} type="number" onChange={(value) => updateForm("standardWeight", value)} />
         <TextInput label="Standart Yoğunluk" value={form.standardDensity} readonly={readonly} type="number" onChange={(value) => updateForm("standardDensity", value)} />
@@ -766,9 +791,9 @@ function ProductionTab({ form, readonly, updateForm }: RecipeFormTabProps) {
 
 function CostTab({ form, readonly, updateForm, rawMaterialCost, currency, estimatedPairCost }: RecipeFormTabProps & { rawMaterialCost: number; currency: string; estimatedPairCost: number }) {
   return (
-    <TabPanel title="Maliyet" note="Şimdilik frontend hesaplar; Material Master son alış fiyatları altyapısı hazırdır.">
+    <TabPanel title="Maliyet" note="Şimdilik frontend hesaplar; Malzeme Kartı son alış fiyatları altyapısı hazırdır.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <CostCard title="Hammadde" value={formatMoney(rawMaterialCost, currency)} note="Material son alış fiyatlarından" />
+        <CostCard title="Hammadde" value={formatMoney(rawMaterialCost, currency)} note="Malzeme son alış fiyatlarından" />
         <EditableCostCard title="İşçilik" value={form.laborCost} readonly={readonly} currency={currency} onChange={(value) => updateForm("laborCost", value)} />
         <EditableCostCard title="Elektrik" value={form.electricityCost} readonly={readonly} currency={currency} onChange={(value) => updateForm("electricityCost", value)} />
         <EditableCostCard title="Paketleme" value={form.packagingCost} readonly={readonly} currency={currency} onChange={(value) => updateForm("packagingCost", value)} />
