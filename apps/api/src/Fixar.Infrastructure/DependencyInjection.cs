@@ -80,6 +80,7 @@ public static class DependencyInjection
             static void Roles(Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder p, params string[] roles) => p.RequireRole(roles);
             var ceo = RoleNames.CEO;
             options.AddPolicy(AuthorizationPolicies.CanManageUsers, p => Roles(p, ceo));
+            options.AddPolicy(AuthorizationPolicies.CanViewSystemHealth, p => Roles(p, ceo));
             options.AddPolicy(AuthorizationPolicies.CanManageCustomers, p => Roles(p, ceo, RoleNames.SalesManager));
             options.AddPolicy(AuthorizationPolicies.CanManageSalesOrders, p => Roles(p, ceo, RoleNames.SalesManager, RoleNames.FinanceManager, RoleNames.Finance));
             options.AddPolicy(AuthorizationPolicies.CanManagePurchases, p => Roles(p, ceo, RoleNames.PurchasingManager, RoleNames.Purchasing));

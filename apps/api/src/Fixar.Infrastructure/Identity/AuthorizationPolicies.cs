@@ -3,6 +3,7 @@ namespace Fixar.Infrastructure.Identity;
 public static class AuthorizationPolicies
 {
     public const string CanManageUsers = nameof(CanManageUsers);
+    public const string CanViewSystemHealth = nameof(CanViewSystemHealth);
     public const string CanManageCustomers = nameof(CanManageCustomers);
     public const string CanManageSalesOrders = nameof(CanManageSalesOrders);
     public const string CanManagePurchases = nameof(CanManagePurchases);
