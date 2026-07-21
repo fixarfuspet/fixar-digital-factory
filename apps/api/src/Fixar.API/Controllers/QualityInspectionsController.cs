@@ -6,6 +6,7 @@ using Fixar.Domain.Entities;
 using Fixar.Domain.Enums;
 using Fixar.Infrastructure.Persistence;
 using Fixar.Infrastructure.Identity;
+using Fixar.API.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -118,7 +119,7 @@ public class QualityInspectionsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality)]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality), Idempotent]
     public async Task<IActionResult> Create([FromBody] UpsertQualityInspectionRequest request, CancellationToken cancellationToken)
     {
         var validation = ValidateRequest(request, requireCompleteFields: false);
@@ -132,6 +133,8 @@ public class QualityInspectionsController : ControllerBase
 
         if (assignment is null)
             return NotFound(ApiResponse<object>.Fail("Seçilen istasyon ataması bulunamadı.", "STATION_ASSIGNMENT_NOT_FOUND"));
+        if (request.CheckedPairs > assignment.ProducedPairs)
+            return Conflict(ApiResponse<object>.Fail("Kontrol edilen miktar istasyonda üretilen miktarı aşamaz.", "QUALITY_EXCEEDS_PRODUCTION"));
 
         var utcNow = DateTime.UtcNow;
         var actor = GetActor();
@@ -157,7 +160,7 @@ public class QualityInspectionsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality)]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality), Idempotent]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpsertQualityInspectionRequest request, CancellationToken cancellationToken)
     {
         var validation = ValidateRequest(request, requireCompleteFields: false);
@@ -184,6 +187,8 @@ public class QualityInspectionsController : ControllerBase
 
         if (assignment is null)
             return NotFound(ApiResponse<object>.Fail("Seçilen istasyon ataması bulunamadı.", "STATION_ASSIGNMENT_NOT_FOUND"));
+        if (request.CheckedPairs > assignment.ProducedPairs)
+            return Conflict(ApiResponse<object>.Fail("Kontrol edilen miktar istasyonda üretilen miktarı aşamaz.", "QUALITY_EXCEEDS_PRODUCTION"));
 
         ApplyRequest(inspection, request, assignment, DateTime.UtcNow);
         inspection.UpdatedByName = GetActor();
@@ -200,9 +205,11 @@ public class QualityInspectionsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/complete")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality), Idempotent]
     public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken)
     {
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockProductionWrites(cancellationToken);
 
         var inspection = await _db.QualityInspections
             .Include(x => x.Defects)
@@ -226,6 +233,8 @@ public class QualityInspectionsController : ControllerBase
 
         if (assignment is null)
             return NotFound(ApiResponse<object>.Fail("Seçilen istasyon ataması bulunamadı.", "STATION_ASSIGNMENT_NOT_FOUND"));
+        if (inspection.CheckedPairs > assignment.ProducedPairs)
+            return Conflict(ApiResponse<object>.Fail("Kontrol edilen miktar istasyonda üretilen miktarı aşamaz.", "QUALITY_EXCEEDS_PRODUCTION"));
 
         var utcNow = DateTime.UtcNow;
         var actor = GetActor();
@@ -283,8 +292,11 @@ public class QualityInspectionsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = AuthorizationPolicies.CanOverrideProductionRules), Idempotent]
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelQualityInspectionRequest request, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await LockProductionWrites(cancellationToken);
         var inspection = await _db.QualityInspections.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (inspection is null)
@@ -292,6 +304,11 @@ public class QualityInspectionsController : ControllerBase
 
         if (inspection.IsCancelled)
             return BadRequest(ApiResponse<object>.Fail("İptal edilmiş kalite kontrolü tekrar iptal edilemez.", "QUALITY_ALREADY_CANCELLED"));
+        var hasActiveLinkedFire = await _db.StationAssignmentFires.AnyAsync(x =>
+            !x.IsCancelled && x.StationAssignmentId == inspection.StationAssignmentId &&
+            x.Note == "Kalite kontrol bağlantısı: " + inspection.InspectionNumber, cancellationToken);
+        if (hasActiveLinkedFire)
+            return Conflict(ApiResponse<object>.Fail("Kalite kontrolünün bağlı fire kaydı önce yetkili fire iptal akışından geri alınmalıdır.", "QUALITY_HAS_ACTIVE_FIRE"));
 
         var utcNow = DateTime.UtcNow;
         var actor = GetActor();
@@ -311,11 +328,13 @@ public class QualityInspectionsController : ControllerBase
         AddAuditLog("Quality Inspection Cancelled", inspection.Id, new { inspection.InspectionNumber, inspection.CancellationReason });
 
         await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
-        return Ok(ApiResponse<object>.SuccessResponse(new { inspection.Id, inspection.Status, inspection.Result }, "Kalite kontrolü iptal edildi. Bağlı fire kayıtları otomatik iptal edilmedi."));
+        return Ok(ApiResponse<object>.SuccessResponse(new { inspection.Id, inspection.Status, inspection.Result }, "Kalite kontrolü iptal edildi."));
     }
 
     [HttpPost("{id:guid}/duplicate")]
+    [Authorize(Policy = AuthorizationPolicies.CanRecordQuality), Idempotent]
     public async Task<IActionResult> Duplicate(Guid id, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -588,6 +607,8 @@ public class QualityInspectionsController : ControllerBase
             return ApiResponse<object>.Fail("Numune adedi sıfırdan büyük olmalıdır.", "INVALID_SAMPLE_SIZE");
         if (request.CheckedPairs <= 0)
             return ApiResponse<object>.Fail("Kontrol edilen çift sayısı sıfırdan büyük olmalıdır.", "INVALID_CHECKED_PAIRS");
+        if (request.CheckedPairs > request.SampleSizePairs)
+            return ApiResponse<object>.Fail("Kontrol edilen çift sayısı numune adedini aşamaz.", "CHECKED_EXCEEDS_SAMPLE");
         if (request.AcceptedPairs < 0 || request.RejectedPairs < 0 || request.ConditionalAcceptedPairs < 0)
             return ApiResponse<object>.Fail("Kontrol adetleri negatif olamaz.", "INVALID_PAIR_COUNTS");
         if (request.AcceptedPairs + request.RejectedPairs + request.ConditionalAcceptedPairs != request.CheckedPairs)
@@ -834,6 +855,12 @@ public class QualityInspectionsController : ControllerBase
             next = parsed + 1;
 
         return prefix + next.ToString("0000");
+    }
+
+    private async Task LockProductionWrites(CancellationToken cancellationToken)
+    {
+        if (_db.Database.IsRelational())
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81003)", cancellationToken);
     }
 
     private Operator? FindOperator(string? operatorName)
