@@ -266,6 +266,8 @@ public class StationAssignmentsController : ControllerBase
     public async Task<IActionResult> AddProduction([FromBody] AddProductionRequest request, CancellationToken cancellationToken)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        if (_db.Database.IsRelational())
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81003)", cancellationToken);
 
         var assignment = await QueryAssignments()
             .FirstOrDefaultAsync(x => x.Id == request.StationAssignmentId && x.FinishedAt == null, cancellationToken);
@@ -275,6 +277,10 @@ public class StationAssignmentsController : ControllerBase
 
         if (request.ProducedPairs <= 0)
             return BadRequest(ApiResponse<object>.Fail("Üretilen çift 0'dan büyük olmalı.", "INVALID_QUANTITY"));
+
+        if (request.ProducedPairs > assignment.PlannedPairs - assignment.ProducedPairs ||
+            request.ProducedPairs > assignment.OrderItem.QuantityPairs - assignment.OrderItem.ProducedPairs)
+            return Conflict(ApiResponse<object>.Fail("Üretim miktarı istasyon veya sipariş kalemi kalan miktarını aşamaz.", "PRODUCTION_EXCEEDS_REMAINING"));
 
         var hasOpenDowntime = await HasOpenDowntime(assignment.Id, cancellationToken);
         if (hasOpenDowntime)
@@ -298,6 +304,8 @@ public class StationAssignmentsController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail("Tur adedi 0'dan büyük olmalı.", "INVALID_TURN_COUNT"));
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        if (_db.Database.IsRelational())
+            await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(81003)", cancellationToken);
 
         var actor = GetActor();
         if (!string.IsNullOrWhiteSpace(request.RequestId))
@@ -355,9 +363,23 @@ public class StationAssignmentsController : ControllerBase
 
         var utcNow = DateTime.UtcNow;
         var stationResults = new List<object>();
+        var processed = new List<StationAssignment>();
 
         foreach (var assignment in eligible)
         {
+            var assignmentRemaining = assignment.PlannedPairs - assignment.ProducedPairs;
+            var orderRemaining = assignment.OrderItem.QuantityPairs - assignment.OrderItem.ProducedPairs;
+            if (request.TurnCount > assignmentRemaining || request.TurnCount > orderRemaining)
+            {
+                skipped.Add(new
+                {
+                    StationNumber = assignment.StationNumberSnapshot,
+                    AssignmentId = assignment.Id,
+                    Reason = "İstasyon veya sipariş kalemi hedefi doldu."
+                });
+                continue;
+            }
+
             assignment.ProducedPairs += request.TurnCount;
             assignment.OrderItem.ProducedPairs += request.TurnCount;
             assignment.TotalTurns += request.TurnCount;
@@ -369,6 +391,7 @@ public class StationAssignmentsController : ControllerBase
 
             var metadata = JsonSerializer.Serialize(new { requestId = request.RequestId, assignment.TotalTurns });
             await AddEvent(assignment.Id, "Tur Eklendi", utcNow, request.TurnCount, null, request.Note, actor, metadata, cancellationToken);
+            processed.Add(assignment);
 
             stationResults.Add(new
             {
@@ -383,19 +406,22 @@ public class StationAssignmentsController : ControllerBase
             });
         }
 
+        if (processed.Count == 0)
+            return Conflict(ApiResponse<object>.Fail("Aktif istasyonların kalan üretim hedefi bulunmuyor.", "PRODUCTION_TARGET_REACHED"));
+
         await _db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var result = new
         {
             TurnCount = request.TurnCount,
-            ActiveStationCount = eligible.Count,
+            ActiveStationCount = processed.Count,
             SkippedStationCount = skipped.Count,
-            TotalAddedPairs = eligible.Count * request.TurnCount,
+            TotalAddedPairs = processed.Count * request.TurnCount,
             AddedAt = utcNow,
             Stations = stationResults,
             SkippedStations = skipped,
-            ReleaseDueStations = eligible
+            ReleaseDueStations = processed
                 .Where(IsReleaseDue)
                 .Select(x => new { StationNumber = x.StationNumberSnapshot, AssignmentId = x.Id })
                 .ToList()

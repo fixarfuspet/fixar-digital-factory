@@ -204,3 +204,25 @@ Durum: Kısmen tamamlandı; kritik miktar, tekrar gönderim ve yetki açıkları
 - Sipariş kalanını aşan mükerrer iş emri engeli.
 
 Sonuç: Backend testleri 51/51 başarılı.
+
+## Aşama 8 — Canlı üretim ve istasyon hareketleri
+
+Durum: Kısmen tamamlandı; kritik hedef aşımı ve eşzamanlı yazım riski giderildi. Gerçek PostgreSQL ile paralel istek yük testi ortam eksikliği nedeniyle çalıştırılamadı.
+
+### Kök neden ve düzeltme
+
+- Manuel üretim ve toplu tur ekleme akışları yalnız pozitif miktarı kontrol ediyor, istasyon planı veya sipariş kaleminin kalan miktarını aşmayı engellemiyordu.
+- Farklı idempotency anahtarlarıyla aynı anda gelen geçerli iki istek aynı eski miktarı okuyabildiği için kayıp güncelleme veya fazla üretim riski vardı.
+- Manuel üretim ve tur ekleme işlemleri PostgreSQL transaction-scoped advisory lock altında seri hâle getirildi. Kalan miktar kontrolü kilit alındıktan sonra yapılıyor.
+- Manuel üretim, hem `StationAssignment.PlannedPairs` hem `OrderItem.QuantityPairs` kalanını aşarsa kontrollü `409 PRODUCTION_EXCEEDS_REMAINING` döndürüyor.
+- Toplu tur işlemi hedefi dolu istasyonları atlıyor; hiçbir istasyonda yeterli kalan yoksa `409 PRODUCTION_TARGET_REACHED` döndürüyor.
+- Yanıt toplamları yalnız gerçekten işlenen istasyonlardan hesaplanıyor. Başarılı turda istasyon ve sipariş kalemi miktarı aynı transaction içinde artıyor ve `Tur Eklendi` denetim olayı oluşuyor.
+- Mevcut idempotency filtresi ve istemci `RequestId` tekrar kontrolü korunuyor.
+
+### Regression testleri
+
+- Manuel üretimin kalan miktarı aşması engelleniyor ve hiçbir miktar/olay değişmiyor.
+- Toplu turun kalan miktarı aşması engelleniyor ve hiçbir miktar/olay değişmiyor.
+- Tam kalan miktardaki tur istasyon ile sipariş kalemini birlikte hedefe getiriyor ve denetim olayı yazıyor.
+
+Sonuç: Backend testleri 54/54 başarılı.
