@@ -1,0 +1,3 @@
+# Depo Kullanıcısı Günlük Kullanım
+
+Stocks, material lots/containers, boxes, warehouse ve shipments ekranlarını kullanırsınız. Sabah kritik stok, lot blokajı/son kullanma ve bekleyen kabul/sevkiyatı kontrol edin. Mal kabulde lot ve container miktarını tek kez girin; container ana stoğu ayrıca artırmaz. Kutuyu QR olmadan kabul etmeyin. Sevkiyatta müşteri, order item, hazır ve sevk miktarını karşılaştırın; kısmi sevkiyatı gerçek miktarla kaydedin. Hatalı stok/tüketim/sevkiyat için mevcut reversal/cancel yetkili akışını kullanın. Negatif stok, fiziksel-sistem farkı veya kopuk QR'da hareketi durdurun. Gün sonunda hareket ve fiziksel sayımı mutabıklaştırıp çıkış yapın.

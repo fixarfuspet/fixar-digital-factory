@@ -1,0 +1,3 @@
+# Finans Kullanıcısı Günlük Kullanım
+
+Receivables, collections, ledger, accounts, transactions, cash flow, supplier payables/payments, cheques ve profitability ekranlarını kullanırsınız. Sabah açık kasa/banka, kur ve vadesi gelen kalemleri kontrol edin. Tahsilat/ödeme öncesi müşteri/tedarikçi, para birimi, hesap, belge ve tutarı doğrulayın; allocation toplamı ana tutarı aşmamalıdır. Yanlış kayıt doğrudan silinmez, yetkili reversal yapılır ve gerekçe yazılır. Aynı banka referansını tekrar göndermeyin. Kur/tutar farkı, dengesiz cari veya finance posting uyarısında işlemi durdurun. Şifre/token paylaşmak, geriye dönük belgesiz kayıt ve audit dışı düzeltme yasaktır. Gün sonunda kasa/banka/cari ve başarısız postingleri kapatıp çıkış yapın.

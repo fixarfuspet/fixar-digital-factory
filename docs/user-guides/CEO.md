@@ -1,0 +1,3 @@
+# CEO Günlük Kullanım
+
+Girişte yalnız kurumsal hesabı kullanın; URL ve sertifikayı doğrulayın. Ana sayfa, CEO dashboard, system control, kârlılık, finans ve audit ekranlarını kullanırsınız. Sabah health/backup/istisna; akşam üretim, fire, sevkiyat, nakit ve marjı kontrol edin. System control kırmızıysa pilotu durdurun ve correlation ID ile teknik ekibe bildirin. Yanlış operasyon kaydını SQL ile değiştirmeyin; sorumlu role reversal/cancel yaptırın. Kullanıcı/rol, maliyet finalizasyonu ve production override en kritik işlemlerdir; dört göz onayı olmadan yapmayın. İş bitince çıkış yapın; hesabı paylaşmayın.

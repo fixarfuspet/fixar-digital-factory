@@ -1,0 +1,3 @@
+# Bakım Kullanıcısı Günlük Kullanım
+
+Maintenance dashboard, request, work order, preventive plans, checklist ve parts ekranlarını kullanırsınız. Başlangıçta kritik arıza, geciken periyodik bakım ve üretimi etkileyen varlıkları kontrol edin. Talebi doğru makine/istasyon/kalıp ve öncelikle açın; başlangıç/bitiş, işçilik, parça ve doğrulamayı gerçek zamanda kaydedin. Parça kullanımı stoğu etkiler; yanlış miktarı doğrudan stoktan düzeltmeyin. Tamamlanmamış checklist veya üretim onayı olmadan işi kapatmayın. Güvenlik riski, tekrar eden arıza veya kritik parça yokluğunda makineyi devre dışı bırakıp üretim müdürüne bildirin. Kayıt silmek ve bakım yapılmadan tamamlandı göstermek yasaktır; vardiya sonunda açık işleri devredip çıkış yapın.

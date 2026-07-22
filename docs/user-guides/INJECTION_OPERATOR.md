@@ -1,0 +1,3 @@
+# Enjeksiyon Operatörü Günlük Kullanım
+
+Live Production ve size atanmış istasyon ekranlarını kullanırsınız. Başlangıçta istasyon, iş emri, kalıp, ürün ve operatör adını fiziksel planla karşılaştırın. Her turu bir kez kaydedin; iyi çift ve fireyi ayrı girin, gerekiyorsa kalıp ayırıcı olayını kaydedin. Ekran beklerken yeniden basmayın. Yanlış turda amire haber verin; manager reversal/düzeltme akışını kullanır. Atanmamış iş emri, stok uyarısı, yanlış kalıp veya QR üretilemiyorsa devam etmeyin. Şifre paylaşmak, başka istasyona kayıt girmek ve doğrudan stok düzeltmek yasaktır. Vardiya sonunda açık tur bırakmadan çıkış yapın.

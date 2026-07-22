@@ -1,0 +1,3 @@
+# Üretim Müdürü Günlük Kullanım
+
+Work Orders, planlama, rezervasyon, station assignments, live production, kalite ve traceability ekranlarını kullanırsınız. Vardiya başında açık iş emirlerini, reçete/kalıp/lot hazırlığını ve istasyon durumunu doğrulayın. İş emrini planlayın, stok rezervasyonu yapın, doğru kalıp/operator ile atayın; miktar sınırlarını izleyin. 409 veya miktar farkında komutu tekrar tekrar göndermeyin; correlation ID kaydedin. Yanlış atamayı mevcut bitirme/iptal, tüketimi yetkili reversal akışıyla düzeltin. Reçete versiyonu, stok yetersizliği veya traceability kopukluğunda üretimi durdurun. Vardiya sonunda iyi/fire/kesim/kutu toplamlarını kapatıp çıkış yapın.

@@ -1,0 +1,3 @@
+# Kesim Operatörü Günlük Kullanım
+
+Cutting ve üretim kutusu/QR ekranlarını kullanırsınız. Gün başında kesim makinesi, kutu QR'ı, ürün ve bekleyen çift sayısını doğrulayın. İyi kesim ve fireyi gerçek miktarla kaydedin; kutu toplamını aşan giriş yapmayın. Yanlış kutu okutulursa işlemi tamamlamadan durun; tamamlanmış yanlış kayıt için üretim müdürüne correlation ID verin. QR'sız kutu, miktar farkı veya ürün uyuşmazlığında fiziksel ürünü karantinaya alın. Kayıt silmek, başka operatör hesabı kullanmak veya fireyi iyi ürün göstermek yasaktır. Vardiya sonunda yarım kalan kutuları etiketleyip devredin ve çıkış yapın.
