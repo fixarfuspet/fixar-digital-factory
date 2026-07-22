@@ -1,0 +1,71 @@
+name: fixar-os
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - backup-data:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [data]
+    logging: &logging
+      driver: json-file
+      options: {max-size: "20m", max-file: "10"}
+
+  api:
+    build: {context: ./apps/api, dockerfile: Dockerfile}
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:?required};Username=${POSTGRES_USER:?required};Password=${POSTGRES_PASSWORD:?required}
+      Jwt__Secret: ${JWT_SECRET:?required}
+      Jwt__Issuer: ${JWT_ISSUER:-FixarOS}
+      Jwt__Audience: ${JWT_AUDIENCE:-FixarOSClients}
+      Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN:?required}
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [data, app]
+    logging: *logging
+
+  web:
+    build: {context: ./apps/web, dockerfile: Dockerfile}
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      API_BASE_URL: http://api:8080
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [app]
+    logging: *logging
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx/fixar-os.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ops/certs:/etc/nginx/certs:ro
+    depends_on:
+      web: {condition: service_healthy}
+      api: {condition: service_healthy}
+    networks: [app]
+    logging: *logging
+
+volumes:
+  postgres-data:
+  backup-data:
+networks:
+  app:
+  data:
+    internal: true
