@@ -17,7 +17,7 @@ public sealed class ControllerContractTests
     [Fact]
     public void Every_controller_has_api_route_and_explicit_authorization_contract()
     {
-        Assert.Equal(52, Controllers.Length);
+        Assert.Equal(55, Controllers.Length);
         foreach (var controller in Controllers)
         {
             Assert.NotNull(controller.GetCustomAttribute<ApiControllerAttribute>());
