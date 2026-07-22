@@ -137,6 +137,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkOrderCostService, WorkOrderCostService>();
         services.AddScoped<IProfitabilityReportService, ProfitabilityReportService>();
         services.AddScoped<IFinancialCashFlowService, FinancialCashFlowService>();
+        services.AddScoped<IAtomicFinanceService, AtomicFinanceService>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ApplicationDbContextInitialiser>();

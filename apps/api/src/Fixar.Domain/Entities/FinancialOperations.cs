@@ -30,10 +30,26 @@ public class FinancialTransaction : BaseEntity
     public string SourceType { get; set; } = "Manual";
     public Guid? SourceId { get; set; }
     public Guid? CustomerId { get; set; }
+    public Guid? SupplierId { get; set; }
+    public Supplier? Supplier { get; set; }
+    public Guid? FinanceCategoryId { get; set; }
+    public FinanceCategory? FinanceCategory { get; set; }
+    public Guid? PurchaseOrderId { get; set; }
+    public PurchaseOrder? PurchaseOrder { get; set; }
+    public Guid? OrderId { get; set; }
+    public Order? Order { get; set; }
     public Guid? CustomerCollectionId { get; set; }
     public Guid? ChequeId { get; set; }
     public string Currency { get; set; } = "TRY";
     public decimal Amount { get; set; }
+    public decimal ExchangeRate { get; set; } = 1m;
+    public string ReportingCurrency { get; set; } = "TRY";
+    public decimal ReportingAmount { get; set; }
+    public string? PaymentMethod { get; set; }
+    public string? CounterpartyName { get; set; }
+    public string? DocumentNumber { get; set; }
+    public string? BusinessReference { get; set; }
+    public bool AffectsBalance { get; set; } = true;
     public string? Description { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? BankReference { get; set; }
@@ -44,6 +60,44 @@ public class FinancialTransaction : BaseEntity
     public string? ReversalReason { get; set; }
     public DateTime Created { get; set; }
     public Guid? CreatedBy { get; set; }
+}
+
+public class FinanceCategory : BaseAuditableEntity
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string CategoryType { get; set; } = "Expense";
+    public Guid? ParentCategoryId { get; set; }
+    public FinanceCategory? ParentCategory { get; set; }
+    public ICollection<FinanceCategory> Children { get; set; } = new List<FinanceCategory>();
+    public string? CostCenter { get; set; }
+    public bool IncludeInProductionCost { get; set; }
+    public string CostBehavior { get; set; } = "Variable";
+    public bool IsActive { get; set; } = true;
+    public string? Description { get; set; }
+}
+
+public class AccountReconciliation : BaseAuditableEntity
+{
+    public string ReconciliationNumber { get; set; } = string.Empty;
+    public string AccountPartyType { get; set; } = "Customer";
+    public Guid? CustomerId { get; set; }
+    public Customer? Customer { get; set; }
+    public Guid? SupplierId { get; set; }
+    public Supplier? Supplier { get; set; }
+    public DateTime PeriodStart { get; set; }
+    public DateTime PeriodEnd { get; set; }
+    public decimal OpeningBalance { get; set; }
+    public decimal PeriodDebit { get; set; }
+    public decimal PeriodCredit { get; set; }
+    public decimal ClosingBalance { get; set; }
+    public string Currency { get; set; } = "TRY";
+    public string Status { get; set; } = "Draft";
+    public string SnapshotJson { get; set; } = "{}";
+    public string? CounterpartyNote { get; set; }
+    public string? InternalNote { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string? ApprovedBy { get; set; }
 }
 
 public class CustomerCheque : BaseAuditableEntity

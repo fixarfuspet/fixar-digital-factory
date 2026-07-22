@@ -2,6 +2,9 @@ using Fixar.API.Extensions;
 using Fixar.Application;
 using Fixar.Infrastructure;
 using Serilog;
+using QuestPDF.Infrastructure;
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
