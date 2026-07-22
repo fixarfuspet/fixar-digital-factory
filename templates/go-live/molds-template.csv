@@ -1,0 +1,2 @@
+code,name,product_code,size_range,cavity_count,mold_type,standard_cycle_time_seconds,release_frequency_cycles,storage_location,is_active
+KLP-0001,Pilot Kalip,URN-0001,40-41,2,Injection,60,10,Raf-A1,true

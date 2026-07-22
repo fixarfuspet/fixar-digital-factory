@@ -1,0 +1,2 @@
+code,name,contact_person,email,phone,tax_office,tax_number,address,default_currency,payment_term_days,is_active
+TED-0001,ORNEK TEDARIKCI A.S.,Ad Soyad,satin-alma@example.invalid,+90-000-000-0000,Vergi Dairesi,0000000000,Adres,TRY,30,true

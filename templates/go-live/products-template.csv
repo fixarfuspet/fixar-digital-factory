@@ -1,0 +1,2 @@
+code,name,model_code,category,product_type,foam_type,average_weight,target_density,standard_cycle_time,default_box_quantity,has_dtf_label,is_active
+URN-0001,Pilot Urun,MDL-001,Taban,PU,Standart,0.500,0.000,60,20,false,true

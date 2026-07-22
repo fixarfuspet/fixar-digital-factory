@@ -1,0 +1,2 @@
+code,name,material_type,unit,category,default_supplier_code,currency,last_purchase_price,minimum_stock,critical_stock,lot_tracking_enabled,expiry_tracking_enabled,density,is_active
+MAT-0001,Pilot Hammadde,RawMaterial,kg,Poliol,TED-0001,TRY,0,0,0,true,true,1.000,true

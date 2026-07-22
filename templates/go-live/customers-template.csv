@@ -1,0 +1,2 @@
+customer_code,legal_name,contact_name,email,phone,tax_office,tax_number,address_line1,district,city,country,postal_code,default_currency,payment_term_days,credit_limit,is_active
+MUS-0001,ORNEK MUSTERI A.S.,Ad Soyad,operasyon@example.invalid,+90-000-000-0000,Vergi Dairesi,0000000000,Adres,Mahalle,Sehir,TR,00000,TRY,30,0,true

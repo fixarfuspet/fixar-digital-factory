@@ -1,0 +1,2 @@
+material_code,warehouse_name,location_code,lot_number,container_number,receipt_date,expiry_date,quantity,unit,unit_cost,currency,source_document
+MAT-0001,Ana Depo,A-01,LOT-2026-0001,VRL-0001,2026-07-22,2027-07-22,0,kg,0,TRY,SAYIM-2026-01
