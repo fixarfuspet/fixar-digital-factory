@@ -8,7 +8,17 @@ FIXAR_PG_DATABASE=fixar_stage \
 scripts/test-data-reset.sh
 ```
 
-Apply modu mevcut aşamada güvenlik gereği kapalıdır. İlişkisel silme sırası gerçek veri kopyasında ayrıca onaylanmadan otomatik silme yapılmaz. Bu nedenle canlı başlangıç temizliği için süreç şudur:
+Apply modu fail-closed'dur. Açık TEST işaretli müşteri, malzeme ve reçeteler yalnız tarihsel order/quote, lot/consumption veya work-order bağımlılığı yoksa transaction içinde temizlenebilir. Finans, stok hareketi, üretim ve audit geçmişi otomatik silinmez. Bağımlılık bulunursa tüm transaction hata verip rollback olur.
+
+```bash
+FIXAR_PG_USER=fixar_operator FIXAR_PG_DATABASE=fixar_stage \
+FIXAR_BACKUP_FILE=/secure/verified.dump \
+scripts/test-data-reset.sh --confirm-test-data-reset
+```
+
+Production'da ayrıca `--confirm-production-test-data-reset` ve `FIXAR_PRODUCTION_RESET_APPROVAL=DELETE-CONFIRMED-TEST-DATA` zorunludur.
+
+Canlı başlangıç temizliği için süreç şudur:
 
 1. Dry-run çıktısını iş birimi sahibi onaylar.
 2. Doğrulanmış backup alınır ve restore testi geçer.
