@@ -1,0 +1,15 @@
+[Unit]
+Description=FIXAR OS PostgreSQL daily backup
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=fixar-backup
+Group=fixar-backup
+Environment=FIXAR_BACKUP_ENV_FILE=/etc/fixar-os/backup.env
+ExecStart=/opt/fixar-os/scripts/run-postgres-backup.sh
+Nice=10
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/backups/fixar-os /var/log/fixar-os

@@ -13,6 +13,9 @@ PG_DUMP="$(find_pg_tool pg_dump)"
 PSQL="$(find_pg_tool psql)"
 OUTPUT_DIR="${FIXAR_BACKUP_DIR:-$SCRIPT_DIR/../artifacts/postgres-backups}"
 mkdir -p "$OUTPUT_DIR"
+minimum_free_mb="${FIXAR_BACKUP_MIN_FREE_MB:-1024}"
+available_mb="$(df -Pm "$OUTPUT_DIR" | awk 'NR==2 {print $4}')"
+[[ "$available_mb" -ge "$minimum_free_mb" ]] || { printf 'Yetersiz disk: available=%sMB required=%sMB\n' "$available_mb" "$minimum_free_mb" >&2; exit 5; }
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup_file="$OUTPUT_DIR/${FIXAR_PG_DATABASE}_${timestamp}.dump"
 manifest_file="$backup_file.manifest.json"
@@ -30,3 +33,6 @@ printf '{\n  "database": "%s",\n  "createdUtc": "%s",\n  "backupBytes": %s,\n  "
   "$FIXAR_PG_DATABASE" "$timestamp" "$backup_size" "$db_size" "$table_count" "$checksum" > "$manifest_file"
 
 printf 'BACKUP_FILE=%s\nMANIFEST_FILE=%s\n' "$backup_file" "$manifest_file"
+
+retention_days="${FIXAR_BACKUP_RETENTION_DAYS:-35}"
+find "$OUTPUT_DIR" -type f \( -name "${FIXAR_PG_DATABASE}_*.dump" -o -name "${FIXAR_PG_DATABASE}_*.dump.manifest.json" \) -mtime "+$retention_days" -delete
