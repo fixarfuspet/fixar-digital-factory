@@ -19,7 +19,8 @@ internal static class CustomerFinanceSupport
 
     public static async Task<string> NextNumber(ApplicationDbContext db, string prefix, DateTime date, CancellationToken ct)
     {
-        await db.Database.ExecuteSqlRawAsync(prefix == "REC" ? "SELECT pg_advisory_xact_lock(81301)" : prefix == "COL" ? "SELECT pg_advisory_xact_lock(81302)" : "SELECT pg_advisory_xact_lock(81303)", ct);
+        if (db.Database.IsNpgsql())
+            await db.Database.ExecuteSqlRawAsync(prefix == "REC" ? "SELECT pg_advisory_xact_lock(81301)" : prefix == "COL" ? "SELECT pg_advisory_xact_lock(81302)" : "SELECT pg_advisory_xact_lock(81303)", ct);
         var start = $"{prefix}-{date:yyyyMMdd}-";
         var values = prefix switch
         {

@@ -28,6 +28,7 @@ public class GlobalExceptionHandler : IExceptionHandler
             NotFoundException => (StatusCodes.Status404NotFound, "NOT_FOUND", exception.Message),
             ValidationAppException => (StatusCodes.Status400BadRequest, "VALIDATION_ERROR", exception.Message),
             ForbiddenAccessException => (StatusCodes.Status403Forbidden, "FORBIDDEN", exception.Message),
+            ConflictAppException conflict => (StatusCodes.Status409Conflict, conflict.ErrorCode, conflict.Message),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "UNAUTHORIZED", "Bu işlem için giriş yapmanız gerekiyor."),
             _ => (StatusCodes.Status500InternalServerError, "INTERNAL_SERVER_ERROR", "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.")
         };
