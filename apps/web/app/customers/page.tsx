@@ -1,6 +1,6 @@
 "use client";import{safeResponseJson}from"../lib/api/client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffectEvent,useEffect, useMemo, useState } from "react";
 
 const API = (process.env.NEXT_PUBLIC_API_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
 type Customer = { id:string; customerCode:string; name:string; contactName?:string; phone?:string; email?:string; city?:string; country?:string; defaultCurrency:string; paymentTermDays:number; creditLimit:number; isActive:boolean; activeOrderCount:number; createdAt:string };
@@ -10,7 +10,7 @@ const empty:Form={name:"",legalName:"",contactName:"",phone:"",email:"",taxOffic
 export default function CustomersPage(){
   const [rows,setRows]=useState<Customer[]>([]),[search,setSearch]=useState(""),[status,setStatus]=useState(""),[currency,setCurrency]=useState(""),[form,setForm]=useState<Form|null>(null),[error,setError]=useState("");
   async function load(){const p=new URLSearchParams();if(search)p.set("search",search);if(status)p.set("isActive",status);if(currency)p.set("currency",currency);const r=await fetch(`${API}/customers?${p}`);const j=await safeResponseJson(r);setRows(j.data??[])}
-  useEffect(()=>{void load()},[search,status,currency]);
+  const loadEffect=useEffectEvent(load);useEffect(()=>{const timer=window.setTimeout(()=>void loadEffect(),0);return()=>window.clearTimeout(timer)},[search,status,currency]);
   const cards=useMemo(()=>({total:rows.length,active:rows.filter(x=>x.isActive).length,open:rows.filter(x=>x.activeOrderCount>0).length,newThisMonth:rows.filter(x=>new Date(x.createdAt).getMonth()===new Date().getMonth()).length}),[rows]);
   async function edit(id:string){const r=await fetch(`${API}/customers/${id}`),j=await safeResponseJson(r),x=j.data;setForm({id:x.id,name:x.companyName||x.name||"",legalName:x.legalName||"",contactName:x.contactName||"",phone:x.phone||"",email:x.email||"",taxOffice:x.taxOffice||"",taxNumber:x.taxNumber||"",addressLine1:x.addressLine1||"",addressLine2:x.addressLine2||"",district:x.district||"",city:x.city||"",postalCode:x.postalCode||"",country:x.country||"",defaultCurrency:x.defaultCurrency||"TRY",paymentTermDays:String(x.paymentTermDays??0),creditLimit:String(x.creditLimit??0),notes:x.notes||""})}
   async function save(){if(!form)return;setError("");const body={...form,paymentTermDays:Number(form.paymentTermDays),creditLimit:Number(form.creditLimit)};const r=await fetch(`${API}/customers${form.id?`/${form.id}`:""}`,{method:form.id?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await safeResponseJson(r);if(!r.ok){setError(j.message??"Kayıt başarısız.");return}setForm(null);await load()}

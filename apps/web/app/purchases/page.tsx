@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useMemo, useState, type ReactNode } from "react";
 import { safeResponseJson } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "red" | "cyan" | "amber";
@@ -557,30 +557,38 @@ function PurchaseFormModal({
   const [form, setForm] = useState<PurchaseFormState>(() => createEmptyPurchaseForm());
   const [lines, setLines] = useState<PurchaseFormLine[]>(() => [createEmptyPurchaseLine()]);
 
+  const loadStocksEffect = useEffectEvent(loadStocks);
+  const loadMaterialsEffect = useEffectEvent(loadMaterials);
+  const loadSuppliersEffect = useEffectEvent(loadSuppliers);
+
   useEffect(() => {
     if (!open) return;
-
-    setError(null);
-    setForm(toPurchaseForm(initialPurchase));
-    setLines(toPurchaseFormLines(initialPurchase));
-    loadStocks();
-    loadMaterials();
-    loadSuppliers();
+    const timer = window.setTimeout(() => {
+      setError(null);
+      setForm(toPurchaseForm(initialPurchase));
+      setLines(toPurchaseFormLines(initialPurchase));
+      void loadStocksEffect();
+      void loadMaterialsEffect();
+      void loadSuppliersEffect();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, initialPurchase]);
 
   useEffect(() => {
     if (!open || materials.length === 0 || stocks.length === 0) return;
+    const timer = window.setTimeout(() => {
+      setLines((current) =>
+        current.map((line) => {
+          if (line.materialId || !line.stockItemId) return line;
 
-    setLines((current) =>
-      current.map((line) => {
-        if (line.materialId || !line.stockItemId) return line;
+          const stock = stocks.find((item) => item.id === line.stockItemId);
+          const material = findMaterialForStock(stock, materials);
 
-        const stock = stocks.find((item) => item.id === line.stockItemId);
-        const material = findMaterialForStock(stock, materials);
-
-        return material ? { ...line, materialId: material.id, unit: material.unit || line.unit || stock?.unit || "" } : line;
-      })
-    );
+          return material ? { ...line, materialId: material.id, unit: material.unit || line.unit || stock?.unit || "" } : line;
+        })
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [materials, open, stocks]);
 
   async function loadStocks() {
@@ -1064,10 +1072,12 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
 
   useEffect(() => {
     if (!purchaseId) {
-      setPurchase(null);
-      setError(null);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setPurchase(null);
+        setError(null);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();

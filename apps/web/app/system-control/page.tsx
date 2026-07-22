@@ -25,7 +25,7 @@ export default function SystemControlPage() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
   return <main className="min-h-screen bg-zinc-950 p-4 text-white sm:p-7"><div className="mx-auto max-w-7xl space-y-6">
     <PageHeader eyebrow="Yalnız CEO" title="Sistem Kontrol Merkezi" description="Veri değiştirmeden bağlantı, migration ve operasyonel veri bütünlüğünü denetler." actions={<button onClick={()=>void load()} disabled={loading} className="min-h-11 rounded-xl bg-emerald-400 px-4 font-bold text-black disabled:opacity-50">Yeniden Kontrol Et</button>}/>
     {loading&&<LoadingState/>}{error&&<ErrorState message={error}/>} {report&&<>

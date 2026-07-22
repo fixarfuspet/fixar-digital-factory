@@ -173,15 +173,16 @@ function QualityControlContent() {
   const [detail, setDetail] = useState<QualityInspection | null>(null);
 
   useEffect(() => {
-    void loadData();
+    const timer = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     const stationAssignmentId = searchParams.get("stationAssignmentId");
-    if (stationAssignmentId && assignments.length > 0) {
-      setDetail(null);
-      setModalOpen(true);
-    }
+    const timer = stationAssignmentId && assignments.length > 0
+      ? window.setTimeout(() => { setDetail(null); setModalOpen(true); }, 0)
+      : undefined;
+    return () => { if (timer !== undefined) window.clearTimeout(timer); };
   }, [assignments, searchParams]);
 
   async function loadData() {

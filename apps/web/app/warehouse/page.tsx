@@ -18,8 +18,6 @@ export default function WarehousePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => { void loadData(); }, []);
-
   async function loadData() {
     try {
       const [boxData, summaryData] = await Promise.all([apiGet<unknown>("/production-boxes"), apiGet<Summary>("/production-boxes/summary")]);
@@ -29,6 +27,8 @@ export default function WarehousePage() {
       setError(requestError instanceof Error ? requestError.message : "Depo verileri alınamadı.");
     }
   }
+
+  useEffect(() => { const timer = window.setTimeout(() => void loadData(), 0); return () => window.clearTimeout(timer); }, []);
 
   async function action(path: string, body: unknown, message: string) {
     try {

@@ -317,10 +317,12 @@ function SupplierFormModal({
 
   useEffect(() => {
     if (!mode) return;
-
-    setForm(toSupplierForm(supplier));
-    setError(null);
-    setSaving(false);
+    const timer = window.setTimeout(() => {
+      setForm(toSupplierForm(supplier));
+      setError(null);
+      setSaving(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [mode, supplier]);
 
   if (!mode) return null;

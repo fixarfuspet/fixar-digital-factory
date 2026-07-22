@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffectEvent,useEffect, useState } from "react";
 import { safeResponseJson } from "../../lib/api/client";
 
 type Props = {
@@ -44,9 +44,11 @@ export default function ManageAssignmentModal({ open, station, onClose }: Props)
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
 
+  const loadEffect = useEffectEvent(load);
   useEffect(() => {
     if (!open || !station) return;
-    load();
+    const timer = window.setTimeout(() => void loadEffect(), 0);
+    return () => window.clearTimeout(timer);
   }, [open, station]);
 
   async function load() {
@@ -57,7 +59,7 @@ export default function ManageAssignmentModal({ open, station, onClose }: Props)
     setLoading(false);
   }
 
-  async function post<T = unknown>(url: string, body: any) {
+  async function post<T = unknown>(url: string, body: unknown) {
     const response = await fetch(API + url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

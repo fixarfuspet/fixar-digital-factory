@@ -602,8 +602,8 @@ function WorkOrderModal({
   useEffect(() => {
     if (!workOrder?.id) return;
     if (workOrder.requirements) {
-      setRequirements(workOrder.requirements);
-      return;
+      const timer = window.setTimeout(() => setRequirements(workOrder.requirements ?? null), 0);
+      return () => window.clearTimeout(timer);
     }
 
     void apiGet<RequirementPayload>("/work-orders/" + workOrder.id + "/requirements")
@@ -613,9 +613,11 @@ function WorkOrderModal({
 
   useEffect(() => {
     if (!workOrder?.id) {
-      setQualitySummary(null);
-      setOperationSummary(null);
-      return;
+      const timer = window.setTimeout(() => {
+        setQualitySummary(null);
+        setOperationSummary(null);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     void apiGet<WorkOrderQualitySummary>("/quality-inspections/work-order/" + workOrder.id + "/summary")

@@ -575,9 +575,12 @@ function MaterialModal({
   const isEdit = mode === "edit";
 
   useEffect(() => {
-    setForm(toFormState(material));
-    setActiveTab("general");
-    setFormError(null);
+    const timer = window.setTimeout(() => {
+      setForm(toFormState(material));
+      setActiveTab("general");
+      setFormError(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [material]);
 
   function updateField<K extends keyof MaterialFormState>(key: K, value: MaterialFormState[K]) {

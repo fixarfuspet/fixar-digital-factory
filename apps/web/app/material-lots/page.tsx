@@ -1,7 +1,7 @@
 "use client";import{safeResponseJson}from"../lib/api/client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffectEvent,useEffect, useMemo, useState } from "react";
 
 const API = "/api/backend/api/v1";
 type Lot = { id:string; lotNumber:string; supplierLotNumber?:string; materialId:string; materialCode?:string; materialName:string; stockItemId:string; stockCode?:string; supplierName?:string; receivedDate:string; expiryDate?:string; initialQuantity:number; currentQuantity:number; reservedQuantity:number; availableQuantity:number; unit:string; warehouse?:string; rackCode?:string; status:string; qualityStatus:string; isBlocked:boolean; isActive:boolean; containerCount:number };
@@ -13,7 +13,7 @@ export default function MaterialLotsPage(){
  const [lots,setLots]=useState<Lot[]>([]),[materials,setMaterials]=useState<Choice[]>([]),[stocks,setStocks]=useState<Choice[]>([]); const [summary,setSummary]=useState<Summary>({total:0,available:0,qualityPending:0,blocked:0,expired:0,expiringSoon:0,depleted:0}); const [search,setSearch]=useState(""),[status,setStatus]=useState(""),[quality,setQuality]=useState(""); const [message,setMessage]=useState("");
  const [form,setForm]=useState({materialId:"",stockItemId:"",lotNumber:"",receivedDate:new Date().toISOString().slice(0,10),expiryDate:"",initialQuantity:"",unit:"",warehouse:"",rackCode:"",qualityStatus:"Pending",notes:""});
  async function load(){ const qs=new URLSearchParams(); if(search)qs.set("search",search);if(status)qs.set("status",status);if(quality)qs.set("qualityStatus",quality); const [a,b,c,d]=await Promise.all([fetch(`${API}/material-lots?${qs}`),fetch(`${API}/material-lots/summary`),fetch(`${API}/materials`),fetch(`${API}/stocks`)]); const [aj,bj,cj,dj]=await Promise.all([safeResponseJson(a),safeResponseJson(b),safeResponseJson(c),safeResponseJson(d)]);setLots(aj.data??[]);setSummary(bj.data??summary);setMaterials(cj.data??[]);setStocks(dj.data??[]); }
- useEffect(()=>{void load()},[]); const matching=useMemo(()=>stocks.filter(x=>!form.materialId||x.materialId===form.materialId),[stocks,form.materialId]);
+ const loadEffect=useEffectEvent(load);useEffect(()=>{const timer=window.setTimeout(()=>void loadEffect(),0);return()=>window.clearTimeout(timer)},[]); const matching=useMemo(()=>stocks.filter(x=>!form.materialId||x.materialId===form.materialId),[stocks,form.materialId]);
  async function create(e:FormEvent){e.preventDefault();const r=await fetch(`${API}/material-lots`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,initialQuantity:Number(form.initialQuantity),expiryDate:form.expiryDate||null})});const j=await safeResponseJson(r);setMessage(r.ok?"Lot oluşturuldu.":j.message??"Lot oluşturulamadı.");if(r.ok){setForm({...form,lotNumber:"",initialQuantity:"",expiryDate:"",notes:""});await load();}}
  async function action(id:string,name:string,reason?:string){const r=await fetch(`${API}/material-lots/${id}/${name}`,{method:"POST",headers:{"Content-Type":"application/json"},body:reason?JSON.stringify({reason}):undefined});const j=await safeResponseJson(r);setMessage(r.ok?"İşlem tamamlandı.":j.message??"İşlem yapılamadı.");if(r.ok)await load();}
  return <main className="min-h-screen bg-zinc-950 p-6 text-white"><div className="mx-auto max-w-7xl space-y-6">

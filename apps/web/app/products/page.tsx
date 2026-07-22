@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { safeResponseJson } from "../lib/api/client";
 
@@ -608,9 +609,12 @@ function ProductMasterModal({
   const isEdit = mode === "edit";
 
   useEffect(() => {
-    setForm(toFormState(product));
-    setActiveTab("general");
-    setFormError(null);
+    const timer = window.setTimeout(() => {
+      setForm(toFormState(product));
+      setActiveTab("general");
+      setFormError(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [product]);
 
   const totalGram = useMemo(() => calculateTotalGram(form.recipeLines), [form.recipeLines]);
@@ -778,7 +782,7 @@ function ProductMasterModal({
           )}
           {activeTab === "packaging" && <PackagingTab form={form} readonly={readonly} updateField={updateField} />}
           {activeTab === "quality" && <QualityTab form={form} readonly={readonly} updateField={updateField} />}
-          {activeTab === "cost" && <CostTab form={form} readonly={readonly} rawMaterialCost={rawMaterialCost} packagingCost={packagingCost} estimatedPairCost={estimatedPairCost} updateField={updateField} />}
+          {activeTab === "cost" && <CostTab form={form} readonly={readonly} rawMaterialCost={rawMaterialCost} estimatedPairCost={estimatedPairCost} updateField={updateField} />}
           {activeTab === "documents" && <TechnicalDocumentsTab form={form} readonly={readonly} updateTechnicalDocument={updateTechnicalDocument} onImageUpload={handleImageUpload} />}
           {activeTab === "variants" && <CustomerVariantsTab form={form} readonly={readonly} updateCustomerVariant={updateCustomerVariant} />}
           {activeTab === "route" && <ProductionRouteTab form={form} readonly={readonly} updateRouteStep={updateRouteStep} />}
@@ -849,7 +853,7 @@ function ImagePreview({ title, name, dataUrl }: { title: string; name: string; d
     <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
       <div className="flex aspect-[4/3] items-center justify-center bg-white/[0.04]">
         {dataUrl ? (
-          <img src={dataUrl} alt={title} className="h-full w-full object-cover" />
+          <Image src={dataUrl} alt={title} width={640} height={480} unoptimized className="h-full w-full object-cover" />
         ) : (
           <div className="px-3 text-center">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">{title}</p>
@@ -1137,14 +1141,12 @@ function CostTab({
   form,
   readonly,
   rawMaterialCost,
-  packagingCost,
   estimatedPairCost,
   updateField,
 }: {
   form: ProductFormState;
   readonly: boolean;
   rawMaterialCost: number;
-  packagingCost: number;
   estimatedPairCost: number;
   updateField: <K extends keyof ProductFormState>(key: K, value: ProductFormState[K]) => void;
 }) {
@@ -1525,7 +1527,7 @@ function FileUploadBox({
       <div className="grid gap-4 sm:grid-cols-[140px_1fr] sm:items-center">
         <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
           {previewDataUrl ? (
-            <img src={previewDataUrl} alt={title} className="h-full w-full object-cover" />
+            <Image src={previewDataUrl} alt={title} width={640} height={480} unoptimized className="h-full w-full object-cover" />
           ) : (
             <span className="px-3 text-center text-xs font-black uppercase tracking-[0.18em] text-zinc-500">Önizleme</span>
           )}
@@ -2019,10 +2021,6 @@ function safeParsedNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function safeNumber(value?: number | null) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
 function toInputNumber(value?: number | null) {
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
 }
@@ -2045,12 +2043,6 @@ function calculateRawMaterialCost(lines: RecipeLine[]) {
 
 function calculateRecipeTotal(lines: RecipeLine[]) {
   return lines.reduce((sum, line) => sum + calculateLineTotal(line), 0);
-}
-
-function calculatePackagingCost(lines: RecipeLine[]) {
-  return lines
-    .filter((line) => ["Koli", "Etiket", "Diğer"].includes(line.material))
-    .reduce((sum, line) => sum + calculateLineTotal(line), 0);
 }
 
 function formatNumber(value?: number | null) {

@@ -64,11 +64,11 @@ export default function ProductionPlanningPage() {
   async function loadStations() {
     try {
       const response = await fetch(API + "/station-assignments/active");
-      const result = await safeResponseJson<any[]>(response);
+      const result = await safeResponseJson<Array<{stationNumberSnapshot:number;status?:string;customerName?:string;productName?:string;moldName?:string;operatorName?:string;remainingPairs?:number;producedPairs?:number}>>(response);
 
       const list = [...emptyStations];
 
-      (result.data ?? []).forEach((x: any) => {
+      (result.data ?? []).forEach((x) => {
         const stationNumber = x.stationNumberSnapshot;
         const index = stationNumber - 1;
 

@@ -110,9 +110,11 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
 
   useEffect(() => {
     if (!customerId) {
-      setOrders([]);
-      setOrderItemId("");
-      return;
+      const timer = window.setTimeout(() => {
+        setOrders([]);
+        setOrderItemId("");
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     fetch(API + "/production-planning/lookups/orders?customerId=" + customerId)

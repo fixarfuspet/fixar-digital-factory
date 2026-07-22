@@ -18,7 +18,7 @@ export default function UsersPage() {
     setRoles(((await safeResponseJson(roleResponse)) as ApiResponse<string[]>).data ?? []);
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, []);
 
   async function save(user: User) {
     const response = await fetch(`/api/backend/api/v1/users/${user.id}/access`, {

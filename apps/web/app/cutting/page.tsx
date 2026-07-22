@@ -34,10 +34,11 @@ function CuttingContent() {
   const [success, setSuccess] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  useEffect(() => { void loadData(); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => void loadData(), 0); return () => window.clearTimeout(timer); }, []);
   useEffect(() => {
     const assignmentId = params.get("stationAssignmentId");
-    if (assignmentId) setForm((current) => ({ ...current, stationAssignmentId: assignmentId }));
+    const timer = assignmentId ? window.setTimeout(() => setForm((current) => ({ ...current, stationAssignmentId: assignmentId })), 0) : undefined;
+    return () => { if (timer !== undefined) window.clearTimeout(timer); };
   }, [params]);
 
   async function loadData() {

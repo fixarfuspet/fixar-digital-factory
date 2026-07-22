@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { safeResponseJson } from "../lib/api/client";
 
@@ -911,7 +912,7 @@ function ImagePreview({ title, name, dataUrl }: { title: string; name: string; d
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
       <div className="flex aspect-[4/3] items-center justify-center bg-white/[0.04]">
-        {dataUrl ? <img src={dataUrl} alt={title} className="h-full w-full object-cover" /> : <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">{title}</p>}
+        {dataUrl ? <Image src={dataUrl} alt={title} width={640} height={480} unoptimized className="h-full w-full object-cover" /> : <p className="text-xs font-black uppercase tracking-[0.18em] text-zinc-500">{title}</p>}
       </div>
       <div className="border-t border-white/10 px-3 py-2 text-xs font-bold text-zinc-300">{name || "Önizleme yok"}</div>
     </div>
@@ -1327,12 +1328,6 @@ function formatDateInput(value: Date) {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("tr-TR");
 }
 
 function toDateInput(value: string) {

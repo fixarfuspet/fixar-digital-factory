@@ -581,10 +581,12 @@ function MovementHistoryModal({ stock, onClose }: { stock: StockItem | null; onC
 
   useEffect(() => {
     if (!stock) {
-      setMovements([]);
-      setError(null);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setMovements([]);
+        setError(null);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();
