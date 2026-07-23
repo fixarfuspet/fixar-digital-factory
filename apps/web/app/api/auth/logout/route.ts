@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, getApiBaseUrl } from "@/app/lib/auth/constants";
+import { isSameOriginRequest } from "@/app/lib/security/origin";
 
 /**
  * Revokes the refresh token on the real backend (best-effort) and always
@@ -8,8 +9,7 @@ import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, getApiBaseUrl } from "@/app/
  * call succeeds, so the browser is logged out either way.
  */
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return NextResponse.json({ success: false, message: "İstek kaynağı doğrulanamadı." }, { status: 403 });
   }
   const cookieStore = await cookies();

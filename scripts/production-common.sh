@@ -6,6 +6,8 @@ ENV_FILE="${FIXAR_ENV_FILE:-$ROOT/.env.production}"
 require_production_env() {
   [[ -s "$ENV_FILE" ]] || { printf 'Production env bulunamadı: %s\n' "$ENV_FILE" >&2; exit 2; }
   grep -Eq '^JWT_SECRET=.{64,}$' "$ENV_FILE" || { printf 'JWT_SECRET en az 64 karakter olmalıdır.\n' >&2; exit 3; }
+  grep -Eq '^FIXAR_ADMIN_EMAIL=.+@.+$' "$ENV_FILE" || { printf 'FIXAR_ADMIN_EMAIL zorunludur.\n' >&2; exit 3; }
+  grep -Eq '^FIXAR_ADMIN_PASSWORD=.{12,}$' "$ENV_FILE" || { printf 'FIXAR_ADMIN_PASSWORD en az 12 karakter olmalıdır.\n' >&2; exit 3; }
   ! grep -Eq 'change-me|REPLACE_WITH|FIXAR_DEV_TEST_PASSWORD' "$ENV_FILE" || { printf 'Placeholder/development secret reddedildi.\n' >&2; exit 3; }
   set -a
   # shellcheck disable=SC1090

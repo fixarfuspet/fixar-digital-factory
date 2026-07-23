@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE, getApiBaseUrl } from "@/app/lib/auth/constants";
 import { parseJsonResponse, type AuthResultDto, type BackendApiResponse } from "@/app/lib/auth/backend";
+import { isSameOriginRequest } from "@/app/lib/security/origin";
 
 /**
  * Backend-for-frontend proxy for login. The browser never talks to the
@@ -9,8 +10,7 @@ import { parseJsonResponse, type AuthResultDto, type BackendApiResponse } from "
  * cookies so they're inaccessible to client-side JavaScript (XSS-safe).
  */
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request)) {
     return NextResponse.json({ success: false, message: "İstek kaynağı doğrulanamadı." }, { status: 403 });
   }
   let body: { email?: unknown; password?: unknown };
