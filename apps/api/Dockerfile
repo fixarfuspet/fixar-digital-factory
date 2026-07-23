@@ -3,7 +3,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-COPY Directory.Build.props FixarOS.sln ./
+COPY Directory.Build.props ./
 COPY src/Fixar.Domain/Fixar.Domain.csproj src/Fixar.Domain/
 COPY src/Fixar.Application/Fixar.Application.csproj src/Fixar.Application/
 COPY src/Fixar.Infrastructure/Fixar.Infrastructure.csproj src/Fixar.Infrastructure/
