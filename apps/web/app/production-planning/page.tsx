@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import AssignmentModal from "../components/production-planning/AssignmentModal";
 import ManageAssignmentModal from "../components/production-planning/ManageAssignmentModal";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type Station = {
   station: number;
@@ -22,7 +22,7 @@ type LastTurn = {
   totalAddedPairs: number;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 
 const emptyStations: Station[] = Array.from({ length: 24 }, (_, i) => ({
   station: i + 1,
@@ -63,7 +63,7 @@ export default function ProductionPlanningPage() {
 
   async function loadStations() {
     try {
-      const response = await fetch(API + "/station-assignments/active");
+      const response = await authenticatedFetch(API + "/station-assignments/active");
       const result = await safeResponseJson<Array<{stationNumberSnapshot:number;status?:string;customerName?:string;productName?:string;moldName?:string;operatorName?:string;remainingPairs?:number;producedPairs?:number}>>(response);
 
       const list = [...emptyStations];
@@ -117,7 +117,7 @@ export default function ProductionPlanningPage() {
 
     setSavingTurn(true);
 
-    const response = await fetch(API + "/station-assignments/add-turn", {
+    const response = await authenticatedFetch(API + "/station-assignments/add-turn", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

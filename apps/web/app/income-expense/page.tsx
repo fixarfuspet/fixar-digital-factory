@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FinanceOpsNav } from "../components/finance/FinanceOpsNav";
-import { apiRequest } from "../lib/api/client";
+import { API_PROXY, apiRequest } from "../lib/api/client";
 
 type Account = { id: string; accountCode: string; name: string; currency: string; isActive: boolean };
 type Category = { id: string; code: string; name: string; categoryType: string; isActive: boolean };
@@ -10,9 +10,9 @@ const initial = { financialAccountId: "", transactionDate: new Date().toISOStrin
 
 export default function IncomeExpensePage() {
   const [accounts, setAccounts] = useState<Account[]>([]), [categories, setCategories] = useState<Category[]>([]), [form, setForm] = useState(initial), [message, setMessage] = useState(""), [busy, setBusy] = useState(false);
-  useEffect(() => { void (async () => { const [a, c] = await Promise.all([apiRequest<Account[]>("/api/backend/api/v1/financial-accounts?isActive=true"), apiRequest<Category[]>("/api/backend/api/v1/finance-categories?isActive=true")]); setAccounts(a.data ?? []); setCategories(c.data ?? []); })(); }, []);
+  useEffect(() => { void (async () => { const [a, c] = await Promise.all([apiRequest<Account[]>(`${API_PROXY}/financial-accounts?isActive=true`), apiRequest<Category[]>(`${API_PROXY}/finance-categories?isActive=true`)]); setAccounts(a.data ?? []); setCategories(c.data ?? []); })(); }, []);
   const update = (key: string, value: string) => setForm(x => ({ ...x, [key]: value }));
-  async function save() { setBusy(true); setMessage(""); const action = form.direction === "Inflow" ? "manual-income" : "manual-expense"; const result = await apiRequest<{ transactionNumber: string }>(`/api/backend/api/v1/financial-transactions/${action}`, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ ...form, transactionDate: new Date(form.transactionDate).toISOString(), amount: Number(form.amount), exchangeRate: Number(form.exchangeRate), financeCategoryId: form.financeCategoryId || null, businessReference: form.businessReference || null }) }); setBusy(false); setMessage(result.ok ? `Finans hareketi kaydedildi: ${result.data?.transactionNumber ?? ""}` : (result.message ?? "Finans hareketi kaydedilemedi.")); if (result.ok) setForm(initial); }
+  async function save() { setBusy(true); setMessage(""); const action = form.direction === "Inflow" ? "manual-income" : "manual-expense"; const result = await apiRequest<{ transactionNumber: string }>(`${API_PROXY}/financial-transactions/${action}`, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ ...form, transactionDate: new Date(form.transactionDate).toISOString(), amount: Number(form.amount), exchangeRate: Number(form.exchangeRate), financeCategoryId: form.financeCategoryId || null, businessReference: form.businessReference || null }) }); setBusy(false); setMessage(result.ok ? `Finans hareketi kaydedildi: ${result.data?.transactionNumber ?? ""}` : (result.message ?? "Finans hareketi kaydedilemedi.")); if (result.ok) setForm(initial); }
   return <main className="min-h-screen bg-zinc-950 p-4 text-white md:p-6"><div className="mx-auto max-w-6xl space-y-5"><header><p className="text-lime-300">AUDİTLİ KASA HAREKETİ</p><h1 className="text-3xl font-black">Gelir ve Gider Kaydı</h1></header><FinanceOpsNav />{message && <p className={box}>{message}</p>}<section className={`${box} grid gap-3 md:grid-cols-3`}>
     <Field label="Hesap"><select className={control} value={form.financialAccountId} onChange={e => update("financialAccountId", e.target.value)}><option value="">Hesap seçin</option>{accounts.map(x => <option key={x.id} value={x.id}>{x.accountCode} · {x.name} ({x.currency})</option>)}</select></Field>
     <Field label="İşlem tarihi"><input className={control} type="date" value={form.transactionDate} onChange={e => update("transactionDate", e.target.value)} /></Field>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "red" | "cyan" | "amber";
 
@@ -91,7 +91,7 @@ type PdfPageImage = {
   height: number;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60";
 const PAYMENT_TYPES = ["Nakit", "Havale", "Kredi Kartı", "Çek", "Vadeli"];
@@ -119,7 +119,7 @@ export default function PurchasesPage() {
     setError(null);
 
     try {
-      const response = await fetch(API + "/purchases");
+      const response = await authenticatedFetch(API + "/purchases");
 
       if (!response.ok) {
         throw new Error("Satın alma kayıtları alınamadı.");
@@ -167,7 +167,7 @@ export default function PurchasesPage() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(`${API}/purchases/${purchase.id}/cancel`, {
+      const response = await authenticatedFetch(`${API}/purchases/${purchase.id}/cancel`, {
         method: "POST",
       });
       const resultText = await response.text();
@@ -596,7 +596,7 @@ function PurchaseFormModal({
     setStocksError(null);
 
     try {
-      const response = await fetch(API + "/stocks");
+      const response = await authenticatedFetch(API + "/stocks");
 
       if (!response.ok) {
         throw new Error("Stok listesi alınamadı.");
@@ -617,7 +617,7 @@ function PurchaseFormModal({
     setMaterialsError(null);
 
     try {
-      const response = await fetch(API + "/materials");
+      const response = await authenticatedFetch(API + "/materials");
 
       if (!response.ok) {
         throw new Error("Malzeme listesi alınamadı.");
@@ -638,7 +638,7 @@ function PurchaseFormModal({
     setSuppliersError(null);
 
     try {
-      const response = await fetch(API + "/suppliers");
+      const response = await authenticatedFetch(API + "/suppliers");
 
       if (!response.ok) {
         throw new Error("Tedarikçi listesi alınamadı.");
@@ -771,7 +771,7 @@ function PurchaseFormModal({
     setSaving(true);
 
     try {
-      const response = await fetch(initialPurchase ? `${API}/purchases/${initialPurchase.id}` : API + "/purchases", {
+      const response = await authenticatedFetch(initialPurchase ? `${API}/purchases/${initialPurchase.id}` : API + "/purchases", {
         method: initialPurchase ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1091,9 +1091,9 @@ function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string | nul
 
       try {
         const [response, stocksResponse, materialsResponse] = await Promise.all([
-          fetch(`${API}/purchases/${purchaseId}`, { signal: controller.signal }),
-          fetch(API + "/stocks", { signal: controller.signal }),
-          fetch(API + "/materials", { signal: controller.signal }),
+          authenticatedFetch(`${API}/purchases/${purchaseId}`, { signal: controller.signal }),
+          authenticatedFetch(API + "/stocks", { signal: controller.signal }),
+          authenticatedFetch(API + "/materials", { signal: controller.signal }),
         ]);
 
         if (!response.ok) {

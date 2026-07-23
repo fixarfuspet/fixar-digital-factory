@@ -34,7 +34,6 @@ async function proxy(request: NextRequest, context: Context) {
 
   const target = new URL(path.join("/"), `${getApiBaseUrl()}/`);
   target.search = request.nextUrl.search;
-
   // Tarayıcıdan gelen bütün header'ları backend'e taşımıyoruz.
   // Yalnızca backend'in ihtiyaç duyduğu güvenli başlıkları oluşturuyoruz.
   const headers = new Headers();

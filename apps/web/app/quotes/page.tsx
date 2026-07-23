@@ -1,11 +1,13 @@
 "use client";
+import { authenticatedFetch, API_PROXY } from "@/app/lib/api/client";
+
 
 import Link from "next/link";
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { EmptyState, ErrorState, LoadingState, PageHeader, SectionCard, StatCard, StatusBadge } from "../components/ui/SystemUI";
 import { uiLabel } from "../lib/ui/labels";
 
-const API="/api/backend/api/v1"; const control="min-h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-base text-white outline-none focus:border-emerald-400/60";
+const API = API_PROXY; const control="min-h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-base text-white outline-none focus:border-emerald-400/60";
 type QuoteRow={id:string;quoteNumber:string;customerId:string;customerName:string;quoteDate:string;validUntil:string;currency:string;totalSalesAmount:number;totalEstimatedCost?:number;estimatedGrossProfit?:number;estimatedGrossMarginPercent?:number;estimatedLeadTimeDays?:number;estimatedDeliveryDate?:string;status:string;convertedOrderId?:string;itemCount:number;warningCount:number};
 type Customer={id:string;customerCode:string;name:string;companyName?:string;defaultCurrency:string;paymentTermDays:number}; type Product={id:string;code:string;name:string};
 type Item={id?:string;productId:string;size:string;color:string;quantity:string;unitPrice:string;fabricRequired:boolean;dtfRequired:boolean;labelDescription:string;notes:string};
@@ -18,7 +20,7 @@ const INITIAL_TODAY=new Date().toISOString().slice(0,10); const INITIAL_VALID_UN
 
 function filterDate(value:string,endOfDay=false){return value?`${value}T${endOfDay?"23:59:59.999":"00:00:00.000"}Z`:""}
 async function fetchResponse<T>(url:string,init?:RequestInit):Promise<ParsedResponse<T>>{
- const response=await fetch(url,init);if(response.status===401){window.location.assign("/");throw new Error("AUTH_REQUIRED")}
+ const response=await authenticatedFetch(url,init);
  const contentType=response.headers.get("content-type")?.toLowerCase()??"",contentLength=response.headers.get("content-length");
  if(response.status===204||contentLength==="0")return{ok:response.ok,status:response.status,payload:null,empty:true,invalid:false};
  let body="";try{body=await response.text()}catch(error){console.error("Teklif API yanıtı okunamadı.",{url,status:response.status,error});return{ok:response.ok,status:response.status,payload:null,empty:false,invalid:true}}

@@ -1,4 +1,6 @@
 "use client";
+import { authenticatedFetch, API_PROXY } from "@/app/lib/api/client";
+
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -6,7 +8,7 @@ import Link from "next/link";
 type ApiResponse<T> = { data?: T; message?: string; errorMessage?: string };
 type Box = { id: string; boxNumber: string; customerName?: string | null; productName?: string | null; productCode?: string | null; workOrderNumber?: string | null; pairCount: number; status: string; warehouseLocation?: string | null; rackCode?: string | null; receivedToWarehouseAt?: string | null };
 type Summary = { warehouseBoxes?: number; warehousePairs?: number; readyBoxes?: number; readyPairs?: number };
-const API = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
+const API = API_PROXY;
 const CONTROL = "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none focus:border-emerald-400/60";
 
 export default function WarehousePage() {
@@ -68,7 +70,7 @@ function Card({ label, value, tone = "cyan" }: { label: string; value: number; t
 function Empty({ text }: { text: string }) { return <div className="rounded-2xl border border-white/10 bg-black/20 p-10 text-center text-zinc-400">{text}</div>; }
 async function apiGet<T>(path: string): Promise<T> { return apiRequest<T>(path, { method: "GET" }); }
 async function apiPost<T>(path: string, body: unknown): Promise<T> { return apiRequest<T>(path, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(body) }); }
-async function apiRequest<T>(path: string, init: RequestInit): Promise<T> { const res = await fetch(API + path, init); const text = await res.text(); const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined; if (!res.ok) { const p = isRecord(payload) ? payload as ApiResponse<T> : undefined; throw new Error(p?.message || p?.errorMessage || "İstek başarısız oldu."); } if (isRecord(payload) && "data" in payload) return (payload as ApiResponse<T>).data as T; return payload as T; }
+async function apiRequest<T>(path: string, init: RequestInit): Promise<T> { const res = await authenticatedFetch(API + path, init); const text = await res.text(); const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined; if (!res.ok) { const p = isRecord(payload) ? payload as ApiResponse<T> : undefined; throw new Error(p?.message || p?.errorMessage || "İstek başarısız oldu."); } if (isRecord(payload) && "data" in payload) return (payload as ApiResponse<T>).data as T; return payload as T; }
 function extractArray(value: unknown): unknown[] { if (Array.isArray(value)) return value; if (isRecord(value) && Array.isArray(value.data)) return value.data; return []; }
 function mapBox(value: unknown): Box | null { if (!isRecord(value)) return null; return { id: String(value.id ?? ""), boxNumber: String(value.boxNumber ?? ""), customerName: readString(value.customerName), productCode: readString(value.productCode), productName: readString(value.productName), workOrderNumber: readString(value.workOrderNumber), pairCount: toNumber(value.pairCount), status: String(value.status ?? ""), warehouseLocation: readString(value.warehouseLocation), rackCode: readString(value.rackCode), receivedToWarehouseAt: readString(value.receivedToWarehouseAt) }; }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null; }

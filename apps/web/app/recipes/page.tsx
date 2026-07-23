@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -104,7 +104,7 @@ type ApiResponse<T> = {
   errorCode?: string;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const PRODUCT_MARKER = "\n\n---FIXAR_PRODUCT_MASTER_JSON---\n";
 const RECIPE_MARKER = "\n\n---FIXAR_RECIPE_UI_JSON---\n";
 const CONTROL_CLASS =
@@ -118,14 +118,8 @@ const TABS: Array<{ id: RecipeTab; label: string }> = [
   { id: "revision", label: "5 Revizyon" },
   { id: "notes", label: "6 Açıklamalar" },
 ];
-const AUTH_REDIRECT = "AUTH_REDIRECT";
-
 async function fetchMasterData(url: string): Promise<unknown> {
-  const response = await fetch(url, { cache: "no-store" });
-  if (response.status === 401) {
-    window.location.assign("/");
-    throw new Error(AUTH_REDIRECT);
-  }
+  const response = await authenticatedFetch(url, { cache: "no-store" });
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   if (!contentType.includes("json")) throw new Error(`Beklenmeyen yanıt türü: ${contentType || "boş"}`);
@@ -134,10 +128,6 @@ async function fetchMasterData(url: string): Promise<unknown> {
   } catch (error) {
     throw new Error("API yanıtı ayrıştırılamadı.", { cause: error });
   }
-}
-
-function isAuthRedirect(reason: unknown) {
-  return reason instanceof Error && reason.message === AUTH_REDIRECT;
 }
 
 export default function RecipesPage() {
@@ -171,15 +161,15 @@ export default function RecipesPage() {
       ? extractMaterials(materialsResult.value).filter((material) => material.isActive !== false)
       : [];
 
-    if (productsResult.status === "rejected" && !isAuthRedirect(productsResult.reason)) {
+    if (productsResult.status === "rejected") {
       console.error("Ürün listesi yüklenemedi.", productsResult.reason);
       errors.push("Ürün listesi yüklenemedi.");
     }
-    if (materialsResult.status === "rejected" && !isAuthRedirect(materialsResult.reason)) {
+    if (materialsResult.status === "rejected") {
       console.error("Malzeme listesi yüklenemedi.", materialsResult.reason);
       errors.push("Malzeme listesi yüklenemedi.");
     }
-    if (recipesResult.status === "rejected" && !isAuthRedirect(recipesResult.reason)) {
+    if (recipesResult.status === "rejected") {
       console.error("Reçete listesi yüklenemedi.", recipesResult.reason);
       errors.push("Reçete listesi yüklenemedi.");
     }
@@ -465,7 +455,7 @@ function RecipeModal({
 
     setSaving(true);
     try {
-      const response = await fetch(mode === "edit" && recipe ? `${API}/recipes/${recipe.id}` : `${API}/recipes`, {
+      const response = await authenticatedFetch(mode === "edit" && recipe ? `${API}/recipes/${recipe.id}` : `${API}/recipes`, {
         method: mode === "edit" ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toRecipeRequest(form, selectedLines, materials)),
@@ -499,7 +489,7 @@ function RecipeModal({
         };
       }
 
-      const response = await fetch(endpoint, {
+      const response = await authenticatedFetch(endpoint, {
         method: "POST",
         headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,

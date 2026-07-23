@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -112,7 +112,7 @@ type OperatorFormState = {
   isActive: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
 const DEPARTMENTS = ["Injection", "Cutting", "Packaging", "Warehouse", "Quality", "Maintenance", "ProductionManagement"];
@@ -214,8 +214,8 @@ export default function OperatorsPage() {
     setError(null);
     try {
       const [operatorsResponse, machinesResponse] = await Promise.all([
-        fetch(API + "/operators"),
-        fetch(API + "/machines"),
+        authenticatedFetch(API + "/operators"),
+        authenticatedFetch(API + "/machines"),
       ]);
       if (!operatorsResponse.ok) throw new Error(await readError(operatorsResponse, "Operatör listesi alınamadı."));
       if (!machinesResponse.ok) throw new Error(await readError(machinesResponse, "Makine listesi alınamadı."));
@@ -255,7 +255,7 @@ export default function OperatorsPage() {
   async function handleActionSuccess(message: string, operatorId?: string) {
     await loadData();
     if (operatorId && selectedOperator?.id === operatorId) {
-      const response = await fetch(`${API}/operators/${operatorId}`);
+      const response = await authenticatedFetch(`${API}/operators/${operatorId}`);
       if (response.ok) setSelectedOperator(extractOne<Operator>(await safeResponseJson(response)));
     }
     closeAction();
@@ -484,7 +484,7 @@ function OperatorModal({ mode, operatorEntity, machines, onClose, onSaved }: { m
     }
     setSaving(true);
     try {
-      const response = await fetch(mode === "edit" && operatorEntity ? `${API}/operators/${operatorEntity.id}` : `${API}/operators`, {
+      const response = await authenticatedFetch(mode === "edit" && operatorEntity ? `${API}/operators/${operatorEntity.id}` : `${API}/operators`, {
         method: mode === "edit" ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toOperatorRequest(form)),
@@ -602,7 +602,7 @@ function OperatorActionModal({ mode, operatorEntity, machines, onClose, onSucces
         message = getActionTitle(mode) + " tamamlandı.";
       }
 
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: "POST",
         headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,

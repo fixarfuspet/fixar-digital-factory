@@ -1,5 +1,5 @@
-import { apiRequest } from "../../lib/api/client";
-export const API="/api/backend/api/v1";
+import { apiRequest, API_PROXY } from "../../lib/api/client";
+export const API = API_PROXY;
 export async function api<T>(path:string,init?:RequestInit,idempotent=false):Promise<T>{const headers=new Headers(init?.headers);if(init?.body)headers.set("Content-Type","application/json");if(idempotent)headers.set("Idempotency-Key",crypto.randomUUID());const result=await apiRequest<T>(`${API}/${path}`,{...init,headers,cache:"no-store"});if(!result.ok)throw new Error(result.message??(result.status===403?"Bu işlem için bakım yetkiniz bulunmuyor.":result.status===404?"Kayıt bulunamadı.":result.status===409?"İşlem mevcut durumla çakışıyor.":"İşlem tamamlanamadı."));return result.data as T}
 export const post=<T>(path:string,body:unknown={})=>api<T>(path,{method:"POST",body:JSON.stringify(body)},true);export const put=<T>(path:string,body:unknown)=>api<T>(path,{method:"PUT",body:JSON.stringify(body)});
 export type Me={userId:string;userName:string;email:string;roles:string[]};

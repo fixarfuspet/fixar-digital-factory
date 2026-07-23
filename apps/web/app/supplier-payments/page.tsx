@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SupplierFinanceView } from "../components/finance/SupplierFinanceView";
-import { apiRequest } from "../lib/api/client";
+import { API_PROXY, apiRequest } from "../lib/api/client";
 
 type Supplier = { id: string; supplierCode?: string; name: string };
 type Account = { id: string; accountCode: string; name: string; currency: string };
@@ -10,12 +10,12 @@ const initial = { supplierId: "", financialAccountId: "", paymentDate: new Date(
 
 export default function Page() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]), [accounts, setAccounts] = useState<Account[]>([]), [form, setForm] = useState(initial), [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [refresh, setRefresh] = useState(0);
-  useEffect(() => { void (async () => { const [s, a] = await Promise.all([apiRequest<Supplier[]>("/api/backend/api/v1/suppliers"), apiRequest<Account[]>("/api/backend/api/v1/financial-accounts?isActive=true")]); setSuppliers(s.data ?? []); setAccounts(a.data ?? []); })(); }, []);
+  useEffect(() => { void (async () => { const [s, a] = await Promise.all([apiRequest<Supplier[]>(`${API_PROXY}/suppliers`), apiRequest<Account[]>(`${API_PROXY}/financial-accounts?isActive=true`)]); setSuppliers(s.data ?? []); setAccounts(a.data ?? []); })(); }, []);
   const update = (key: string, value: string | boolean) => setForm(x => ({ ...x, [key]: value }));
   async function record() {
     if (!form.supplierId || !form.financialAccountId || !form.amount || !form.externalReference) { setMessage("Tedarikçi, hesap, tutar ve tekil referans zorunludur."); return; }
     setBusy(true); setMessage("");
-    const result = await apiRequest("/api/backend/api/v1/supplier-payments/record-and-allocate", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ ...form, paymentDate: new Date(form.paymentDate).toISOString(), amount: Number(form.amount), exchangeRate: Number(form.exchangeRate), allocations: null }) });
+    const result = await apiRequest(`${API_PROXY}/supplier-payments/record-and-allocate`, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ ...form, paymentDate: new Date(form.paymentDate).toISOString(), amount: Number(form.amount), exchangeRate: Number(form.exchangeRate), allocations: null }) });
     setBusy(false); setMessage(result.ok ? "Ödeme, cari dağıtım ve kasa çıkışı tek işlemde kaydedildi." : (result.message ?? "Tedarikçi ödemesi kaydedilemedi."));
     if (result.ok) { setForm(initial); setRefresh(x => x + 1); }
   }

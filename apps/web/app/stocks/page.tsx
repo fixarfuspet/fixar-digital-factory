@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type MovementType = "Giriş" | "Çıkış";
 type StockDialogMode = "create" | "edit" | "delete";
@@ -74,7 +74,7 @@ type StockFormState = {
   isActive: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60";
 
@@ -118,7 +118,7 @@ export default function StocksPage() {
     setError(null);
 
     try {
-      const response = await fetch(API + "/stocks");
+      const response = await authenticatedFetch(API + "/stocks");
 
       if (!response.ok) {
         throw new Error("Stok listesi alınamadı.");
@@ -597,7 +597,7 @@ function MovementHistoryModal({ stock, onClose }: { stock: StockItem | null; onC
       setError(null);
 
       try {
-        const response = await fetch(`${API}/stocks/${stockId}/movements`, {
+        const response = await authenticatedFetch(`${API}/stocks/${stockId}/movements`, {
           signal: controller.signal,
         });
 
@@ -750,7 +750,7 @@ function StockFormModal({
     };
 
     try {
-      const response = await fetch(initialStock ? `${API}/stocks/${initialStock.id}` : API + "/stocks", {
+      const response = await authenticatedFetch(initialStock ? `${API}/stocks/${initialStock.id}` : API + "/stocks", {
         method: initialStock ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1025,7 +1025,7 @@ function MovementModalContent({
 
     setSaving(true);
 
-    const response = await fetch(API + "/stocks/movement", {
+    const response = await authenticatedFetch(API + "/stocks/movement", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

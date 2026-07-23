@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -134,7 +134,7 @@ type ApiResponse<T> = {
   success?: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const EXTRA_MARKER = "\n\n---FIXAR_MATERIAL_MASTER_JSON---\n";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
@@ -246,7 +246,7 @@ export default function MaterialsPage() {
     setError(null);
 
     try {
-      const response = await fetch(API + "/materials");
+      const response = await authenticatedFetch(API + "/materials");
 
       if (!response.ok) {
         throw new Error("Malzeme listesi alınamadı.");
@@ -277,7 +277,7 @@ export default function MaterialsPage() {
     setDetailLoading(true);
 
     try {
-      const response = await fetch(`${API}/materials/${material.id}`);
+      const response = await authenticatedFetch(`${API}/materials/${material.id}`);
 
       if (!response.ok) {
         throw new Error("Malzeme detayı alınamadı.");
@@ -611,7 +611,7 @@ function MaterialModal({
     setSaving(true);
 
     try {
-      const response = await fetch(isEdit && material ? `${API}/materials/${material.id}` : API + "/materials", {
+      const response = await authenticatedFetch(isEdit && material ? `${API}/materials/${material.id}` : API + "/materials", {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toRequestBody(form)),

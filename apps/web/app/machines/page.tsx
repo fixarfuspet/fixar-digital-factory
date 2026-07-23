@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -87,7 +87,7 @@ type MachineFormState = {
   isActive: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
 const MACHINE_TYPES = ["Injection", "Cutting", "Packaging", "DTF", "Warehouse", "Quality"];
@@ -163,7 +163,7 @@ export default function MachinesPage() {
     setError(null);
 
     try {
-      const response = await fetch(API + "/machines");
+      const response = await authenticatedFetch(API + "/machines");
       if (!response.ok) {
         throw new Error(await readError(response, "Makine listesi alınamadı."));
       }
@@ -202,7 +202,7 @@ export default function MachinesPage() {
   async function handleActionSuccess(message: string, machineId?: string) {
     await loadMachines();
     if (machineId && selectedMachine?.id === machineId) {
-      const response = await fetch(`${API}/machines/${machineId}`);
+      const response = await authenticatedFetch(`${API}/machines/${machineId}`);
       if (response.ok) {
         setSelectedMachine(extractOne<Machine>(await safeResponseJson(response)));
       }
@@ -439,7 +439,7 @@ function MachineModal({
 
     setSaving(true);
     try {
-      const response = await fetch(mode === "edit" && machine ? `${API}/machines/${machine.id}` : `${API}/machines`, {
+      const response = await authenticatedFetch(mode === "edit" && machine ? `${API}/machines/${machine.id}` : `${API}/machines`, {
         method: mode === "edit" ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toMachineRequest(form)),
@@ -586,7 +586,7 @@ function MachineActionModal({ mode, machine, onClose, onSuccess }: { mode: Actio
         message = "Üretim kaydı işlendi.";
       }
 
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

@@ -1,4 +1,4 @@
-"use client";import{safeResponseJson}from"../lib/api/client";
+"use client";import { API_PROXY, safeResponseJson, authenticatedFetch } from "../lib/api/client";
 
 import { useEffect, useState } from "react";
 
@@ -11,9 +11,8 @@ export default function UsersPage() {
   const [message, setMessage] = useState("");
 
   async function load() {
-    const [userResponse, roleResponse] = await Promise.all([fetch("/api/backend/api/v1/users"), fetch("/api/backend/api/v1/users/roles")]);
+    const [userResponse, roleResponse] = await Promise.all([authenticatedFetch(`${API_PROXY}/users`), authenticatedFetch(`${API_PROXY}/users/roles`)]);
     if (userResponse.status === 403) { setMessage("Bu ekran için kullanıcı yönetimi yetkiniz bulunmuyor."); return; }
-    if (userResponse.status === 401) { window.location.href = "/"; return; }
     setUsers(((await safeResponseJson(userResponse)) as ApiResponse<User[]>).data ?? []);
     setRoles(((await safeResponseJson(roleResponse)) as ApiResponse<string[]>).data ?? []);
   }
@@ -21,7 +20,7 @@ export default function UsersPage() {
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, []);
 
   async function save(user: User) {
-    const response = await fetch(`/api/backend/api/v1/users/${user.id}/access`, {
+    const response = await authenticatedFetch(`${API_PROXY}/users/${user.id}/access`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: user.isActive, roles: user.roles }),
     });
     setMessage(response.ok ? "Kullanıcı erişimi güncellendi." : response.status === 403 ? "Bu işlem için yetkiniz bulunmuyor." : "Güncelleme başarısız.");

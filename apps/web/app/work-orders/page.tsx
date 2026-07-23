@@ -1,4 +1,6 @@
 "use client";
+import { authenticatedFetch, API_PROXY } from "@/app/lib/api/client";
+
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -245,7 +247,7 @@ type ApiResponse<T> = {
   success?: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const PRODUCT_MARKER = "\n\n---FIXAR_PRODUCT_MASTER_JSON---\n";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
@@ -1296,7 +1298,7 @@ async function apiPut<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {
-  const response = await fetch(API + path, init);
+  const response = await authenticatedFetch(API + path, init);
   const text = await response.text();
   const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined;
 

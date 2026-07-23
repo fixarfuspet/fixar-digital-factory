@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ErrorState, LoadingState, PageHeader, SectionCard, StatCard, StatusBadge } from "../components/ui/SystemUI";
-import { apiRequest } from "../lib/api/client";
+import { apiRequest, API_PROXY } from "../lib/api/client";
 
-const API = "/api/backend/api/v1/system-control";
+const API = API_PROXY + "/system-control";
 type Check = { key: string; title: string; count: number; status: string; details: unknown[] };
 type Report = { checkedAt: string; backend: string; database: string; authentication: string; activeUser?: string; healthy: boolean; checks: Check[] };
 

@@ -1,4 +1,4 @@
-"use client";import{safeResponseJson}from"../../lib/api/client";
+"use client";import { safeResponseJson, authenticatedFetch, API_PROXY } from "../../lib/api/client";
 
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -69,7 +69,7 @@ type ProductionRecipe = {
   isoSetting: string;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const PAIRS_PER_MOLD_HOUR = 9;
 
 export default function AssignmentModal({ open, station, onClose }: Props) {
@@ -91,19 +91,19 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
 
-    fetch(API + "/production-planning/lookups/customers")
+    authenticatedFetch(API + "/production-planning/lookups/customers")
       .then((r) => safeResponseJson(r))
       .then((r) => setCustomers(r.data ?? []));
 
-    fetch(API + "/production-planning/lookups/operators")
+    authenticatedFetch(API + "/production-planning/lookups/operators")
       .then((r) => safeResponseJson(r))
       .then((r) => setOperators(r.data ?? []));
 
-    fetch(API + "/station-assignments/active")
+    authenticatedFetch(API + "/station-assignments/active")
       .then((r) => safeResponseJson(r))
       .then((r) => setActiveAssignments(r.data ?? []));
 
-    fetch(API + "/work-orders/available-for-planning")
+    authenticatedFetch(API + "/work-orders/available-for-planning")
       .then((r) => safeResponseJson(r))
       .then((r) => setWorkOrders(r.data ?? []));
   }, [open]);
@@ -117,7 +117,7 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
       return () => window.clearTimeout(timer);
     }
 
-    fetch(API + "/production-planning/lookups/orders?customerId=" + customerId)
+    authenticatedFetch(API + "/production-planning/lookups/orders?customerId=" + customerId)
       .then((r) => safeResponseJson(r))
       .then((r) => setOrders(r.data ?? []));
   }, [customerId]);
@@ -198,7 +198,7 @@ export default function AssignmentModal({ open, station, onClose }: Props) {
 
     setSaving(true);
 
-    const response = await fetch(API + "/station-assignments/assign", {
+    const response = await authenticatedFetch(API + "/station-assignments/assign", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

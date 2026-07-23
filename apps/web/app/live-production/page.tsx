@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import ManageAssignmentModal from "../components/production-planning/ManageAssignmentModal";
-import { apiRequest } from "../lib/api/client";
+import { apiRequest, API_PROXY } from "../lib/api/client";
 
 type LiveStation = {
   stationNumber: number;
@@ -79,7 +79,7 @@ type Downtime = {
   isOpen: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 
 const FIRE_REASONS = [
   "Eksik Döküm",

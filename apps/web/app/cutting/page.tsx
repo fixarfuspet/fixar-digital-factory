@@ -1,4 +1,6 @@
 "use client";
+import { authenticatedFetch, API_PROXY } from "@/app/lib/api/client";
+
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -10,7 +12,7 @@ type CuttingRecord = { id: string; recordNumber: string; recordDate: string; sta
 type Summary = { totalInputPairs?: number; todayCutPairs?: number; goodPairs?: number; rejectedPairs?: number; reworkPairs?: number; waitingForPacking?: number };
 type FormState = { stationAssignmentId: string; cuttingMachineId: string; shift: string; inputPairs: string; goodPairs: string; rejectedPairs: string; reworkPairs: string; notes: string };
 
-const API = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
+const API = API_PROXY;
 const CONTROL = "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none focus:border-emerald-400/60";
 const emptyForm: FormState = { stationAssignmentId: "", cuttingMachineId: "", shift: "1", inputPairs: "", goodPairs: "", rejectedPairs: "0", reworkPairs: "0", notes: "" };
 
@@ -145,7 +147,7 @@ function Mini({ label, value }: { label: string; value: string | number }) { ret
 function Empty({ text }: { text: string }) { return <div className="rounded-2xl border border-white/10 bg-black/20 p-10 text-center text-zinc-400">{text}</div>; }
 async function apiGet<T>(path: string): Promise<T> { return apiRequest<T>(path, { method: "GET" }); }
 async function apiPost<T>(path: string, body: unknown): Promise<T> { return apiRequest<T>(path, { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(body) }); }
-async function apiRequest<T>(path: string, init: RequestInit): Promise<T> { const res = await fetch(API + path, init); const text = await res.text(); const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined; if (!res.ok) { const p = isRecord(payload) ? payload as ApiResponse<T> : undefined; throw new Error(p?.message || p?.errorMessage || "İstek başarısız oldu."); } if (isRecord(payload) && "data" in payload) return (payload as ApiResponse<T>).data as T; return payload as T; }
+async function apiRequest<T>(path: string, init: RequestInit): Promise<T> { const res = await authenticatedFetch(API + path, init); const text = await res.text(); const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined; if (!res.ok) { const p = isRecord(payload) ? payload as ApiResponse<T> : undefined; throw new Error(p?.message || p?.errorMessage || "İstek başarısız oldu."); } if (isRecord(payload) && "data" in payload) return (payload as ApiResponse<T>).data as T; return payload as T; }
 function extractArray(value: unknown): unknown[] { if (Array.isArray(value)) return value; if (isRecord(value) && Array.isArray(value.data)) return value.data; return []; }
 function mapRecord(value: unknown): CuttingRecord | null { if (!isRecord(value)) return null; return { id: String(value.id ?? ""), recordNumber: String(value.recordNumber ?? ""), recordDate: String(value.recordDate ?? ""), stationAssignmentId: readString(value.stationAssignmentId), stationNumber: numberOrNull(value.stationNumber), workOrderNumber: readString(value.workOrderNumber), customerName: readString(value.customerName), productCode: readString(value.productCode), productName: readString(value.productName), cuttingMachineId: String(value.cuttingMachineId ?? ""), cuttingMachineName: String(value.cuttingMachineName ?? ""), operatorName: readString(value.operatorName), inputPairs: toNumber(value.inputPairs), goodPairs: toNumber(value.goodPairs), rejectedPairs: toNumber(value.rejectedPairs), reworkPairs: toNumber(value.reworkPairs), boxedPairs: toNumber(value.boxedPairs), remainingForPacking: toNumber(value.remainingForPacking), status: String(value.status ?? "") }; }
 function mapAssignment(value: unknown): Assignment | null { if (!isRecord(value)) return null; return { stationAssignmentId: String(value.stationAssignmentId ?? ""), stationNumber: toNumber(value.stationNumber), workOrderNumber: readString(value.workOrderNumber), customerName: readString(value.customerName), productCode: readString(value.productCode), productName: readString(value.productName), producedPairs: toNumber(value.producedPairs), injectionFirePairs: toNumber(value.injectionFirePairs), alreadyCutInputPairs: toNumber(value.alreadyCutInputPairs), remainingForCutting: toNumber(value.remainingForCutting) }; }

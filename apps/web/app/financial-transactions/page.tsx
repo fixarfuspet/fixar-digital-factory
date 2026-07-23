@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FinanceOpsNav } from "../components/finance/FinanceOpsNav";
-import { safeResponseJson } from "../lib/api/client";
+import { API_PROXY, safeResponseJson, authenticatedFetch } from "../lib/api/client";
 
 type Row = { id: string; transactionNumber: string; accountName: string; transactionDate: string; transactionType: string; direction: string; sourceType: string; currency: string; amount: number; referenceNumber?: string; isReversed: boolean };
 type Summary = { currency: string; todayIn: number; todayOut: number; monthIn: number; monthOut: number };
@@ -10,7 +10,7 @@ type Summary = { currency: string; todayIn: number; todayOut: number; monthIn: n
 export default function Page() {
   const [rows, setRows] = useState<Row[]>([]), [summary, setSummary] = useState<Summary[]>([]);
   useEffect(() => { void (async () => {
-    const [transactions, totals] = await Promise.all([fetch("/api/backend/api/v1/financial-transactions"), fetch("/api/backend/api/v1/financial-transactions/summary")]);
+    const [transactions, totals] = await Promise.all([authenticatedFetch(`${API_PROXY}/financial-transactions`), authenticatedFetch(`${API_PROXY}/financial-transactions/summary`)]);
     setRows((await safeResponseJson<Row[]>(transactions)).data ?? []);
     setSummary((await safeResponseJson<Summary[]>(totals)).data ?? []);
   })(); }, []);

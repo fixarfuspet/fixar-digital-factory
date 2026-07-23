@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red" | "blue" | "violet" | "zinc";
 type DialogMode = "create" | "edit" | "detail" | null;
@@ -133,7 +133,7 @@ type MoldFormState = {
   isActive: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
 const MOLD_TYPES = ["Single", "Pair", "Right", "Left", "Combined"];
@@ -231,8 +231,8 @@ export default function MoldsPage() {
 
     try {
       const [moldsResponse, productsResponse] = await Promise.all([
-        fetch(API + "/molds"),
-        fetch(API + "/products"),
+        authenticatedFetch(API + "/molds"),
+        authenticatedFetch(API + "/products"),
       ]);
 
       if (!moldsResponse.ok) {
@@ -279,7 +279,7 @@ export default function MoldsPage() {
   async function handleActionSuccess(message: string, moldId?: string) {
     await loadData();
     if (moldId && selectedMold?.id === moldId) {
-      const response = await fetch(`${API}/molds/${moldId}`);
+      const response = await authenticatedFetch(`${API}/molds/${moldId}`);
       if (response.ok) {
         setSelectedMold(extractOne<Mold>(await safeResponseJson(response)));
       }
@@ -537,7 +537,7 @@ function MoldModal({
 
     setSaving(true);
     try {
-      const response = await fetch(mode === "edit" && mold ? `${API}/molds/${mold.id}` : `${API}/molds`, {
+      const response = await authenticatedFetch(mode === "edit" && mold ? `${API}/molds/${mold.id}` : `${API}/molds`, {
         method: mode === "edit" ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toMoldRequest(form)),
@@ -668,7 +668,7 @@ function MoldActionModal({ mode, mold, onClose, onSuccess }: { mode: ActionMode;
         message = "Bakım kaydı işlendi.";
       }
 
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

@@ -1,4 +1,6 @@
 "use client";
+import { authenticatedFetch, API_PROXY } from "@/app/lib/api/client";
+
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -104,7 +106,7 @@ type QualityForm = {
   defects: QualityDefectForm[];
 };
 
-const API = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
+const API = API_PROXY;
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
 const INSPECTION_TYPES = [
@@ -669,7 +671,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function apiRequest<T>(path: string, init: RequestInit): Promise<T> {
-  const response = await fetch(API + path, init);
+  const response = await authenticatedFetch(API + path, init);
   const text = await response.text();
   const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined;
   if (!response.ok) {

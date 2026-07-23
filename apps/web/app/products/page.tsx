@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "cyan" | "amber" | "red";
 type ProductDialogMode = "create" | "edit" | "detail" | null;
@@ -167,7 +167,7 @@ type ApiResponse<T> = {
   success?: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const DETAILS_MARKER = "\n\n---FIXAR_PRODUCT_MASTER_JSON---\n";
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-70";
@@ -340,7 +340,7 @@ export default function ProductsPage() {
     setError(null);
 
     try {
-      const response = await fetch(API + "/products");
+      const response = await authenticatedFetch(API + "/products");
 
       if (!response.ok) {
         throw new Error("Ürün listesi alınamadı.");
@@ -371,7 +371,7 @@ export default function ProductsPage() {
     setDetailLoading(true);
 
     try {
-      const response = await fetch(`${API}/products/${product.id}`);
+      const response = await authenticatedFetch(`${API}/products/${product.id}`);
 
       if (!response.ok) {
         throw new Error("Ürün detayı alınamadı.");
@@ -689,7 +689,7 @@ function ProductMasterModal({
     setSaving(true);
 
     try {
-      const response = await fetch(isEdit && product ? `${API}/products/${product.id}` : API + "/products", {
+      const response = await authenticatedFetch(isEdit && product ? `${API}/products/${product.id}` : API + "/products", {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toRequestBody(form)),

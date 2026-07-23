@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { FinanceNav } from "../components/finance/FinanceNav";
-import { apiRequest } from "../lib/api/client";
+import { apiRequest, API_PROXY } from "../lib/api/client";
 
-const API = "/api/backend/api/v1/customer-collections";
+const API = API_PROXY + "/customer-collections";
 type Row = { id: string; collectionNumber: string; customerName: string; collectionDate: string; currency: string; amount: number; paymentMethod: string; status: string; unallocatedAmount: number; isReversed: boolean; financePostingStatus?: string };
 type Customer = { id: string; customerCode: string; name: string; companyName?: string; defaultCurrency: string };
 type Account = { id: string; accountCode: string; name: string; accountType: string; currency: string; isActive: boolean };
@@ -13,7 +13,7 @@ const initial = { customerId: "", financialAccountId: "", collectionDate: new Da
 export default function Page() {
   const [rows, setRows] = useState<Row[]>([]), [customers, setCustomers] = useState<Customer[]>([]), [accounts, setAccounts] = useState<Account[]>([]), [message, setMessage] = useState(""), [busy, setBusy] = useState(false), [form, setForm] = useState(initial);
   async function load() {
-    const [collections, customerLookup, accountLookup] = await Promise.all([apiRequest<Row[]>(API), apiRequest<Customer[]>("/api/backend/api/v1/customer-receivables/customer-lookup"), apiRequest<Account[]>("/api/backend/api/v1/financial-accounts?isActive=true")]);
+    const [collections, customerLookup, accountLookup] = await Promise.all([apiRequest<Row[]>(API), apiRequest<Customer[]>(`${API_PROXY}/customer-receivables/customer-lookup`), apiRequest<Account[]>(`${API_PROXY}/financial-accounts?isActive=true`)]);
     setRows(collections.data ?? []); setCustomers(customerLookup.data ?? []); setAccounts(accountLookup.data ?? []);
     if (!collections.ok) setMessage("Tahsilatlar yüklenemedi.");
   }

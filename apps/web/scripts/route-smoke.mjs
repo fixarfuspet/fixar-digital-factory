@@ -41,6 +41,18 @@ try {
   await waitUntilReady();
   const routes = [...new Set(await discoverRoutes(path.join(root, "app")))].sort();
   const failures = [];
+  const refreshResponse = await fetch(`${baseUrl}/api/auth/refresh`, {
+    method: "POST",
+    headers: { Origin: baseUrl },
+    redirect: "manual",
+  });
+  if (refreshResponse.status !== 401) {
+    failures.push(`/api/auth/refresh: ${refreshResponse.status}, oturumsuz 401 bekleniyordu`);
+  }
+  const proxyResponse = await fetch(`${baseUrl}/api/backend/api/v1/auth/me`, { redirect: "manual" });
+  if (proxyResponse.status !== 401) {
+    failures.push(`/api/backend/api/v1/auth/me: ${proxyResponse.status}, oturumsuz 401 bekleniyordu`);
+  }
   for (const route of routes) {
     const response = await fetch(`${baseUrl}${route}`, { redirect: "manual" });
     if (route === "/") {
@@ -53,7 +65,7 @@ try {
     }
   }
   if (failures.length) throw new Error(`Route smoke başarısız:\n${failures.join("\n")}`);
-  console.log(`Başarılı: ${routes.length} uygulama route'u ve session yönlendirmesi doğrulandı.`);
+  console.log(`Başarılı: ${routes.length} uygulama route'u, BFF auth uçları ve session yönlendirmesi doğrulandı.`);
 } finally {
   server.kill("SIGTERM");
 }

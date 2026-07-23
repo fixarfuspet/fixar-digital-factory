@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { safeResponseJson } from "../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../lib/api/client";
 
 type DashboardTone = "emerald" | "red" | "cyan" | "amber";
 type DialogMode = "create" | "edit" | null;
@@ -38,7 +38,7 @@ type SupplierFormState = {
   isActive: boolean;
 };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 const CONTROL_CLASS =
   "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400/60";
 
@@ -61,7 +61,7 @@ export default function SuppliersPage() {
     setError(null);
 
     try {
-      const response = await fetch(API + "/suppliers");
+      const response = await authenticatedFetch(API + "/suppliers");
 
       if (!response.ok) {
         throw new Error("Tedarikçi listesi alınamadı.");
@@ -346,7 +346,7 @@ function SupplierFormModal({
     setSaving(true);
 
     try {
-      const response = await fetch(isEdit ? `${API}/suppliers/${supplier.id}` : API + "/suppliers", {
+      const response = await authenticatedFetch(isEdit ? `${API}/suppliers/${supplier.id}` : API + "/suppliers", {
         method: isEdit ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",

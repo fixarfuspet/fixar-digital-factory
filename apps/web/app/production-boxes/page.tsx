@@ -1,4 +1,6 @@
 "use client";
+import { authenticatedFetch, API_PROXY } from "@/app/lib/api/client";
+
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -8,7 +10,7 @@ type Box = { id: string; boxNumber: string; cuttingRecordId?: string | null; cut
 type CuttingRecord = { id: string; recordNumber: string; customerName?: string | null; productName?: string | null; goodPairs: number; boxedPairs: number; remainingForPacking: number; status: string };
 type Summary = { totalBoxes?: number; totalPairs?: number; packedBoxes?: number; packedPairs?: number; warehouseBoxes?: number; readyBoxes?: number; shippedBoxes?: number };
 
-const API = (process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "/api/backend/api/v1").replace(/\/$/, "");
+const API = API_PROXY;
 const CONTROL = "w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white outline-none focus:border-emerald-400/60";
 
 export default function ProductionBoxesPage() {
@@ -118,7 +120,7 @@ function Mini({ label, value }: { label: string; value: string | number }) { ret
 function Empty({ text }: { text: string }) { return <div className="rounded-2xl border border-white/10 bg-black/20 p-10 text-center text-zinc-400">{text}</div>; }
 async function apiGet<T>(path: string): Promise<T> { return apiRequest<T>(path, { method: "GET" }); }
 async function apiPost<T>(path: string, body: unknown): Promise<T> { return apiRequest<T>(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); }
-async function apiRequest<T>(path: string, init: RequestInit): Promise<T> { const res = await fetch(API + path, init); const text = await res.text(); const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined; if (!res.ok) { const p = isRecord(payload) ? payload as ApiResponse<T> : undefined; throw new Error(p?.message || p?.errorMessage || "İstek başarısız oldu."); } if (isRecord(payload) && "data" in payload) return (payload as ApiResponse<T>).data as T; return payload as T; }
+async function apiRequest<T>(path: string, init: RequestInit): Promise<T> { const res = await authenticatedFetch(API + path, init); const text = await res.text(); const payload = text ? JSON.parse(text) as ApiResponse<T> | T : undefined; if (!res.ok) { const p = isRecord(payload) ? payload as ApiResponse<T> : undefined; throw new Error(p?.message || p?.errorMessage || "İstek başarısız oldu."); } if (isRecord(payload) && "data" in payload) return (payload as ApiResponse<T>).data as T; return payload as T; }
 function extractArray(value: unknown): unknown[] { if (Array.isArray(value)) return value; if (isRecord(value) && Array.isArray(value.data)) return value.data; return []; }
 function mapBox(value: unknown): Box | null { if (!isRecord(value)) return null; return { id: String(value.id ?? ""), boxNumber: String(value.boxNumber ?? ""), cuttingRecordId: readString(value.cuttingRecordId), cuttingRecordNumber: readString(value.cuttingRecordNumber), customerName: readString(value.customerName), productCode: readString(value.productCode), productName: readString(value.productName), workOrderNumber: readString(value.workOrderNumber), pairCount: toNumber(value.pairCount), status: String(value.status ?? ""), warehouseLocation: readString(value.warehouseLocation), rackCode: readString(value.rackCode), shipmentReference: readString(value.shipmentReference), packedAt: readString(value.packedAt), receivedToWarehouseAt: readString(value.receivedToWarehouseAt), readyForShipmentAt: readString(value.readyForShipmentAt), shippedAt: readString(value.shippedAt) }; }
 function mapCutting(value: unknown): CuttingRecord | null { if (!isRecord(value)) return null; return { id: String(value.id ?? ""), recordNumber: String(value.recordNumber ?? ""), customerName: readString(value.customerName), productName: readString(value.productName), goodPairs: toNumber(value.goodPairs), boxedPairs: toNumber(value.boxedPairs), remainingForPacking: toNumber(value.remainingForPacking), status: String(value.status ?? "") }; }

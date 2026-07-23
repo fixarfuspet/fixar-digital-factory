@@ -16,4 +16,6 @@ npm run build
 npm run test:smoke
 ```
 
-Backend yollarında standart `/api/backend/api/v1/...` biçimidir. `NEXT_PUBLIC_API_BASE_URL` yalnız tarayıcı tarafından gerçekten erişilebilen bir adres için kullanılmalıdır; normal local/production akışında BFF yolu tercih edilir.
+Tarayıcıdaki tüm backend çağrıları ortak API istemcisi üzerinden aynı origin'deki
+`/api/backend/api/v1/...` BFF yoluna gider. Tarayıcıya backend adresi açan
+`NEXT_PUBLIC_API_*` değişkenleri kullanılmaz.

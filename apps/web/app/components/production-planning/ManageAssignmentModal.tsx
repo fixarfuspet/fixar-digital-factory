@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffectEvent,useEffect, useState } from "react";
-import { safeResponseJson } from "../../lib/api/client";
+import { safeResponseJson, authenticatedFetch, API_PROXY } from "../../lib/api/client";
 
 type Props = {
   open: boolean;
@@ -29,7 +29,7 @@ type AssignmentDetail = {
 
 type AddTurnResult = { turnCount: number; activeStationCount: number; totalAddedPairs: number };
 
-const API = "/api/backend/api/v1";
+const API = API_PROXY;
 
 export default function ManageAssignmentModal({ open, station, onClose }: Props) {
   const [item, setItem] = useState<AssignmentDetail | null>(null);
@@ -53,14 +53,14 @@ export default function ManageAssignmentModal({ open, station, onClose }: Props)
 
   async function load() {
     setLoading(true);
-    const response = await fetch(API + "/station-assignments/station/" + station);
+    const response = await authenticatedFetch(API + "/station-assignments/station/" + station);
     const result = await safeResponseJson<AssignmentDetail>(response);
     setItem(result.data ?? null);
     setLoading(false);
   }
 
   async function post<T = unknown>(url: string, body: unknown) {
-    const response = await fetch(API + url, {
+    const response = await authenticatedFetch(API + url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
