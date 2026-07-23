@@ -8,7 +8,7 @@ COPY src/Fixar.Domain/Fixar.Domain.csproj src/Fixar.Domain/
 COPY src/Fixar.Application/Fixar.Application.csproj src/Fixar.Application/
 COPY src/Fixar.Infrastructure/Fixar.Infrastructure.csproj src/Fixar.Infrastructure/
 COPY src/Fixar.API/Fixar.API.csproj src/Fixar.API/
-RUN dotnet restore FixarOS.sln
+RUN dotnet restore src/Fixar.API/Fixar.API.csproj
 
 COPY src/ src/
 RUN dotnet publish src/Fixar.API/Fixar.API.csproj -c Release -o /app/publish --no-restore
