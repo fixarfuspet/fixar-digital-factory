@@ -63,11 +63,7 @@ cd apps/api
 dotnet user-secrets init --project src/Fixar.API
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=fixar_os_dev;Username=postgres;Password=postgres" --project src/Fixar.API
 
-# 2. Apply the included InitialCreate migration:
-dotnet tool install --global dotnet-ef
-dotnet ef database update --project src/Fixar.Infrastructure --startup-project src/Fixar.API
-
-# 3. Run:
+# 2. Run (pending migrations are applied automatically before the API starts):
 dotnet run --project src/Fixar.API
 ```
 
@@ -90,14 +86,9 @@ docker compose up --build
 
 This starts PostgreSQL, [Seq](https://datalust.co/seq) (structured log viewer, UI at
 `http://localhost:8081`), and the API (`http://localhost:8080`). The API container runs
-`ASPNETCORE_ENVIRONMENT=Production` by default — automatic migration-on-startup is
-intentionally **disabled** in Production (see below), so run migrations separately:
-
-```bash
-docker compose exec api dotnet ef database update --project src/Fixar.Infrastructure --startup-project src/Fixar.API
-```
-
-(or bake the migration bundle into your CI/CD pipeline — see "Production notes" below).
+`ASPNETCORE_ENVIRONMENT=Production` by default. On every startup, the API waits for
+PostgreSQL, applies all pending migrations, seeds the fixed RBAC roles, and only then begins
+accepting requests. A migration failure stops startup so an outdated schema is never served.
 
 ## Configuration
 
@@ -110,10 +101,10 @@ purpose; the app fails fast at startup if `Jwt:Secret` is missing.
 
 ## Production notes
 
-- **Migrations are not applied automatically outside Development.** Run
-  `dotnet ef database update` (or a migration bundle: `dotnet ef migrations bundle`) as an
-  explicit CI/CD step before/during deployment, so schema changes are reviewed and don't
-  race multiple API replicas on startup.
+- **Migrations are applied automatically in every environment before request handling
+  starts.** Database changes must remain backward compatible during rolling deployments.
+  Review generated migrations before release and avoid starting multiple replicas
+  simultaneously while a long-running migration is in progress.
 - **Swagger is only enabled in Development.** Enable it for staging by adjusting the
   `IsDevelopment()` check in `Program.cs` if needed, ideally behind authentication.
 - Rotate `Jwt:Secret` per environment and store it in a secret manager, not in

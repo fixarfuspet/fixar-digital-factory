@@ -6,9 +6,8 @@ using Microsoft.Extensions.Logging;
 namespace Fixar.Infrastructure.Persistence;
 
 /// <summary>
-/// Applies pending migrations and seeds the fixed RBAC role list. Intended
-/// to run once at startup in Development; in Production, migrations
-/// should instead be applied via CI/CD (see apps/api/README.md).
+/// Applies pending migrations and seeds the fixed RBAC role list during
+/// application startup, before the API begins accepting requests.
 /// </summary>
 public class ApplicationDbContextInitialiser
 {

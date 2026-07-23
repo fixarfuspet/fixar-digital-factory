@@ -29,13 +29,14 @@ try
 
     var app = builder.Build();
 
+    await app.InitialiseDatabaseAsync();
+
     if (app.Environment.IsDevelopment())
     {
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FIXAR_DEV_TEST_PASSWORD")))
         {
             using var scope = app.Services.CreateScope();
             var initialiser = scope.ServiceProvider.GetRequiredService<Fixar.Infrastructure.Persistence.ApplicationDbContextInitialiser>();
-            await initialiser.SeedAsync();
             await initialiser.SeedDevelopmentTestUsersAsync();
         }
         app.UseSwaggerDocumentation();
