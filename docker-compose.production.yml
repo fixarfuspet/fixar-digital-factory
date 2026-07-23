@@ -32,6 +32,10 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-FixarOS}
       Jwt__Audience: ${JWT_AUDIENCE:-FixarOSClients}
       Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN:?required}
+      BootstrapAdmin__Email: ${FIXAR_ADMIN_EMAIL:?required}
+      BootstrapAdmin__Password: ${FIXAR_ADMIN_PASSWORD:?required}
+      BootstrapAdmin__FirstName: ${FIXAR_ADMIN_FIRST_NAME:-FIXAR}
+      BootstrapAdmin__LastName: ${FIXAR_ADMIN_LAST_NAME:-Administrator}
     depends_on:
       postgres: {condition: service_healthy}
     networks: [data, app]

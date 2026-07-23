@@ -1,6 +1,8 @@
 using Fixar.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Fixar.Infrastructure.Persistence;
@@ -15,24 +17,48 @@ public class ApplicationDbContextInitialiser
     private readonly ApplicationDbContext _context;
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IConfiguration _configuration;
+    private readonly IHostEnvironment _environment;
 
     public ApplicationDbContextInitialiser(
         ILogger<ApplicationDbContextInitialiser> logger,
         ApplicationDbContext context,
         RoleManager<ApplicationRole> roleManager,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         _logger = logger;
         _context = context;
         _roleManager = roleManager;
         _userManager = userManager;
+        _configuration = configuration;
+        _environment = environment;
     }
 
     public async Task MigrateAsync()
     {
         try
         {
+            var connection = _context.Database.GetDbConnection();
+            _logger.LogInformation(
+                "Applying database migrations to {Database} on {DataSource}",
+                connection.Database,
+                connection.DataSource);
+
             await _context.Database.MigrateAsync();
+
+            var pendingMigrations = (await _context.Database.GetPendingMigrationsAsync()).ToArray();
+            if (pendingMigrations.Length > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Database migration did not complete. Pending migrations: {string.Join(", ", pendingMigrations)}");
+            }
+
+            var appliedMigrationCount = (await _context.Database.GetAppliedMigrationsAsync()).Count();
+            _logger.LogInformation(
+                "Database migration completed successfully; {AppliedMigrationCount} migrations are applied",
+                appliedMigrationCount);
         }
         catch (Exception ex)
         {
@@ -49,9 +75,13 @@ public class ApplicationDbContextInitialiser
             {
                 if (!await _roleManager.RoleExistsAsync(roleName))
                 {
-                    await _roleManager.CreateAsync(new ApplicationRole(roleName));
+                    EnsureSucceeded(
+                        await _roleManager.CreateAsync(new ApplicationRole(roleName)),
+                        $"Role '{roleName}' could not be created");
                 }
             }
+
+            await SeedBootstrapAdminAsync();
         }
         catch (Exception ex)
         {
@@ -96,5 +126,77 @@ public class ApplicationDbContextInitialiser
             if (!currentRoles.Contains(definition.Role)) await _userManager.AddToRoleAsync(user, definition.Role);
         }
         _logger.LogInformation("Development test users are ready (password not logged).");
+    }
+
+    private async Task SeedBootstrapAdminAsync()
+    {
+        var email = _configuration["BootstrapAdmin:Email"]?.Trim();
+        var password = _configuration["BootstrapAdmin:Password"];
+        var firstName = _configuration["BootstrapAdmin:FirstName"]?.Trim();
+        var lastName = _configuration["BootstrapAdmin:LastName"]?.Trim();
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            if (_environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "BootstrapAdmin:Email and BootstrapAdmin:Password must be configured in Production.");
+            }
+
+            _logger.LogInformation("Bootstrap admin seed skipped because it is not configured.");
+            return;
+        }
+
+        var admin = await _userManager.FindByEmailAsync(email);
+        if (admin is null)
+        {
+            admin = new ApplicationUser
+            {
+                Id = Guid.NewGuid(),
+                UserName = email,
+                Email = email,
+                FirstName = string.IsNullOrWhiteSpace(firstName) ? "FIXAR" : firstName,
+                LastName = string.IsNullOrWhiteSpace(lastName) ? "Administrator" : lastName,
+                EmailConfirmed = true,
+                IsActive = true
+            };
+
+            EnsureSucceeded(
+                await _userManager.CreateAsync(admin, password),
+                "Bootstrap admin user could not be created");
+        }
+        else
+        {
+            admin.UserName = email;
+            admin.Email = email;
+            admin.EmailConfirmed = true;
+            admin.IsActive = true;
+            if (!string.IsNullOrWhiteSpace(firstName)) admin.FirstName = firstName;
+            if (!string.IsNullOrWhiteSpace(lastName)) admin.LastName = lastName;
+
+            EnsureSucceeded(await _userManager.UpdateAsync(admin), "Bootstrap admin user could not be updated");
+
+            var passwordToken = await _userManager.GeneratePasswordResetTokenAsync(admin);
+            EnsureSucceeded(
+                await _userManager.ResetPasswordAsync(admin, passwordToken, password),
+                "Bootstrap admin password could not be synchronized");
+        }
+
+        if (!await _userManager.IsInRoleAsync(admin, RoleNames.CEO))
+        {
+            EnsureSucceeded(
+                await _userManager.AddToRoleAsync(admin, RoleNames.CEO),
+                "Bootstrap admin CEO role could not be assigned");
+        }
+
+        _logger.LogInformation("Bootstrap admin {AdminEmail} is active and ready", email);
+    }
+
+    private static void EnsureSucceeded(IdentityResult result, string message)
+    {
+        if (result.Succeeded) return;
+
+        var errors = string.Join("; ", result.Errors.Select(error => $"{error.Code}: {error.Description}"));
+        throw new InvalidOperationException($"{message}. {errors}");
     }
 }

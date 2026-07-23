@@ -47,6 +47,10 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:-FixarOS}
       Jwt__Audience: ${JWT_AUDIENCE:-FixarOSClients}
       Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN:-http://localhost:3000}
+      BootstrapAdmin__Email: ${FIXAR_ADMIN_EMAIL:?FIXAR_ADMIN_EMAIL is required}
+      BootstrapAdmin__Password: ${FIXAR_ADMIN_PASSWORD:?FIXAR_ADMIN_PASSWORD is required}
+      BootstrapAdmin__FirstName: ${FIXAR_ADMIN_FIRST_NAME:-FIXAR}
+      BootstrapAdmin__LastName: ${FIXAR_ADMIN_LAST_NAME:-Administrator}
       Serilog__WriteTo__2__Name: Seq
       Serilog__WriteTo__2__Args__serverUrl: "http://seq:5341"
     ports:

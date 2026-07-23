@@ -88,13 +88,15 @@ This starts PostgreSQL, [Seq](https://datalust.co/seq) (structured log viewer, U
 `http://localhost:8081`), and the API (`http://localhost:8080`). The API container runs
 `ASPNETCORE_ENVIRONMENT=Production` by default. On every startup, the API waits for
 PostgreSQL, applies all pending migrations, seeds the fixed RBAC roles, and only then begins
-accepting requests. A migration failure stops startup so an outdated schema is never served.
+accepting requests. A migration or seed failure stops startup with a non-zero exit code so an
+outdated schema is never served. `FIXAR_ADMIN_EMAIL` and `FIXAR_ADMIN_PASSWORD` are required
+by Compose; the configured account is synchronized as an active `CEO` bootstrap admin.
 
 ## Configuration
 
 All settings can be overridden via environment variables using the standard ASP.NET Core
 double-underscore convention, e.g. `ConnectionStrings__DefaultConnection`, `Jwt__Secret`,
-`Cors__AllowedOrigins__0`. Never commit real secrets — `appsettings.Development.json`
+`Cors__AllowedOrigins__0`, `BootstrapAdmin__Email`, and `BootstrapAdmin__Password`. Never commit real secrets — `appsettings.Development.json`
 contains a placeholder JWT secret for local use only, and `appsettings.json` /
 `appsettings.Production.json` leave `Jwt:Secret` and the connection string empty on
 purpose; the app fails fast at startup if `Jwt:Secret` is missing.

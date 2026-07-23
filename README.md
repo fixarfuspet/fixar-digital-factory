@@ -39,7 +39,10 @@ dotnet ef database update \
   --startup-project apps/api/src/Fixar.API/Fixar.API.csproj
 ```
 
-Production migrationları uygulama başlangıcında otomatik çalışmaz; deployment öncesi yedek ve migration SQL incelemesinden sonra ayrı adımda uygulanmalıdır.
+Production dahil tüm ortamlarda bekleyen migrationlar Kestrel başlamadan önce otomatik uygulanır.
+Migration veya başlangıç seed'i başarısız olursa API non-zero kodla kapanır. Production'da
+`BootstrapAdmin__Email` ve `BootstrapAdmin__Password` zorunludur; Docker Compose bunları
+`.env.production` içindeki `FIXAR_ADMIN_EMAIL` ve `FIXAR_ADMIN_PASSWORD` değerlerinden geçirir.
 
 ## Doğrulama
 
@@ -57,7 +60,7 @@ npm run test:smoke
 
 ## Production notları
 
-- `ConnectionStrings__DefaultConnection`, `Jwt__Secret` ve CORS originleri secret/config yönetiminden gelmelidir.
+- `ConnectionStrings__DefaultConnection`, `Jwt__Secret`, bootstrap admin parolası ve CORS originleri secret/config yönetiminden gelmelidir.
 - Reverse proxy HTTPS sonlandırması, trusted proxy listesi ve backup/restore politikası deployment ortamında açıkça tanımlanmalıdır.
 - PostgreSQL yedek/restore runbook'u henüz depoda bulunmuyor; doğrulanmadan canlıya çıkılmamalıdır.
 - Ayrıntılı mevcut durum ve kalan riskler: `docs/SYSTEM_AUDIT_2026-07-22.md`.

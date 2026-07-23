@@ -63,6 +63,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "FIXAR OS API terminated unexpectedly");
+    Environment.ExitCode = 1;
 }
 finally
 {
