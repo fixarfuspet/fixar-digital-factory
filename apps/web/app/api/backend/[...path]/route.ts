@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ACCESS_TOKEN_COOKIE, getApiBaseUrl } from "@/app/lib/auth/constants";
 import { isSameOriginRequest } from "@/app/lib/security/origin";
@@ -22,8 +21,10 @@ async function proxy(request: NextRequest, context: Context) {
 
   const { path } = await context.params;
 
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
+  // Use the cookie attached to this exact proxy request. This is the same
+  // source used by proxy.ts and avoids relying on any browser Authorization
+  // header or an ambient cookie store.
+  const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
 
   if (!accessToken) {
     return NextResponse.json(
