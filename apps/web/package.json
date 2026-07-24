@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:auth-proxy": "node scripts/auth-proxy-integration.mjs",
+    "test:auth-production": "node scripts/production-auth-integration.mjs",
     "test:smoke": "node scripts/route-smoke.mjs"
   },
   "dependencies": {

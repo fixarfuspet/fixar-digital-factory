@@ -7,10 +7,12 @@ using Fixar.Infrastructure.Persistence.Interceptors;
 using Fixar.Infrastructure.Persistence.Repositories;
 using Fixar.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Fixar.Infrastructure;
@@ -72,6 +74,22 @@ public static class DependencyInjection
                     ValidAudience = jwtSettings.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
                     ClockSkew = TimeSpan.FromMinutes(1)
+                };
+                options.Events = new JwtBearerEvents
+                {
+                    OnAuthenticationFailed = context =>
+                    {
+                        LogJwtFailure(context.HttpContext, context.Exception.GetType().Name);
+                        return Task.CompletedTask;
+                    },
+                    OnChallenge = context =>
+                    {
+                        if (!context.HttpContext.User.Identity?.IsAuthenticated ?? true)
+                        {
+                            LogJwtFailure(context.HttpContext, "Challenge");
+                        }
+                        return Task.CompletedTask;
+                    }
                 };
             });
 
@@ -146,5 +164,24 @@ public static class DependencyInjection
             .AddNpgSql(connectionString, name: "postgresql", tags: new[] { "ready" });
 
         return services;
+    }
+
+    private static void LogJwtFailure(HttpContext context, string reason)
+    {
+        var authorization = context.Request.Headers.Authorization.ToString();
+        var token = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authorization["Bearer ".Length..].Trim()
+            : string.Empty;
+        var logger = context.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Fixar.Authentication");
+
+        logger.LogWarning(
+            "JWT authentication failed. Path={Path} Reason={Reason} BearerPresent={BearerPresent} TokenLength={TokenLength} DotCount={DotCount}",
+            context.Request.Path,
+            reason,
+            token.Length > 0,
+            token.Length,
+            token.Count(character => character == '.'));
     }
 }
